@@ -1,0 +1,282 @@
+/*
+ * Copyright (C) 2015-2026 Philip Helger (www.helger.com)
+ * philip[at]helger[dot]com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.helger.phoss.ap.db;
+
+import java.time.OffsetDateTime;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+import com.helger.annotation.Nonnegative;
+import com.helger.base.enforce.ValueEnforcer;
+import com.helger.base.state.ESuccess;
+import com.helger.collection.commons.CommonsArrayList;
+import com.helger.collection.commons.ICommonsList;
+import com.helger.db.jdbc.callback.ConstantPreparedStatementDataProvider;
+import com.helger.db.jdbc.executor.DBExecutor;
+import com.helger.db.jdbc.executor.DBResultRow;
+import com.helger.peppol.mls.EPeppolMLSResponseCode;
+import com.helger.peppol.sbdh.EPeppolMLSType;
+import com.helger.phoss.ap.api.IInboundTransaction;
+import com.helger.phoss.ap.api.IInboundTransactionManager;
+import com.helger.phoss.ap.api.codelist.EInboundStatus;
+import com.helger.phoss.ap.api.codelist.EReportingStatus;
+import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
+import com.helger.phoss.ap.db.dto.InboundTransactionRow;
+
+public class InboundTransactionManagerJDBC extends AbstractAPJDBCManager implements IInboundTransactionManager
+{
+  private static final String COLS = "id, incoming_id, c2_seat_id, c3_seat_id, signing_cert_cn," +
+                                     " sender_id, receiver_id, doc_type_id, process_id," +
+                                     " document_bytes, document_size, document_hash," +
+                                     " as4_message_id, as4_timestamp, sbdh_instance_id," +
+                                     " c4_country_code, is_duplicate_as4, is_duplicate_sbdh," +
+                                     " status, attempt_count, received_dt, completed_dt," +
+                                     " reporting_status, next_retry_dt, error_details," +
+                                     " mls_to, mls_type, mls_response_code, mls_outbound_transaction_id";
+
+  public InboundTransactionManagerJDBC (@NonNull final IAPTimestampManager aTimestampMgr)
+  {
+    super (aTimestampMgr);
+  }
+
+  @NonNull
+  public IInboundTransaction create (@NonNull final String sIncomingID,
+                                     @NonNull final String sC2SeatID,
+                                     @NonNull final String sC3SeatID,
+                                     @NonNull final String sSigningCertCN,
+                                     @NonNull final String sSenderID,
+                                     @NonNull final String sReceiverID,
+                                     @NonNull final String sDocTypeID,
+                                     @NonNull final String sProcessID,
+                                     final byte @NonNull [] aDocumentBytes,
+                                     @Nonnegative final long nDocumentSize,
+                                     @NonNull final String sDocumentHash,
+                                     @NonNull final String sAS4MessageID,
+                                     @NonNull final OffsetDateTime aAS4Timestamp,
+                                     @NonNull final String sSbdhInstanceID,
+                                     final boolean bIsDuplicateAS4,
+                                     final boolean bIsDuplicateSBDH,
+                                     @Nullable final String sMlsTo,
+                                     @NonNull final EPeppolMLSType eMlsType)
+  {
+    final String sID = createUniqueRowID ();
+    final OffsetDateTime aNow = now ();
+
+    final DBExecutor aExecutor = newExecutor ();
+    aExecutor.insertOrUpdateOrDelete ("INSERT INTO inbound_transaction (" +
+                                      COLS +
+                                      ")" +
+                                      " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                      new ConstantPreparedStatementDataProvider (sID,
+                                                                                 sIncomingID,
+                                                                                 sC2SeatID,
+                                                                                 sC3SeatID,
+                                                                                 sSigningCertCN,
+                                                                                 sSenderID,
+                                                                                 sReceiverID,
+                                                                                 sDocTypeID,
+                                                                                 sProcessID,
+                                                                                 aDocumentBytes,
+                                                                                 Long.valueOf (nDocumentSize),
+                                                                                 sDocumentHash,
+                                                                                 sAS4MessageID,
+                                                                                 aAS4Timestamp,
+                                                                                 sSbdhInstanceID,
+                                                                                 null,
+                                                                                 Boolean.valueOf (bIsDuplicateAS4),
+                                                                                 Boolean.valueOf (bIsDuplicateSBDH),
+                                                                                 EInboundStatus.RECEIVED.getID (),
+                                                                                 Integer.valueOf (0),
+                                                                                 aNow,
+                                                                                 null,
+                                                                                 EReportingStatus.PENDING.getID (),
+                                                                                 null,
+                                                                                 null,
+                                                                                 sMlsTo,
+                                                                                 eMlsType.getID (),
+                                                                                 null,
+                                                                                 null));
+
+    return getByID (sID);
+  }
+
+  @Nullable
+  public IInboundTransaction getByID (@NonNull final String sID)
+  {
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM inbound_transaction" +
+                                                                      " WHERE id=?",
+                                                                      new ConstantPreparedStatementDataProvider (sID));
+    if (aRows != null && aRows.size () == 1)
+      return new InboundTransactionRow (aRows.getFirstOrNull ());
+    return null;
+  }
+
+  @Nullable
+  public IInboundTransaction getBySbdhInstanceID (@NonNull final String sSbdhInstanceID)
+  {
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM inbound_transaction" +
+                                                                      " WHERE sbdh_instance_id=?",
+                                                                      new ConstantPreparedStatementDataProvider (sSbdhInstanceID));
+    if (aRows != null && aRows.size () == 1)
+      return new InboundTransactionRow (aRows.getFirstOrNull ());
+    return null;
+  }
+
+  @Nullable
+  public IInboundTransaction getByAS4MessageID (@NonNull final String sAS4MessageID)
+  {
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM inbound_transaction" +
+                                                                      " WHERE as4_message_id=?",
+                                                                      new ConstantPreparedStatementDataProvider (sAS4MessageID));
+    if (aRows != null && aRows.size () == 1)
+      return new InboundTransactionRow (aRows.getFirstOrNull ());
+    return null;
+  }
+
+  @NonNull
+  public ESuccess updateStatus (@NonNull final String sID, @NonNull final EInboundStatus eStatus)
+  {
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE inbound_transaction" +
+                                                                      " SET status=?" +
+                                                                      " WHERE id=?",
+                                                                      new ConstantPreparedStatementDataProvider (eStatus.getID (),
+                                                                                                                 sID));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  @NonNull
+  public ESuccess updateStatusAndRetry (@NonNull final String sID,
+                                        @NonNull final EInboundStatus eStatus,
+                                        @Nonnegative final int nAttemptCount,
+                                        @Nullable final OffsetDateTime aNextRetryDT,
+                                        @Nullable final String sErrorDetails)
+  {
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE inbound_transaction" +
+                                                                      " SET status=?, attempt_count=?, next_retry_dt=?, error_details=?" +
+                                                                      " WHERE id=?",
+                                                                      new ConstantPreparedStatementDataProvider (eStatus.getID (),
+                                                                                                                 Integer.valueOf (nAttemptCount),
+                                                                                                                 aNextRetryDT,
+                                                                                                                 sErrorDetails,
+                                                                                                                 sID));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  @NonNull
+  public ESuccess updateStatusCompleted (@NonNull final String sID, @NonNull final EInboundStatus eStatus)
+  {
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE inbound_transaction" +
+                                                                      " SET status=?, completed_dt=?" +
+                                                                      " WHERE id=?",
+                                                                      new ConstantPreparedStatementDataProvider (eStatus.getID (),
+                                                                                                                 now (),
+                                                                                                                 sID));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  @NonNull
+  public ESuccess updateC4CountryCode (@NonNull final String sID, @NonNull final String sC4CountryCode)
+  {
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE inbound_transaction" +
+                                                                      " SET c4_country_code=?" +
+                                                                      " WHERE id=?",
+                                                                      new ConstantPreparedStatementDataProvider (sC4CountryCode,
+                                                                                                                 sID));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  @NonNull
+  public ESuccess updateMlsFields (@NonNull final String sID,
+                                   @Nullable final EPeppolMLSResponseCode eMlsResponseCode,
+                                   @Nullable final String sMlsOutboundTransactionID)
+  {
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE inbound_transaction" +
+                                                                      " SET mls_response_code=?, mls_outbound_transaction_id=?" +
+                                                                      " WHERE id=?",
+                                                                      new ConstantPreparedStatementDataProvider (eMlsResponseCode != null ? eMlsResponseCode.getID ()
+                                                                                                                                          : null,
+                                                                                                                 sMlsOutboundTransactionID,
+                                                                                                                 sID));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  @NonNull
+  public ICommonsList <IInboundTransaction> getAllInProcessing ()
+  {
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM inbound_transaction" +
+                                                                      " WHERE status IN (?,?,?)",
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.RECEIVED.getID (),
+                                                                                                                 EInboundStatus.FORWARDING.getID (),
+                                                                                                                 EInboundStatus.FORWARD_FAILED.getID ()));
+    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
+    if (aRows != null)
+      for (final DBResultRow aRow : aRows)
+        ret.add (new InboundTransactionRow (aRow));
+    return ret;
+  }
+
+  @NonNull
+  public ICommonsList <IInboundTransaction> getAllForRetry (@Nonnegative final int nBatchSize)
+  {
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM inbound_transaction" +
+                                                                      " WHERE status=? AND next_retry_dt <= NOW()" +
+                                                                      " ORDER BY next_retry_dt" +
+                                                                      " LIMIT " +
+                                                                      nBatchSize +
+                                                                      " FOR UPDATE SKIP LOCKED",
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARD_FAILED.getID ()));
+    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
+    if (aRows != null)
+      for (final DBResultRow aRow : aRows)
+        ret.add (new InboundTransactionRow (aRow));
+    return ret;
+  }
+
+  @NonNull
+  public ICommonsList <IInboundTransaction> getAllForArchival (@Nonnegative final int nBatchSize)
+  {
+    ValueEnforcer.isGT0 (nBatchSize, "BatchSize");
+
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM inbound_transaction" +
+                                                                      " WHERE status IN (?,?) AND reporting_status=?" +
+                                                                      " ORDER BY completed_dt" +
+                                                                      " LIMIT " +
+                                                                      nBatchSize +
+                                                                      " FOR UPDATE SKIP LOCKED",
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARDED.getID (),
+                                                                                                                 EInboundStatus.PERMANENTLY_FAILED.getID (),
+                                                                                                                 EReportingStatus.REPORTED.getID ()));
+    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
+    if (aRows != null)
+      for (final DBResultRow aRow : aRows)
+        ret.add (new InboundTransactionRow (aRow));
+    return ret;
+  }
+}
