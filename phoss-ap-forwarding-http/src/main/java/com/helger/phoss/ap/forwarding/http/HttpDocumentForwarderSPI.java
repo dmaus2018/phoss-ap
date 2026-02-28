@@ -60,7 +60,7 @@ public class HttpDocumentForwarderSPI implements IDocumentForwarderSPI
 
   public void initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
   {
-    m_eHttpMode = EHttpMode.getFromIDOrNull (aConfig.getAsString (APConfigurationProperties.FORWARDING_HTTP_ENDPOINT));
+    m_eHttpMode = EHttpMode.getFromIDOrNull (aConfig.getAsString (APConfigurationProperties.FORWARDING_HTTP_MODE));
     if (m_eHttpMode == null)
       throw new InitializationException ("The provided forwarding HTTP mode is invalid. Must be one of " +
                                          new CommonsArrayList <> (EHttpMode.values (), EHttpMode::getID));

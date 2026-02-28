@@ -26,6 +26,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import com.helger.db.api.EDatabaseSystemType;
+import com.helger.db.api.config.JdbcConfiguration;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 import com.helger.scope.mock.ScopeTestRule;
@@ -55,7 +56,7 @@ public final class APJdbcConfigurationTest
 
     // Boolean / numeric properties return their defined defaults
     assertTrue (aJdbcConfig.isJdbcExecutionTimeWarningEnabled ());
-    assertEquals (APConfigurationProperties.JDBC_EXECUTION_TIME_WARNING_MS_DEFAULT,
+    assertEquals (JdbcConfiguration.DEFAULT_EXECUTION_DURATION_WARN_MS,
                   aJdbcConfig.getJdbcExecutionTimeWarningMilliseconds ());
 
     assertFalse (aJdbcConfig.isJdbcDebugConnections ());
@@ -77,11 +78,6 @@ public final class APJdbcConfigurationTest
   @Test
   public void testDefaultConstantsValues ()
   {
-    assertEquals (1000L, APConfigurationProperties.JDBC_EXECUTION_TIME_WARNING_MS_DEFAULT);
-    assertTrue (APConfigurationProperties.JDBC_EXECUTION_TIME_WARNING_ENABLED_DEFAULT);
-    assertFalse (APConfigurationProperties.JDBC_DEBUG_CONNECTIONS_DEFAULT);
-    assertFalse (APConfigurationProperties.JDBC_DEBUG_TRANSACTIONS_DEFAULT);
-    assertFalse (APConfigurationProperties.JDBC_DEBUG_SQL_DEFAULT);
     assertEquals (8, APConfigurationProperties.JDBC_POOLING_MAX_CONNECTIONS_DEFAULT);
     assertEquals (10_000L, APConfigurationProperties.JDBC_POOLING_MAX_WAIT_MILLIS_DEFAULT);
     assertEquals (300_000L, APConfigurationProperties.JDBC_POOLING_BETWEEN_EVICTIONS_RUNS_MILLIS_DEFAULT);

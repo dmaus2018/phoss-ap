@@ -43,24 +43,6 @@ public final class APConfigurationProperties
   public static final String PHASE4_API_REQUIREDTOKEN = "phase4.api.requiredtoken";
   public static final String PHASE4_DUMP_PATH = "phase4.dump.path";
 
-  // Database
-  public static final String JDBC_DATABASE_TYPE = "jdbc.database-type";
-  public static final String JDBC_DRIVER = "jdbc.driver";
-  public static final String JDBC_URL = "jdbc.url";
-  public static final String JDBC_USER = "jdbc.user";
-  public static final String JDBC_PASSWORD = "jdbc.password";
-  public static final String JDBC_SCHEMA = "jdbc.schema";
-  public static final String JDBC_EXECUTION_TIME_WARNING_ENABLED = "jdbc.execution-time-warning.enabled";
-  public static final boolean JDBC_EXECUTION_TIME_WARNING_ENABLED_DEFAULT = true;
-  public static final String JDBC_EXECUTION_TIME_WARNING_MS = "jdbc.execution-time-warning.ms";
-  public static final long JDBC_EXECUTION_TIME_WARNING_MS_DEFAULT = 1000L;
-  public static final String JDBC_DEBUG_CONNECTIONS = "jdbc.debug.connections";
-  public static final boolean JDBC_DEBUG_CONNECTIONS_DEFAULT = false;
-  public static final String JDBC_DEBUG_TRANSACTIONS = "jdbc.debug.transactions";
-  public static final boolean JDBC_DEBUG_TRANSACTIONS_DEFAULT = false;
-  public static final String JDBC_DEBUG_SQL = "jdbc.debug.sql";
-  public static final boolean JDBC_DEBUG_SQL_DEFAULT = false;
-
   // Connection pooling
   public static final String JDBC_POOLING_MAX_CONNECTIONS = "pooling.max-connections";
   public static final int JDBC_POOLING_MAX_CONNECTIONS_DEFAULT = 8;

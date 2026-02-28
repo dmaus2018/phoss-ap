@@ -66,7 +66,6 @@ public final class APConfigurationPropertiesTest
   public void testSpecificKeys ()
   {
     assertEquals ("peppol.seatid", APConfigurationProperties.PEPPOL_SEATID);
-    assertEquals ("jdbc.url", APConfigurationProperties.JDBC_URL);
     assertEquals ("retry.sending.max-attempts", APConfigurationProperties.RETRY_SENDING_MAX_ATTEMPTS);
     assertEquals ("mls.type", APConfigurationProperties.MLS_TYPE);
   }
