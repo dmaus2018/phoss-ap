@@ -22,10 +22,9 @@ import org.jspecify.annotations.Nullable;
 import com.helger.annotation.style.IsSPIInterface;
 
 /**
- * SPI interface for receiving notifications about permanent processing
- * failures. Implementations are loaded via {@link java.util.ServiceLoader}.
- * Multiple handlers may be registered. Concrete implementations are
- * deployment-specific (e.g., email, Slack, monitoring system webhook).
+ * SPI interface for receiving notifications about permanent processing failures. Implementations
+ * are loaded via {@link java.util.ServiceLoader}. Multiple handlers may be registered. Concrete
+ * implementations are deployment-specific (e.g., email, Slack, monitoring system webhook).
  *
  * @author Philip Helger
  */
@@ -33,8 +32,7 @@ import com.helger.annotation.style.IsSPIInterface;
 public interface INotificationHandlerSPI
 {
   /**
-   * Called when an outbound or inbound document fails optional verification and
-   * is rejected.
+   * Called when an outbound or inbound document fails optional verification and is rejected.
    *
    * @param sTransactionID
    *        The transaction ID. Never <code>null</code>.
@@ -43,13 +41,12 @@ public interface INotificationHandlerSPI
    * @param sErrorDetails
    *        Optional error details. May be <code>null</code>.
    */
-  void onVerificationRejection (@NonNull String sTransactionID,
-                                @NonNull String sSbdhInstanceID,
-                                @Nullable String sErrorDetails);
+  void onInboundVerificationRejection (@NonNull String sTransactionID,
+                                       @NonNull String sSbdhInstanceID,
+                                       @Nullable String sErrorDetails);
 
   /**
-   * Called when an outbound transaction permanently fails after exhausting all
-   * sending retries.
+   * Called when an outbound transaction permanently fails after exhausting all sending retries.
    *
    * @param sTransactionID
    *        The transaction ID. Never <code>null</code>.
@@ -63,8 +60,7 @@ public interface INotificationHandlerSPI
                                   @Nullable String sErrorDetails);
 
   /**
-   * Called when an inbound transaction permanently fails after exhausting all
-   * forwarding retries.
+   * Called when an inbound transaction permanently fails after exhausting all forwarding retries.
    *
    * @param sTransactionID
    *        The transaction ID. Never <code>null</code>.

@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.ServiceLoader;
 
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +33,7 @@ import com.helger.phoss.ap.api.spi.IDocumentForwarderSPI;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.INotificationHandlerSPI;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
-import com.helger.phoss.ap.api.spi.IReceiverCheckSPI;
+import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
 
 public final class APMetaManager
 {
@@ -43,7 +42,7 @@ public final class APMetaManager
   private static IDocumentForwarderSPI s_aForwarder;
   private static final ICommonsList <IInboundDocumentVerifierSPI> s_aInboundVerifiers = new CommonsArrayList <> ();
   private static final ICommonsList <IOutboundDocumentVerifierSPI> s_aOutboundVerifiers = new CommonsArrayList <> ();
-  private static final ICommonsList <IReceiverCheckSPI> s_aReceiverChecks = new CommonsArrayList <> ();
+  private static final ICommonsList <IPeppolReceiverCheckSPI> s_aReceiverChecks = new CommonsArrayList <> ();
   private static final ICommonsList <INotificationHandlerSPI> s_aNotificationHandlers = new CommonsArrayList <> ();
 
   private APMetaManager ()
@@ -81,7 +80,7 @@ public final class APMetaManager
       LOGGER.info ("Loaded outbound document verifier: " + aVerifier.getClass ().getName ());
     }
 
-    for (final IReceiverCheckSPI aCheck : ServiceLoader.load (IReceiverCheckSPI.class))
+    for (final IPeppolReceiverCheckSPI aCheck : ServiceLoader.load (IPeppolReceiverCheckSPI.class))
     {
       s_aReceiverChecks.add (aCheck);
       LOGGER.info ("Loaded receiver check: " + aCheck.getClass ().getName ());
@@ -101,7 +100,7 @@ public final class APMetaManager
     LOGGER.info ("Shutting down APMetaManager");
   }
 
-  @Nullable
+  @NonNull
   public static IDocumentForwarderSPI getForwarder ()
   {
     return s_aForwarder;
@@ -123,7 +122,7 @@ public final class APMetaManager
 
   @NonNull
   @ReturnsMutableCopy
-  public static ICommonsList <IReceiverCheckSPI> getAllReceiverChecks ()
+  public static ICommonsList <IPeppolReceiverCheckSPI> getAllPeppolReceiverChecks ()
   {
     return s_aReceiverChecks.getClone ();
   }

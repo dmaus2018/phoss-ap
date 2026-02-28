@@ -37,7 +37,7 @@ import com.helger.phoss.ap.api.model.IInboundTransaction;
 public interface IInboundTransactionManager
 {
   /**
-   * Create a new inbound transaction.
+   * Create a new inbound transaction in state 'pending'.
    *
    * @param sIncomingID
    *        The phase4 Incoming ID. Never <code>null</code>.
@@ -108,6 +108,15 @@ public interface IInboundTransactionManager
   IInboundTransaction getByID (@NonNull String sID);
 
   /**
+   * Check if a transaction with the provided AS4 Message ID exists.
+   *
+   * @param sAS4MessageID
+   *        The AS4 Message ID. Never <code>null</code>.
+   * @return <code>true</code> if found, <code>false</code> otherwise.
+   */
+  boolean containsByAS4MessageID (@NonNull String sAS4MessageID);
+
+  /**
    * Look up a transaction by its AS4 Message ID.
    *
    * @param sAS4MessageID
@@ -116,6 +125,15 @@ public interface IInboundTransactionManager
    */
   @Nullable
   IInboundTransaction getByAS4MessageID (@NonNull String sAS4MessageID);
+
+  /**
+   * Check if a transaction with the provided SBDH Instance Identifier exists.
+   *
+   * @param sSbdhInstanceID
+   *        The SBDH Instance Identifier. Never <code>null</code>.
+   * @return <code>true</code> if found, <code>false</code> otherwise.
+   */
+  boolean containsBySbdhInstanceID (@NonNull String sSbdhInstanceID);
 
   /**
    * Look up a transaction by its SBDH Instance Identifier.
@@ -149,7 +167,7 @@ public interface IInboundTransactionManager
    * @param nAttemptCount
    *        The updated attempt count. Must be &ge; 0.
    * @param aNextRetryDT
-   *        The next retry date/time. May be <code>null</code>.
+   *        The next retry date/time. May be <code>null</code> if we're on permanently failed.
    * @param sErrorDetails
    *        Error details. May be <code>null</code>.
    * @return {@link ESuccess}

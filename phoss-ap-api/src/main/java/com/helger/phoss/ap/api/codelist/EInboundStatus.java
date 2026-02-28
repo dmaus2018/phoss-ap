@@ -57,6 +57,11 @@ public enum EInboundStatus implements IHasID <String>
     return m_sID;
   }
 
+  public boolean isFinalState ()
+  {
+    return this == FORWARDED || this == PERMANENTLY_FAILED;
+  }
+
   /**
    * Find the enum constant matching the given ID.
    *

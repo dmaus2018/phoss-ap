@@ -28,10 +28,13 @@ import org.unece.cefact.namespaces.sbdh.StandardBusinessDocument;
 import com.helger.http.header.HttpHeaderMap;
 import com.helger.peppol.sbdh.PeppolSBDHData;
 import com.helger.phase4.ebms3header.Ebms3UserMessage;
+import com.helger.phase4.error.AS4Error;
 import com.helger.phase4.error.AS4ErrorList;
 import com.helger.phase4.incoming.IAS4IncomingMessageMetadata;
 import com.helger.phase4.incoming.IAS4IncomingMessageState;
+import com.helger.phase4.model.error.EEbmsError;
 import com.helger.phase4.peppol.servlet.IPhase4PeppolIncomingSBDHandlerSPI;
+import com.helger.phoss.ap.api.CPhossAP;
 import com.helger.phoss.ap.api.IInboundForwardingAttemptManager;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EDuplicateDetectionMode;
@@ -40,122 +43,15 @@ import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.spi.ForwardingResult;
 import com.helger.phoss.ap.api.spi.IDocumentForwarderSPI;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
-import com.helger.phoss.ap.api.spi.IReceiverCheckSPI;
+import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
 import com.helger.phoss.ap.core.helper.HashHelper;
 import com.helger.phoss.ap.db.APMetaJDBCManager;
+import com.helger.security.certificate.CertificateHelper;
 
 public class InboundMessageProcessor implements IPhase4PeppolIncomingSBDHandlerSPI
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (InboundMessageProcessor.class);
-
-  public void handleIncomingSBD (@NonNull final IAS4IncomingMessageMetadata aMessageMetadata,
-                                 @NonNull final HttpHeaderMap aHeaders,
-                                 @NonNull final Ebms3UserMessage aUserMessage,
-                                 final byte @NonNull [] aSBDBytes,
-                                 @NonNull final StandardBusinessDocument aSBD,
-                                 @NonNull final PeppolSBDHData aPeppolSBD,
-                                 @NonNull final IAS4IncomingMessageState aState,
-                                 @NonNull final AS4ErrorList aProcessingErrorMessages) throws Exception
-  {
-    final IInboundTransactionManager aTxMgr = APMetaJDBCManager.getInboundTransactionMgr ();
-
-    final String sIncomingID = aMessageMetadata.getIncomingUniqueID ();
-    final String sAS4MessageID = aState.getMessageID ();
-    final String sSenderID = aPeppolSBD.getSenderAsIdentifier ().getURIEncoded ();
-    final String sReceiverID = aPeppolSBD.getReceiverAsIdentifier ().getURIEncoded ();
-    final String sDocTypeID = aPeppolSBD.getDocumentTypeAsIdentifier ().getURIEncoded ();
-    final String sProcessID = aPeppolSBD.getProcessAsIdentifier ().getURIEncoded ();
-    final String sSbdhInstanceID = aPeppolSBD.getInstanceIdentifier ();
-
-    LOGGER.info ("Received inbound SBD: SBDH=" + sSbdhInstanceID + " AS4=" + sAS4MessageID);
-
-    // Signing certificate CN
-    String sSigningCertCN = "";
-    final X509Certificate aSigningCert = aState.getSigningCertificate ();
-    if (aSigningCert != null)
-      sSigningCertCN = aSigningCert.getSubjectX500Principal ().getName ();
-
-    // Duplicate detection
-    boolean bIsDuplicateAS4 = false;
-    boolean bIsDuplicateSBDH = false;
-
-    if (aTxMgr.getByAS4MessageID (sAS4MessageID) != null)
-    {
-      bIsDuplicateAS4 = true;
-      if (APCoreConfig.getDuplicateDetectionAS4Mode () == EDuplicateDetectionMode.REJECT)
-      {
-        LOGGER.warn ("Rejecting duplicate AS4 message '" + sAS4MessageID + "'");
-        return;
-      }
-    }
-    if (aTxMgr.getBySbdhInstanceID (sSbdhInstanceID) != null)
-    {
-      bIsDuplicateSBDH = true;
-      if (APCoreConfig.getDuplicateDetectionSBDHMode () == EDuplicateDetectionMode.REJECT)
-      {
-        LOGGER.warn ("Rejecting duplicate SBDH instance '" + sSbdhInstanceID + "'");
-        return;
-      }
-    }
-
-    // Receiver check
-    for (final IReceiverCheckSPI aCheck : APMetaManager.getAllReceiverChecks ())
-    {
-      if (!aCheck.isReceiverServiced (sReceiverID, sDocTypeID, sProcessID))
-      {
-        LOGGER.warn ("Receiver not serviced '" + sReceiverID + "'");
-        return;
-      }
-    }
-
-    // Store in DB
-    final String sDocumentHash = HashHelper.sha256Hex (aSBDBytes);
-    final OffsetDateTime aAS4Timestamp = aState.getMessageTimestamp () != null ? aState.getMessageTimestamp ()
-                                                                                       .toOffsetDateTime ()
-                                                                               : APMetaJDBCManager.getTimestampMgr ()
-                                                                                                  .getCurrentDateTime ();
-
-    final String sTxID = aTxMgr.create (sIncomingID,
-                                        APCoreConfig.getPeppolSeatID () != null ? APCoreConfig.getPeppolSeatID () : "",
-                                        // TODO C3 seat ID
-                                        APCoreConfig.getPeppolSeatID () != null ? APCoreConfig.getPeppolSeatID () : "",
-                                        sSigningCertCN,
-                                        sSenderID,
-                                        sReceiverID,
-                                        sDocTypeID,
-                                        sProcessID,
-                                        aSBDBytes,
-                                        aSBDBytes.length,
-                                        sDocumentHash,
-                                        sAS4MessageID,
-                                        aAS4Timestamp,
-                                        sSbdhInstanceID,
-                                        bIsDuplicateAS4,
-                                        bIsDuplicateSBDH,
-                                        null,
-                                        APCoreConfig.getMlsType ());
-
-    // Optional verification
-    if (APCoreConfig.isVerificationInboundEnabled ())
-    {
-      for (final IInboundDocumentVerifierSPI aVerifier : APMetaManager.getAllInboundVerifiers ())
-      {
-        if (aVerifier.verifyDocument (aSBDBytes, sDocTypeID, sProcessID).isFailure ())
-        {
-          LOGGER.warn ("Inbound document verification failed for '" + sSbdhInstanceID + "'");
-          aTxMgr.updateStatus (sTxID, EInboundStatus.REJECTED);
-          for (final var aHandler : APMetaManager.getAllNotificationHandlers ())
-            aHandler.onVerificationRejection (sTxID, sSbdhInstanceID, "Verification failed");
-          return;
-        }
-      }
-    }
-
-    // Forward
-    final var aTx = aTxMgr.getByID (sTxID);
-    _forwardDocument (aTx);
-  }
 
   private void _forwardDocument (@Nullable final IInboundTransaction aTx)
   {
@@ -165,7 +61,7 @@ public class InboundMessageProcessor implements IPhase4PeppolIncomingSBDHandlerS
     final IDocumentForwarderSPI aForwarder = APMetaManager.getForwarder ();
     if (aForwarder == null)
     {
-      LOGGER.error ("No document forwarder configured");
+      LOGGER.error ("Internal error - No document forwarder configured");
       aTxMgr.updateStatus (aTx.getID (), EInboundStatus.PERMANENTLY_FAILED);
       return;
     }
@@ -174,7 +70,21 @@ public class InboundMessageProcessor implements IPhase4PeppolIncomingSBDHandlerS
     aTxMgr.updateStatus (aTx.getID (), EInboundStatus.FORWARDING);
 
     // Actual forwarding
-    final ForwardingResult aResult = aForwarder.forwardDocument (aTx);
+    ForwardingResult aResult;
+    try
+    {
+      aResult = aForwarder.forwardDocument (aTx);
+    }
+    catch (final Exception ex)
+    {
+      // Be resilient...
+      aResult = ForwardingResult.failure ("forward_exception",
+                                          "Internal error forwarding the document: " +
+                                                               ex.getMessage () +
+                                                               " (" +
+                                                               ex.getClass ().getName () +
+                                                               ")");
+    }
 
     if (aResult.isSuccess ())
     {
@@ -192,17 +102,22 @@ public class InboundMessageProcessor implements IPhase4PeppolIncomingSBDHandlerS
       final int nMaxRetryAttempts = APCoreConfig.getRetryForwardingMaxAttempts ();
       if (nNewAttemptCount >= nMaxRetryAttempts)
       {
+        // Maximum number of retries are exhausted - we go on "permanently failed"
         aTxMgr.updateStatusAndRetry (aTx.getID (),
                                      EInboundStatus.PERMANENTLY_FAILED,
                                      nNewAttemptCount,
                                      null,
-                                     "Max retries (" + nMaxRetryAttempts + ") exhausted: " + aResult.getErrorDetails ());
+                                     "Max retries (" +
+                                           nMaxRetryAttempts +
+                                           ") exhausted: " +
+                                           aResult.getErrorDetails ());
 
         for (final var aHandler : APMetaManager.getAllNotificationHandlers ())
           aHandler.onPermanentForwardingFailure (aTx.getID (), aTx.getSbdhInstanceID (), "Max retries exhausted");
       }
       else
       {
+        // Calculate the next retry and remember it
         final var aNextRetry = BackoffCalculator.calculateNextRetry (nNewAttemptCount,
                                                                      APCoreConfig.getRetryForwardingInitialBackoffMs (),
                                                                      APCoreConfig.getRetryForwardingBackoffMultiplier (),
@@ -214,6 +129,138 @@ public class InboundMessageProcessor implements IPhase4PeppolIncomingSBDHandlerS
                                      aResult.getErrorDetails ());
       }
     }
+  }
+
+  public void handleIncomingSBD (@NonNull final IAS4IncomingMessageMetadata aMessageMetadata,
+                                 @NonNull final HttpHeaderMap aHeaders,
+                                 @NonNull final Ebms3UserMessage aUserMessage,
+                                 final byte @NonNull [] aSBDBytes,
+                                 @NonNull final StandardBusinessDocument aSBD,
+                                 @NonNull final PeppolSBDHData aPeppolSBD,
+                                 @NonNull final IAS4IncomingMessageState aIncomingState,
+                                 @NonNull final AS4ErrorList aProcessingErrorMessages) throws Exception
+  {
+    final IInboundTransactionManager aTxMgr = APMetaJDBCManager.getInboundTransactionMgr ();
+
+    final String sIncomingID = aMessageMetadata.getIncomingUniqueID ();
+    final String sAS4MessageID = aIncomingState.getMessageID ();
+    final String sSenderID = aPeppolSBD.getSenderAsIdentifier ().getURIEncoded ();
+    final String sReceiverID = aPeppolSBD.getReceiverAsIdentifier ().getURIEncoded ();
+    final String sDocTypeID = aPeppolSBD.getDocumentTypeAsIdentifier ().getURIEncoded ();
+    final String sProcessID = aPeppolSBD.getProcessAsIdentifier ().getURIEncoded ();
+    final String sSbdhInstanceID = aPeppolSBD.getInstanceIdentifier ();
+    final String sC2ID = CertificateHelper.getSubjectCN (aIncomingState.getSigningCertificate ());
+    final String sC3ID = APCoreConfig.getPeppolSeatID ();
+
+    LOGGER.info ("Received inbound SBD: SBDH=" + sSbdhInstanceID + " AS4=" + sAS4MessageID);
+
+    // Signing certificate CN
+    String sSigningCertCN = "";
+    final X509Certificate aSigningCert = aIncomingState.getSigningCertificate ();
+    if (aSigningCert != null)
+      sSigningCertCN = aSigningCert.getSubjectX500Principal ().getName ();
+
+    // Duplicate detection
+    boolean bIsDuplicateAS4 = false;
+    boolean bIsDuplicateSBDH = false;
+
+    if (aTxMgr.containsByAS4MessageID (sAS4MessageID))
+    {
+      bIsDuplicateAS4 = true;
+      if (APCoreConfig.getDuplicateDetectionAS4Mode () == EDuplicateDetectionMode.REJECT)
+      {
+        final String sMsg = "Rejecting duplicate AS4 message '" + sAS4MessageID + "'";
+        LOGGER.error (sMsg);
+        aProcessingErrorMessages.add (AS4Error.builder ()
+                                              .ebmsError (EEbmsError.EBMS_OTHER.errorBuilder (CPhossAP.DEFAULT_LOCALE)
+                                                                               .refToMessageInError (aIncomingState.getMessageID ())
+                                                                               .errorDetail (sMsg))
+                                              .build ());
+        return;
+      }
+    }
+
+    if (aTxMgr.containsBySbdhInstanceID (sSbdhInstanceID))
+    {
+      bIsDuplicateSBDH = true;
+      if (APCoreConfig.getDuplicateDetectionSBDHMode () == EDuplicateDetectionMode.REJECT)
+      {
+        final String sMsg = "Rejecting duplicate SBDH instance '" + sSbdhInstanceID + "'";
+        LOGGER.error (sMsg);
+        aProcessingErrorMessages.add (AS4Error.builder ()
+                                              .ebmsError (EEbmsError.EBMS_OTHER.errorBuilder (CPhossAP.DEFAULT_LOCALE)
+                                                                               .refToMessageInError (aIncomingState.getMessageID ())
+                                                                               .errorDetail (sMsg))
+                                              .build ());
+        return;
+      }
+    }
+
+    // Receiver check
+    for (final IPeppolReceiverCheckSPI aReceiverCheck : APMetaManager.getAllPeppolReceiverChecks ())
+    {
+      if (!aReceiverCheck.isReceiverServiced (sReceiverID, sDocTypeID, sProcessID))
+      {
+        LOGGER.error ("Receiver not serviced '" + sReceiverID + "'");
+        aProcessingErrorMessages.add (AS4Error.builder ()
+                                              .ebmsError (EEbmsError.EBMS_OTHER.errorBuilder (CPhossAP.DEFAULT_LOCALE)
+                                                                               .refToMessageInError (aIncomingState.getMessageID ())
+                                                                               .errorDetail ("PEPPOL:NOT_SERVICED"))
+                                              .build ());
+        return;
+      }
+    }
+
+    // Store in DB
+    final String sSbdhHash = HashHelper.sha256Hex (aSBDBytes);
+    final OffsetDateTime aAS4Timestamp;
+    if (aIncomingState.getMessageTimestamp () != null)
+      aAS4Timestamp = aIncomingState.getMessageTimestamp ().toOffsetDateTime ();
+    else
+    {
+      aAS4Timestamp = APMetaJDBCManager.getTimestampMgr ().getCurrentDateTime ();
+      LOGGER.warn ("The incoming AS4 message has not AS4 message timestamp - using the current date time instead");
+    }
+
+    final String sTxID = aTxMgr.create (sIncomingID,
+                                        sC2ID,
+                                        sC3ID,
+                                        sSigningCertCN,
+                                        sSenderID,
+                                        sReceiverID,
+                                        sDocTypeID,
+                                        sProcessID,
+                                        aSBDBytes,
+                                        aSBDBytes.length,
+                                        sSbdhHash,
+                                        sAS4MessageID,
+                                        aAS4Timestamp,
+                                        sSbdhInstanceID,
+                                        bIsDuplicateAS4,
+                                        bIsDuplicateSBDH,
+                                        null,
+                                        APCoreConfig.getMlsType ());
+
+    // Optional verification
+    if (APCoreConfig.isVerificationInboundEnabled ())
+    {
+      for (final IInboundDocumentVerifierSPI aVerifier : APMetaManager.getAllInboundVerifiers ())
+      {
+        if (aVerifier.verifyDocument (aSBDBytes, sDocTypeID, sProcessID).isFailure ())
+        {
+          LOGGER.warn ("Inbound document verification failed for '" + sSbdhInstanceID + "'");
+          aTxMgr.updateStatus (sTxID, EInboundStatus.REJECTED);
+
+          for (final var aHandler : APMetaManager.getAllNotificationHandlers ())
+            aHandler.onInboundVerificationRejection (sTxID, sSbdhInstanceID, "Inbound verification failed");
+          return;
+        }
+      }
+    }
+
+    // Forward
+    final var aTx = aTxMgr.getByID (sTxID);
+    _forwardDocument (aTx);
   }
 
   public void processAS4ResponseMessage (@NonNull final IAS4IncomingMessageMetadata aIncomingMessageMetadata,

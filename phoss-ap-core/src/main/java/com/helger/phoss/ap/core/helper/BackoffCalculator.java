@@ -20,7 +20,9 @@ import java.time.OffsetDateTime;
 
 import org.jspecify.annotations.NonNull;
 
+import com.helger.annotation.Nonnegative;
 import com.helger.annotation.concurrent.Immutable;
+import com.helger.phoss.ap.db.APMetaJDBCManager;
 
 @Immutable
 public final class BackoffCalculator
@@ -29,15 +31,15 @@ public final class BackoffCalculator
   {}
 
   @NonNull
-  public static OffsetDateTime calculateNextRetry (final int nAttemptCount,
-                                                   final long nInitialBackoffMs,
-                                                   final double dMultiplier,
-                                                   final long nMaxBackoffMs)
+  public static OffsetDateTime calculateNextRetry (@Nonnegative final int nAttemptCount,
+                                                   @Nonnegative final long nInitialBackoffMs,
+                                                   @Nonnegative final double dMultiplier,
+                                                   @Nonnegative final long nMaxBackoffMs)
   {
     long nBackoffMs = nInitialBackoffMs;
     for (int i = 1; i < nAttemptCount; i++)
       nBackoffMs = (long) (nBackoffMs * dMultiplier);
     nBackoffMs = Math.min (nBackoffMs, nMaxBackoffMs);
-    return OffsetDateTime.now ().plusNanos (nBackoffMs * 1_000_000L);
+    return APMetaJDBCManager.getTimestampMgr ().getCurrentDateTime ().plusNanos (nBackoffMs * 1_000_000L);
   }
 }

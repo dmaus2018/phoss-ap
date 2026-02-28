@@ -128,17 +128,13 @@ public class InboundTransactionManagerJDBC extends AbstractAPJDBCManager impleme
     return null;
   }
 
-  @Nullable
-  public IInboundTransaction getBySbdhInstanceID (@NonNull final String sSbdhInstanceID)
+  public boolean containsByAS4MessageID (@NonNull final String sAS4MessageID)
   {
-    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
-                                                                      COLS +
-                                                                      " FROM inbound_transaction" +
-                                                                      " WHERE sbdh_instance_id=?",
-                                                                      new ConstantPreparedStatementDataProvider (sSbdhInstanceID));
-    if (aRows != null && aRows.size () == 1)
-      return new InboundTransactionRow (aRows.getFirstOrNull ());
-    return null;
+    final long nAffectedRows = newExecutor ().queryCount ("SELECT COUNT(*)" +
+                                                          " FROM inbound_transaction" +
+                                                          " WHERE as4_message_id=?",
+                                                          new ConstantPreparedStatementDataProvider (sAS4MessageID));
+    return nAffectedRows > 0;
   }
 
   @Nullable
@@ -149,6 +145,28 @@ public class InboundTransactionManagerJDBC extends AbstractAPJDBCManager impleme
                                                                       " FROM inbound_transaction" +
                                                                       " WHERE as4_message_id=?",
                                                                       new ConstantPreparedStatementDataProvider (sAS4MessageID));
+    if (aRows != null && aRows.size () == 1)
+      return new InboundTransactionRow (aRows.getFirstOrNull ());
+    return null;
+  }
+
+  public boolean containsBySbdhInstanceID (@NonNull final String sSbdhInstanceID)
+  {
+    final long nAffectedRows = newExecutor ().queryCount ("SELECT COUNT(*)" +
+                                                          " FROM inbound_transaction" +
+                                                          " WHERE sbdh_instance_id=?",
+                                                          new ConstantPreparedStatementDataProvider (sSbdhInstanceID));
+    return nAffectedRows > 0;
+  }
+
+  @Nullable
+  public IInboundTransaction getBySbdhInstanceID (@NonNull final String sSbdhInstanceID)
+  {
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM inbound_transaction" +
+                                                                      " WHERE sbdh_instance_id=?",
+                                                                      new ConstantPreparedStatementDataProvider (sSbdhInstanceID));
     if (aRows != null && aRows.size () == 1)
       return new InboundTransactionRow (aRows.getFirstOrNull ());
     return null;

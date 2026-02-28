@@ -41,7 +41,8 @@ public interface IDocumentForwarderSPI
   void initFromConfiguration (@NonNull IConfigWithFallback aConfig);
 
   /**
-   * Forward the given inbound transaction's document to the Receiver Backend.
+   * Forward the given inbound transaction's document to the Receiver Backend. This method should
+   * never throw an exception.
    *
    * @param aTransaction
    *        The inbound transaction whose document bytes should be forwarded. Never

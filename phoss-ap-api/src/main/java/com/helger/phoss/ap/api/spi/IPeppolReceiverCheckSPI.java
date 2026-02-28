@@ -29,7 +29,7 @@ import com.helger.annotation.style.IsSPIInterface;
  * @author Philip Helger
  */
 @IsSPIInterface
-public interface IReceiverCheckSPI
+public interface IPeppolReceiverCheckSPI
 {
   /**
    * Check whether the given receiver participant is serviced by this AP for the
