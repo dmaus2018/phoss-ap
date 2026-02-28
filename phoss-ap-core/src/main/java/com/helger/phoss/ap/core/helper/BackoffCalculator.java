@@ -22,7 +22,7 @@ import org.jspecify.annotations.NonNull;
 
 import com.helger.annotation.Nonnegative;
 import com.helger.annotation.concurrent.Immutable;
-import com.helger.phoss.ap.db.APMetaJDBCManager;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 
 @Immutable
 public final class BackoffCalculator
@@ -40,6 +40,6 @@ public final class BackoffCalculator
     for (int i = 1; i < nAttemptCount; i++)
       nBackoffMs = (long) (nBackoffMs * dMultiplier);
     nBackoffMs = Math.min (nBackoffMs, nMaxBackoffMs);
-    return APMetaJDBCManager.getTimestampMgr ().getCurrentDateTime ().plusNanos (nBackoffMs * 1_000_000L);
+    return APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ().plusNanos (nBackoffMs * 1_000_000L);
   }
 }

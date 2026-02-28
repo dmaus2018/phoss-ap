@@ -21,7 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.phoss.ap.api.codelist.EInboundStatus;
 import com.helger.phoss.ap.api.codelist.EOutboundStatus;
-import com.helger.phoss.ap.db.APMetaJDBCManager;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
+import com.helger.phoss.ap.db.APJDBCMetaManager;
 
 public final class StartupRecovery
 {
@@ -40,9 +41,9 @@ public final class StartupRecovery
 
     LOGGER.info ("Running startup recovery");
 
-    final var aTimestampMgr = APMetaJDBCManager.getTimestampMgr ();
-    final var aOutboundMgr = APMetaJDBCManager.getOutboundTransactionMgr ();
-    final var aInboundMgr = APMetaJDBCManager.getInboundTransactionMgr ();
+    final var aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
+    final var aOutboundMgr = APJDBCMetaManager.getOutboundTransactionMgr ();
+    final var aInboundMgr = APJDBCMetaManager.getInboundTransactionMgr ();
 
     // Reset outbound 'sending' -> 'failed' with immediate retry
     final var aSendingTxs = aOutboundMgr.getAllInTransmission ();

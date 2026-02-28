@@ -44,9 +44,10 @@ import com.helger.phoss.ap.api.spi.ForwardingResult;
 import com.helger.phoss.ap.api.spi.IDocumentForwarderSPI;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
 import com.helger.phoss.ap.core.helper.HashHelper;
-import com.helger.phoss.ap.db.APMetaJDBCManager;
+import com.helger.phoss.ap.db.APJDBCMetaManager;
 import com.helger.security.certificate.CertificateHelper;
 
 public class InboundMessageProcessor implements IPhase4PeppolIncomingSBDHandlerSPI
@@ -55,8 +56,8 @@ public class InboundMessageProcessor implements IPhase4PeppolIncomingSBDHandlerS
 
   private void _forwardDocument (@Nullable final IInboundTransaction aTx)
   {
-    final IInboundTransactionManager aTxMgr = APMetaJDBCManager.getInboundTransactionMgr ();
-    final IInboundForwardingAttemptManager aAttemptMgr = APMetaJDBCManager.getInboundForwardingAttemptMgr ();
+    final IInboundTransactionManager aTxMgr = APJDBCMetaManager.getInboundTransactionMgr ();
+    final IInboundForwardingAttemptManager aAttemptMgr = APJDBCMetaManager.getInboundForwardingAttemptMgr ();
 
     final IDocumentForwarderSPI aForwarder = APMetaManager.getForwarder ();
     if (aForwarder == null)
@@ -140,7 +141,7 @@ public class InboundMessageProcessor implements IPhase4PeppolIncomingSBDHandlerS
                                  @NonNull final IAS4IncomingMessageState aIncomingState,
                                  @NonNull final AS4ErrorList aProcessingErrorMessages) throws Exception
   {
-    final IInboundTransactionManager aTxMgr = APMetaJDBCManager.getInboundTransactionMgr ();
+    final IInboundTransactionManager aTxMgr = APJDBCMetaManager.getInboundTransactionMgr ();
 
     final String sIncomingID = aMessageMetadata.getIncomingUniqueID ();
     final String sAS4MessageID = aIncomingState.getMessageID ();
@@ -218,7 +219,7 @@ public class InboundMessageProcessor implements IPhase4PeppolIncomingSBDHandlerS
       aAS4Timestamp = aIncomingState.getMessageTimestamp ().toOffsetDateTime ();
     else
     {
-      aAS4Timestamp = APMetaJDBCManager.getTimestampMgr ().getCurrentDateTime ();
+      aAS4Timestamp = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
       LOGGER.warn ("The incoming AS4 message has not AS4 message timestamp - using the current date time instead");
     }
 

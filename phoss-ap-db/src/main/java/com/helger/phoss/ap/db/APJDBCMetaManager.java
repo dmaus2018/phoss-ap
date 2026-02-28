@@ -28,7 +28,7 @@ import com.helger.phoss.ap.api.IInboundForwardingAttemptManager;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.IOutboundSendingAttemptManager;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
-import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.db.flyway.APFlywayMigrator;
 import com.helger.scope.IScope;
 import com.helger.scope.singleton.AbstractGlobalSingleton;
@@ -38,11 +38,10 @@ import com.helger.scope.singleton.AbstractGlobalSingleton;
  *
  * @author Philip Helger
  */
-public final class APMetaJDBCManager extends AbstractGlobalSingleton
+public final class APJDBCMetaManager extends AbstractGlobalSingleton
 {
-  private static final Logger LOGGER = LoggerFactory.getLogger (APMetaJDBCManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger (APJDBCMetaManager.class);
 
-  private IAPTimestampManager m_aTimestampMgr;
   private APDataSourceProvider m_aDSP;
   private OutboundTransactionManagerJDBC m_aOutboundTxMgr;
   private OutboundSendingAttemptManagerJDBC m_aOutboundAttemptMgr;
@@ -55,13 +54,13 @@ public final class APMetaJDBCManager extends AbstractGlobalSingleton
    */
   @Deprecated (forRemoval = false)
   @UsedViaReflection
-  public APMetaJDBCManager ()
+  public APJDBCMetaManager ()
   {}
 
   @NonNull
-  public static APMetaJDBCManager getInstance ()
+  public static APJDBCMetaManager getInstance ()
   {
-    return getGlobalSingleton (APMetaJDBCManager.class);
+    return getGlobalSingleton (APJDBCMetaManager.class);
   }
 
   @Override
@@ -70,7 +69,7 @@ public final class APMetaJDBCManager extends AbstractGlobalSingleton
     LOGGER.info ("Initializing " + ClassHelper.getClassLocalName (this));
     try
     {
-      m_aTimestampMgr = IAPTimestampManager.createDefaultInstance ();
+      final var aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
 
       // Run Flyway
       APFlywayMigrator.runFlyway ();
@@ -80,11 +79,11 @@ public final class APMetaJDBCManager extends AbstractGlobalSingleton
       APDBExecutor.setDataSourceProvider (m_aDSP);
 
       // Create managers
-      m_aOutboundTxMgr = new OutboundTransactionManagerJDBC (m_aTimestampMgr);
-      m_aOutboundAttemptMgr = new OutboundSendingAttemptManagerJDBC (m_aTimestampMgr);
-      m_aInboundTxMgr = new InboundTransactionManagerJDBC (m_aTimestampMgr);
-      m_aInboundAttemptMgr = new InboundForwardingAttemptManagerJDBC (m_aTimestampMgr);
-      m_aArchivalMgr = new ArchivalManagerJDBC (m_aTimestampMgr);
+      m_aOutboundTxMgr = new OutboundTransactionManagerJDBC (aTimestampMgr);
+      m_aOutboundAttemptMgr = new OutboundSendingAttemptManagerJDBC (aTimestampMgr);
+      m_aInboundTxMgr = new InboundTransactionManagerJDBC (aTimestampMgr);
+      m_aInboundAttemptMgr = new InboundForwardingAttemptManagerJDBC (aTimestampMgr);
+      m_aArchivalMgr = new ArchivalManagerJDBC (aTimestampMgr);
 
       LOGGER.info (ClassHelper.getClassLocalName (this) + " was initialized");
     }
@@ -109,12 +108,6 @@ public final class APMetaJDBCManager extends AbstractGlobalSingleton
         LOGGER.error ("Error closing DataSource", ex);
       }
     }
-  }
-
-  @NonNull
-  public static IAPTimestampManager getTimestampMgr ()
-  {
-    return getInstance ().m_aTimestampMgr;
   }
 
   @NonNull

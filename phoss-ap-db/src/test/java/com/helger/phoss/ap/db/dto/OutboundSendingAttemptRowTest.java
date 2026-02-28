@@ -22,11 +22,14 @@ import static org.junit.Assert.assertNull;
 
 import java.time.OffsetDateTime;
 
+import org.junit.Rule;
 import org.junit.Test;
 
 import com.helger.db.jdbc.executor.DBResultRow;
 import com.helger.phoss.ap.api.codelist.EAttemptStatus;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.db.testhelper.DBResultRowHelper;
+import com.helger.scope.mock.ScopeTestRule;
 
 /**
  * Test class for {@link OutboundSendingAttemptRow}.
@@ -35,10 +38,13 @@ import com.helger.phoss.ap.db.testhelper.DBResultRowHelper;
  */
 public final class OutboundSendingAttemptRowTest
 {
+  @Rule
+  public final ScopeTestRule m_aRule = new ScopeTestRule ();
+
   @Test
   public void testAllFieldsMapped ()
   {
-    final OffsetDateTime aNow = OffsetDateTime.now ();
+    final OffsetDateTime aNow = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
 
     // 9 columns matching OutboundSendingAttemptRow constructor order
     // 0 id
@@ -75,7 +81,7 @@ public final class OutboundSendingAttemptRowTest
   @Test
   public void testNullableFieldsReturnNull ()
   {
-    final OffsetDateTime aNow = OffsetDateTime.now ();
+    final OffsetDateTime aNow = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
 
     final DBResultRow aRow = DBResultRowHelper.createRow ("att-002",
                                                           "tx-002",

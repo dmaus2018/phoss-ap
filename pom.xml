@@ -104,6 +104,11 @@
       </dependency>
       <dependency>
         <groupId>com.helger.phoss.ap</groupId>
+        <artifactId>phoss-ap-basic</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.helger.phoss.ap</groupId>
         <artifactId>phoss-ap-db</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -223,6 +228,7 @@
 
   <modules>
     <module>phoss-ap-api</module>
+    <module>phoss-ap-basic</module>
     <module>phoss-ap-db</module>
     <module>phoss-ap-core</module>
     <module>phoss-ap-forwarding-http</module>

@@ -24,6 +24,7 @@ import static org.junit.Assert.assertNull;
 import java.time.OffsetDateTime;
 
 import org.jspecify.annotations.NonNull;
+import org.junit.Rule;
 import org.junit.Test;
 
 import com.helger.db.jdbc.executor.DBResultRow;
@@ -32,7 +33,9 @@ import com.helger.phoss.ap.api.codelist.EOutboundStatus;
 import com.helger.phoss.ap.api.codelist.EReportingStatus;
 import com.helger.phoss.ap.api.codelist.ESourceType;
 import com.helger.phoss.ap.api.codelist.ETransactionType;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.db.testhelper.DBResultRowHelper;
+import com.helger.scope.mock.ScopeTestRule;
 
 /**
  * Test class for {@link OutboundTransactionRow}.
@@ -41,10 +44,13 @@ import com.helger.phoss.ap.db.testhelper.DBResultRowHelper;
  */
 public final class OutboundTransactionRowTest
 {
+  @Rule
+  public final ScopeTestRule m_aRule = new ScopeTestRule ();
+
   @NonNull
   private static DBResultRow _createValidRow ()
   {
-    final OffsetDateTime aNow = OffsetDateTime.now ();
+    final OffsetDateTime aNow = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
     final byte [] aDocBytes = { 1, 2, 3 };
 
     // 24 columns, matching OutboundTransactionRow constructor order
@@ -139,7 +145,7 @@ public final class OutboundTransactionRowTest
   @Test
   public void testAllFieldsPopulated ()
   {
-    final OffsetDateTime aNow = OffsetDateTime.now ();
+    final OffsetDateTime aNow = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
     final OffsetDateTime aCompleted = aNow.plusMinutes (5);
     final OffsetDateTime aMlsReceived = aNow.plusMinutes (10);
     final byte [] aDocBytes = { 10, 20 };

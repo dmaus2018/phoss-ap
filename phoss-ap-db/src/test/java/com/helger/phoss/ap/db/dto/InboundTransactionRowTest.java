@@ -26,13 +26,16 @@ import static org.junit.Assert.assertTrue;
 import java.time.OffsetDateTime;
 
 import org.jspecify.annotations.NonNull;
+import org.junit.Rule;
 import org.junit.Test;
 
 import com.helger.db.jdbc.executor.DBResultRow;
 import com.helger.peppol.sbdh.EPeppolMLSType;
 import com.helger.phoss.ap.api.codelist.EInboundStatus;
 import com.helger.phoss.ap.api.codelist.EReportingStatus;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.db.testhelper.DBResultRowHelper;
+import com.helger.scope.mock.ScopeTestRule;
 
 /**
  * Test class for {@link InboundTransactionRow}.
@@ -41,10 +44,13 @@ import com.helger.phoss.ap.db.testhelper.DBResultRowHelper;
  */
 public final class InboundTransactionRowTest
 {
+  @Rule
+  public final ScopeTestRule m_aRule = new ScopeTestRule ();
+
   @NonNull
   private static DBResultRow _createValidRow ()
   {
-    final OffsetDateTime aNow = OffsetDateTime.now ();
+    final OffsetDateTime aNow = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
     final byte [] aDocBytes = { 4, 5, 6 };
 
     // 29 columns, matching InboundTransactionRow constructor order
@@ -154,7 +160,7 @@ public final class InboundTransactionRowTest
   @Test
   public void testDuplicateFlags ()
   {
-    final OffsetDateTime aNow = OffsetDateTime.now ();
+    final OffsetDateTime aNow = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
     final byte [] aDocBytes = { 7 };
 
     final DBResultRow aRow = DBResultRowHelper.createRow ("ib-dup",

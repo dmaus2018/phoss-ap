@@ -33,9 +33,10 @@ import com.helger.phoss.ap.api.codelist.ETransactionType;
 import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
 import com.helger.phoss.ap.core.helper.HashHelper;
-import com.helger.phoss.ap.db.APMetaJDBCManager;
+import com.helger.phoss.ap.db.APJDBCMetaManager;
 
 public final class OutboundOrchestrator
 {
@@ -71,7 +72,7 @@ public final class OutboundOrchestrator
       }
     }
 
-    final IOutboundTransactionManager aMgr = APMetaJDBCManager.getOutboundTransactionMgr ();
+    final IOutboundTransactionManager aMgr = APJDBCMetaManager.getOutboundTransactionMgr ();
     // Create in pending state
     final String sTransactionID = aMgr.create (ETransactionType.BUSINESS_DOCUMENT,
                                                sSenderID,
@@ -103,7 +104,7 @@ public final class OutboundOrchestrator
 
     final String sDocumentHash = HashHelper.sha256Hex (aSbdBytes);
 
-    final IOutboundTransactionManager aMgr = APMetaJDBCManager.getOutboundTransactionMgr ();
+    final IOutboundTransactionManager aMgr = APJDBCMetaManager.getOutboundTransactionMgr ();
     // Create in pending state
     final String sTransactionID = aMgr.create (ETransactionType.BUSINESS_DOCUMENT,
                                                sSenderID,
@@ -124,9 +125,9 @@ public final class OutboundOrchestrator
   public static void processPendingOutbound (@NonNull final IOutboundTransaction aTx)
   {
     final String sID = aTx.getID ();
-    final IAPTimestampManager aTimestampMgr = APMetaJDBCManager.getTimestampMgr ();
-    final IOutboundTransactionManager aTxMgr = APMetaJDBCManager.getOutboundTransactionMgr ();
-    final IOutboundSendingAttemptManager aAttemptMgr = APMetaJDBCManager.getOutboundSendingAttemptMgr ();
+    final IAPTimestampManager aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
+    final IOutboundTransactionManager aTxMgr = APJDBCMetaManager.getOutboundTransactionMgr ();
+    final IOutboundSendingAttemptManager aAttemptMgr = APJDBCMetaManager.getOutboundSendingAttemptMgr ();
 
     LOGGER.info ("Processing outbound transaction '" + sID + "'");
 

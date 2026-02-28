@@ -27,7 +27,7 @@ import com.helger.phoss.ap.api.IArchivalManager;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.core.APCoreConfig;
-import com.helger.phoss.ap.db.APMetaJDBCManager;
+import com.helger.phoss.ap.db.APJDBCMetaManager;
 
 public final class ArchivalScheduler
 {
@@ -43,12 +43,12 @@ public final class ArchivalScheduler
   {
     try
     {
-      final ICommonsList <IOutboundTransaction> aTransactions = APMetaJDBCManager.getOutboundTransactionMgr ()
+      final ICommonsList <IOutboundTransaction> aTransactions = APJDBCMetaManager.getOutboundTransactionMgr ()
                                                                                  .getAllForArchival (BATCH_SIZE);
       if (aTransactions.isNotEmpty ())
       {
         LOGGER.info ("Archiving " + aTransactions.size () + " outbound transactions");
-        final IArchivalManager aArchivalMgr = APMetaJDBCManager.getArchivalMgr ();
+        final IArchivalManager aArchivalMgr = APJDBCMetaManager.getArchivalMgr ();
         for (final IOutboundTransaction aTx : aTransactions)
         {
           aArchivalMgr.archiveOutboundTransaction (aTx.getID ());
@@ -65,12 +65,12 @@ public final class ArchivalScheduler
   {
     try
     {
-      final ICommonsList <IInboundTransaction> aTransactions = APMetaJDBCManager.getInboundTransactionMgr ()
+      final ICommonsList <IInboundTransaction> aTransactions = APJDBCMetaManager.getInboundTransactionMgr ()
                                                                                 .getAllForArchival (BATCH_SIZE);
       if (aTransactions.isNotEmpty ())
       {
         LOGGER.info ("Archiving " + aTransactions.size () + " inbound transactions");
-        final IArchivalManager aArchivalMgr = APMetaJDBCManager.getArchivalMgr ();
+        final IArchivalManager aArchivalMgr = APJDBCMetaManager.getArchivalMgr ();
         for (final IInboundTransaction aTx : aTransactions)
         {
           aArchivalMgr.archiveInboundTransaction (aTx.getID ());

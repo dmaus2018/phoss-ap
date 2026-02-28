@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.helger.phoss.ap.api.model.IInboundTransaction;
-import com.helger.phoss.ap.db.APMetaJDBCManager;
+import com.helger.phoss.ap.db.APJDBCMetaManager;
 import com.helger.phoss.ap.webapp.dto.InboundTransactionResponse;
 import com.helger.phoss.ap.webapp.dto.ReportResponse;
 
@@ -39,18 +39,18 @@ public class InboundController
   public ResponseEntity <ReportResponse> reportInbound (@RequestParam ("sbdhInstanceID") final String sSbdhInstanceID,
                                                         @RequestParam ("c4CountryCode") final String sC4CountryCode)
   {
-    final IInboundTransaction aTx = APMetaJDBCManager.getInboundTransactionMgr ().getBySbdhInstanceID (sSbdhInstanceID);
+    final IInboundTransaction aTx = APJDBCMetaManager.getInboundTransactionMgr ().getBySbdhInstanceID (sSbdhInstanceID);
     if (aTx == null)
       return ResponseEntity.notFound ().build ();
 
-    APMetaJDBCManager.getInboundTransactionMgr ().updateC4CountryCode (aTx.getID (), sC4CountryCode);
+    APJDBCMetaManager.getInboundTransactionMgr ().updateC4CountryCode (aTx.getID (), sC4CountryCode);
     return ResponseEntity.ok (new ReportResponse (aTx.getID (), "updated", "C4 country code set to " + sC4CountryCode));
   }
 
   @GetMapping ("/status/{sbdhInstanceID}")
   public ResponseEntity <InboundTransactionResponse> getStatus (@PathVariable final String sbdhInstanceID)
   {
-    final IInboundTransaction aTx = APMetaJDBCManager.getInboundTransactionMgr ().getBySbdhInstanceID (sbdhInstanceID);
+    final IInboundTransaction aTx = APJDBCMetaManager.getInboundTransactionMgr ().getBySbdhInstanceID (sbdhInstanceID);
     if (aTx == null)
       return ResponseEntity.notFound ().build ();
 
@@ -60,7 +60,7 @@ public class InboundController
   @GetMapping ("/in-processing")
   public ResponseEntity <List <InboundTransactionResponse>> getInProcessing ()
   {
-    final var aTxs = APMetaJDBCManager.getInboundTransactionMgr ().getAllInProcessing ();
+    final var aTxs = APJDBCMetaManager.getInboundTransactionMgr ().getAllInProcessing ();
     final List <InboundTransactionResponse> aResult = aTxs.getAllMapped (InboundTransactionResponse::fromDomain);
     return ResponseEntity.ok (aResult);
   }
