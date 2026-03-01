@@ -125,7 +125,13 @@ public class HttpDocumentForwarderSPI implements IDocumentForwarderSPI
     }
     catch (final IOException ex)
     {
-      LOGGER.error ("HTTP forwarding failed for transaction '" + aTransaction.getID () + "'", ex);
+      LOGGER.error ("HTTP forwarding failed for transaction '" +
+                    aTransaction.getID () +
+                    "': " +
+                    ex.getMessage () +
+                    " (" +
+                    ex.getClass ().getName () +
+                    ")");
       return ForwardingResult.failure ("http_io_error", ex.getMessage () + " (" + ex.getClass ().getName () + ")");
     }
     catch (final Exception ex)

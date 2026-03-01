@@ -139,6 +139,11 @@
         <artifactId>phoss-ap-webapp</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.helger.phoss.ap</groupId>
+        <artifactId>phoss-ap-testbackend</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
       <!-- External dependencies -->
       <dependency>
@@ -237,5 +242,6 @@
     <module>phoss-ap-forwarding-s3</module>
     <module>phoss-ap-forwarding-sftp</module>
     <module>phoss-ap-webapp</module>
+    <module>phoss-ap-testbackend</module>
   </modules>
 </project>

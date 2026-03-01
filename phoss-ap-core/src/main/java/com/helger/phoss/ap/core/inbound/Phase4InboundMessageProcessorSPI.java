@@ -127,7 +127,11 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
         {
           // We can store the reporting item immediately
           aTxMgr.updateC4CountryCode (aTx.getID (), aResult.getCountryCodeC4 ());
-          ReportingManager.storeInboundForReporting (aTx);
+
+          // Re-read the transaction to get the updated data
+          final IInboundTransaction aTx2 = aTxMgr.getByID (aTx.getID ());
+
+          ReportingManager.storeInboundForReporting (aTx2);
         }
 
         return ESuccess.SUCCESS;
