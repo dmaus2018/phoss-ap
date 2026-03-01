@@ -37,7 +37,7 @@ import com.helger.phoss.ap.api.config.APConfigProvider;
 import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.APCoreConfig;
-import com.helger.phoss.ap.core.APMetaManager;
+import com.helger.phoss.ap.core.APCoreMetaManager;
 import com.helger.phoss.ap.core.StartupRecovery;
 import com.helger.phoss.ap.core.job.ArchivalScheduler;
 import com.helger.phoss.ap.core.job.RetryScheduler;
@@ -46,6 +46,7 @@ import com.helger.photon.io.WebFileIO;
 import com.helger.security.certificate.ECertificateCheckResult;
 import com.helger.security.certificate.TrustedCAChecker;
 import com.helger.servlet.ServletHelper;
+import com.helger.smpclient.peppol.CachingSMPClientReadOnly;
 import com.helger.smpclient.peppol.SMPClientReadOnly;
 import com.helger.web.scope.mgr.WebScopeManager;
 import com.helger.xservlet.requesttrack.RequestTrackerSettings;
@@ -141,7 +142,9 @@ public class APServletInit
     final KeyStore.PrivateKeyEntry aPKE = aCryptoFactory.getPrivateKeyEntry ();
     if (aPKE == null)
       throw new InitializationException ("Failed to load configured AS4 private key - fix the configuration");
-    LOGGER.info ("Successfully loaded configured AS4 private key from the crypto factory");
+    LOGGER.info ("Successfully loaded configured AS4 private key (alias '" +
+                 aCryptoFactory.getKeyAlias () +
+                 "') from the crypto factory");
 
     // Configure the stage correctly
     final EPeppolNetwork eStage = APCoreConfig.getPeppolStage ();
@@ -166,7 +169,7 @@ public class APServletInit
       throw new InitializationException ("The provided certificate is not a Peppol AP certificate. Check result: " +
                                          eCheckResult);
     }
-    LOGGER.info ("Successfully checked that the provided Peppol AP certificate is valid.");
+    LOGGER.info ("Successfully checked that the provided Peppol AP certificate is from the correct CA");
 
     // Must be set independent on the enabled/disable status
     Phase4PeppolDefaultReceiverConfiguration.setAPCAChecker (aAPCAChecker);
@@ -180,7 +183,7 @@ public class APServletInit
       // To process the message even though the receiver is not registered in
       // our AP
       Phase4PeppolDefaultReceiverConfiguration.setReceiverCheckEnabled (true);
-      final SMPClientReadOnly aReceiverCheckSMPClient = new SMPClientReadOnly (URLHelper.getAsURI (sSMPURL));
+      final SMPClientReadOnly aReceiverCheckSMPClient = new CachingSMPClientReadOnly (URLHelper.getAsURI (sSMPURL));
       APBasicConfig.applyHttpProxySettings (aReceiverCheckSMPClient.httpClientSettings ());
       Phase4PeppolDefaultReceiverConfiguration.setSMPClient (aReceiverCheckSMPClient);
       Phase4PeppolDefaultReceiverConfiguration.setAS4EndpointURL (sAPURL);
@@ -210,7 +213,7 @@ public class APServletInit
     // Initialize all managers
     APBasicMetaManager.getInstance ();
     APJdbcMetaManager.getInstance ();
-    APMetaManager.init ();
+    APCoreMetaManager.init ();
 
     // Recover transactions that were in-flight during unclean shutdown
     StartupRecovery.run ();
@@ -228,7 +231,7 @@ public class APServletInit
 
     RetryScheduler.stop ();
     ArchivalScheduler.stop ();
-    APMetaManager.shutdown ();
+    APCoreMetaManager.shutdown ();
 
     if (WebScopeManager.isGlobalScopePresent ())
     {

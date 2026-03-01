@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import org.unece.cefact.namespaces.sbdh.StandardBusinessDocument;
 
 import com.helger.annotation.style.IsSPIImplementation;
+import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
 import com.helger.diagnostics.error.IError;
 import com.helger.diagnostics.error.list.ErrorList;
@@ -38,6 +39,7 @@ import com.helger.peppol.mls.PeppolMLSMarshaller;
 import com.helger.peppol.reporting.api.CPeppolReporting;
 import com.helger.peppol.sbdh.PeppolSBDHData;
 import com.helger.peppolid.peppol.doctype.EPredefinedDocumentTypeIdentifier;
+import com.helger.peppolid.peppol.process.EPredefinedProcessIdentifier;
 import com.helger.phase4.ebms3header.Ebms3UserMessage;
 import com.helger.phase4.error.AS4Error;
 import com.helger.phase4.error.AS4ErrorList;
@@ -55,10 +57,12 @@ import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.spi.IDocumentForwarderSPI;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
+import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
 import com.helger.phoss.ap.core.APCoreConfig;
-import com.helger.phoss.ap.core.APMetaManager;
+import com.helger.phoss.ap.core.APCoreMetaManager;
+import com.helger.phoss.ap.core.MlsHandler;
 import com.helger.phoss.ap.core.ReportingManager;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
 import com.helger.phoss.ap.core.helper.HashHelper;
@@ -72,17 +76,18 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (Phase4InboundMessageProcessorSPI.class);
 
-  private void _forwardDocument (@Nullable final IInboundTransaction aTx)
+  @NonNull
+  private ESuccess _forwardDocument (@Nullable final IInboundTransaction aTx)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final IInboundForwardingAttemptManager aAttemptMgr = APJdbcMetaManager.getInboundForwardingAttemptMgr ();
 
-    final IDocumentForwarderSPI aForwarder = APMetaManager.getForwarder ();
+    final IDocumentForwarderSPI aForwarder = APCoreMetaManager.getForwarder ();
     if (aForwarder == null)
     {
       LOGGER.error ("Internal error - No document forwarder configured");
       aTxMgr.updateStatus (aTx.getID (), EInboundStatus.PERMANENTLY_FAILED);
-      return;
+      return ESuccess.FAILURE;
     }
 
     // Set status
@@ -118,43 +123,42 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
         aTxMgr.updateC4CountryCode (aTx.getID (), aResult.getCountryCodeC4 ());
         ReportingManager.storeInboundForReporting (aTx);
       }
+
+      return ESuccess.SUCCESS;
+    }
+
+    // Forwarding failed
+    aAttemptMgr.createFailure (aTx.getID (), aResult.getErrorCode (), aResult.getErrorDetails ());
+
+    final int nNewAttemptCount = aTx.getAttemptCount () + 1;
+    final int nMaxRetryAttempts = APCoreConfig.getRetryForwardingMaxAttempts ();
+    if (nNewAttemptCount >= nMaxRetryAttempts)
+    {
+      // Maximum number of retries are exhausted - we go on "permanently failed"
+      aTxMgr.updateStatusAndRetry (aTx.getID (),
+                                   EInboundStatus.PERMANENTLY_FAILED,
+                                   nNewAttemptCount,
+                                   null,
+                                   "Max retries (" + nMaxRetryAttempts + ") exhausted: " + aResult.getErrorDetails ());
+
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onPermanentForwardingFailure (aTx.getID (), aTx.getSbdhInstanceID (), "Max retries exhausted");
     }
     else
     {
-      // Forwarding failed
-      aAttemptMgr.createFailure (aTx.getID (), aResult.getErrorCode (), aResult.getErrorDetails ());
-
-      final int nNewAttemptCount = aTx.getAttemptCount () + 1;
-      final int nMaxRetryAttempts = APCoreConfig.getRetryForwardingMaxAttempts ();
-      if (nNewAttemptCount >= nMaxRetryAttempts)
-      {
-        // Maximum number of retries are exhausted - we go on "permanently failed"
-        aTxMgr.updateStatusAndRetry (aTx.getID (),
-                                     EInboundStatus.PERMANENTLY_FAILED,
-                                     nNewAttemptCount,
-                                     null,
-                                     "Max retries (" +
-                                           nMaxRetryAttempts +
-                                           ") exhausted: " +
-                                           aResult.getErrorDetails ());
-
-        for (final var aHandler : APMetaManager.getAllNotificationHandlers ())
-          aHandler.onPermanentForwardingFailure (aTx.getID (), aTx.getSbdhInstanceID (), "Max retries exhausted");
-      }
-      else
-      {
-        // Calculate the next retry and remember it
-        final var aNextRetry = BackoffCalculator.calculateNextRetry (nNewAttemptCount,
-                                                                     APCoreConfig.getRetryForwardingInitialBackoffMs (),
-                                                                     APCoreConfig.getRetryForwardingBackoffMultiplier (),
-                                                                     APCoreConfig.getRetryForwardingMaxBackoffMs ());
-        aTxMgr.updateStatusAndRetry (aTx.getID (),
-                                     EInboundStatus.FORWARD_FAILED,
-                                     nNewAttemptCount,
-                                     aNextRetry,
-                                     aResult.getErrorDetails ());
-      }
+      // Calculate the next retry and remember it
+      final var aNextRetry = BackoffCalculator.calculateNextRetry (nNewAttemptCount,
+                                                                   APCoreConfig.getRetryForwardingInitialBackoffMs (),
+                                                                   APCoreConfig.getRetryForwardingBackoffMultiplier (),
+                                                                   APCoreConfig.getRetryForwardingMaxBackoffMs ());
+      aTxMgr.updateStatusAndRetry (aTx.getID (),
+                                   EInboundStatus.FORWARD_FAILED,
+                                   nNewAttemptCount,
+                                   aNextRetry,
+                                   aResult.getErrorDetails ());
     }
+
+    return ESuccess.FAILURE;
   }
 
   public void handleIncomingSBD (@NonNull final IAS4IncomingMessageMetadata aMessageMetadata,
@@ -230,7 +234,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
     }
 
     // Receiver check
-    for (final IPeppolReceiverCheckSPI aReceiverCheck : APMetaManager.getAllPeppolReceiverChecks ())
+    for (final IPeppolReceiverCheckSPI aReceiverCheck : APCoreMetaManager.getAllPeppolReceiverChecks ())
     {
       if (!aReceiverCheck.isReceiverServiced (sReceiverID, sDocTypeID, sProcessID))
       {
@@ -241,7 +245,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
                                                                                .errorDetail ("PEPPOL:NOT_SERVICED"))
                                               .build ());
 
-        for (final var aHandler : APMetaManager.getAllNotificationHandlers ())
+        for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
           aHandler.onInboundReceiverNotServiced (sSenderID, sReceiverID, sDocTypeID, sProcessID, sSbdhInstanceID);
 
         return;
@@ -268,7 +272,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
     }
 
     // Store document to disk
-    final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APCoreConfig.getStorageInboundPath ()),
+    final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APBasicConfig.getStorageInboundPath ()),
                                                                       aAS4Timestamp,
                                                                       sSbdhInstanceID + ".sbd",
                                                                       aSBDBytes);
@@ -297,21 +301,22 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
     // Optional verification
     if (APCoreConfig.isVerificationInboundEnabled ())
     {
-      for (final IInboundDocumentVerifierSPI aVerifier : APMetaManager.getAllInboundVerifiers ())
+      for (final IInboundDocumentVerifierSPI aVerifier : APCoreMetaManager.getAllInboundVerifiers ())
       {
         if (aVerifier.verifyDocument (aSBDBytes, sDocTypeID, sProcessID).isFailure ())
         {
           LOGGER.warn ("Inbound document verification failed for '" + sSbdhInstanceID + "'");
           aTxMgr.updateStatus (sTxID, EInboundStatus.REJECTED);
 
-          for (final var aHandler : APMetaManager.getAllNotificationHandlers ())
+          for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
             aHandler.onInboundVerificationRejection (sTxID, sSbdhInstanceID, "Inbound verification failed");
           return;
         }
       }
     }
 
-    if (sDocTypeID.equals (EPredefinedDocumentTypeIdentifier.PEPPOL_MLS_1_0.getURIEncoded ()))
+    if (sDocTypeID.equals (EPredefinedDocumentTypeIdentifier.PEPPOL_MLS_1_0.getURIEncoded ()) &&
+      sProcessID.equals (EPredefinedProcessIdentifier.urn_peppol_edec_mls.getURIEncoded ()))
     {
       LOGGER.info ("Handling incoming MLS message");
       final ErrorList aXSDErrors = new ErrorList ();
@@ -333,12 +338,35 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
       }
 
       final PeppolMLSBuilder aBuilder = PeppolMLSBuilder.createForApplicationResponse (aMLS);
-      // TODO handle incoming MLS
+
+      // The reference ID in the MLS is the SBDH Instance ID of the original outbound business
+      // document
+      final String sReferencedSbdhInstanceID = aBuilder.referenceId ();
+      if (StringHelper.isEmpty (sReferencedSbdhInstanceID))
+      {
+        LOGGER.error ("MLS message '" + sSbdhInstanceID + "' has no reference ID - cannot correlate");
+        aTxMgr.updateStatus (sTxID, EInboundStatus.PERMANENTLY_FAILED);
+        return;
+      }
+
+      // Correlate with the original outbound transaction and update its MLS status
+      if (MlsHandler.handleIncomingMls (sReferencedSbdhInstanceID,
+                                        aBuilder.responseCode (),
+                                        aAS4Timestamp,
+                                        aBuilder.id ()).isFailure ())
+      {
+        for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+          aHandler.onInboundMLSCorrelationError (sTxID, sReferencedSbdhInstanceID, aBuilder.responseCode ());
+      }
     }
 
-    // Forward
+    // Forward - Business Document and MLS
     final var aTx = aTxMgr.getByID (sTxID);
-    _forwardDocument (aTx);
+    if (_forwardDocument (aTx).isFailure ())
+    {
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onInboundForwardingError (sTxID);
+    }
   }
 
   public void processAS4ResponseMessage (@NonNull final IAS4IncomingMessageMetadata aIncomingMessageMetadata,

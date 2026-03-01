@@ -20,6 +20,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.style.IsSPIInterface;
+import com.helger.peppol.mls.EPeppolMLSResponseCode;
 
 /**
  * SPI interface for receiving notifications about permanent processing failures. Implementations
@@ -92,4 +93,28 @@ public interface INotificationHandlerSPI
   void onPermanentForwardingFailure (@NonNull String sTransactionID,
                                      @NonNull String sSbdhInstanceID,
                                      @Nullable String sErrorDetails);
+
+  /**
+   * Called when the inbound message is an MLS but could not be correlated with an outbound
+   * transaction.
+   *
+   * @param sTxID
+   *        The incoming transaction ID. May not be <code>null</code>.
+   * @param sReferencedSbdhInstanceID
+   *        The referenced SBDH ID from the MLS. May not be <code>null</code>.
+   * @param eMlsResponseCode
+   *        The response code contained in the MLS. May not be <code>null</code>.
+   */
+  void onInboundMLSCorrelationError (@NonNull String sTxID,
+                                     @NonNull String sReferencedSbdhInstanceID,
+                                     @NonNull EPeppolMLSResponseCode eMlsResponseCode);
+
+  /**
+   * Called if an inbound messages could not be forwarded properly. The database state has already
+   * been updated when this is called.
+   *
+   * @param sTxID
+   *        The inbound transaction ID. May not be <code>null</code>.
+   */
+  void onInboundForwardingError (@NonNull String sTxID);
 }

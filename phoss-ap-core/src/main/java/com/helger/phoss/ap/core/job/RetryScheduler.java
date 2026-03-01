@@ -26,7 +26,7 @@ import com.helger.collection.commons.ICommonsList;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.core.APCoreConfig;
-import com.helger.phoss.ap.core.APMetaManager;
+import com.helger.phoss.ap.core.APCoreMetaManager;
 import com.helger.phoss.ap.core.OutboundOrchestrator;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 
@@ -105,7 +105,7 @@ public final class RetryScheduler
       if (aTransactions.isNotEmpty ())
         LOGGER.info ("Retrying " + aTransactions.size () + " inbound forwarding transactions");
 
-      final var aForwarder = APMetaManager.getForwarder ();
+      final var aForwarder = APCoreMetaManager.getForwarder ();
       if (aForwarder == null)
         return;
 

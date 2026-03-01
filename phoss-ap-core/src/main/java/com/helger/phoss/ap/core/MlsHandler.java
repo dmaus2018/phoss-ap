@@ -24,9 +24,12 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.base.state.ESuccess;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
 import com.helger.peppol.sbdh.EPeppolMLSType;
 import com.helger.peppol.sbdh.PeppolSBDHData;
+import com.helger.peppolid.peppol.doctype.EPredefinedDocumentTypeIdentifier;
+import com.helger.peppolid.peppol.process.EPredefinedProcessIdentifier;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EMlsReceptionStatus;
@@ -34,8 +37,10 @@ import com.helger.phoss.ap.api.codelist.ESourceType;
 import com.helger.phoss.ap.api.codelist.ETransactionType;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
+import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
+import com.helger.phoss.ap.core.helper.HashHelper;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 
 public final class MlsHandler
@@ -79,7 +84,7 @@ public final class MlsHandler
     final OffsetDateTime aAS4SendingDT = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
 
     // Store MLS document to disk
-    final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APCoreConfig.getStorageOutboundPath ()),
+    final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APBasicConfig.getStorageOutboundPath ()),
                                                                       aAS4SendingDT,
                                                                       sMlsSbdhInstanceID + ".mls",
                                                                       aMlsBytes);
@@ -87,13 +92,13 @@ public final class MlsHandler
     final String sMlsTxID = aOutboundMgr.create (ETransactionType.MLS_RESPONSE,
                                                  aTx.getReceiverID (),
                                                  aTx.getSenderID (),
-                                                 "mls-doc-type",
-                                                 "mls-process",
+                                                 EPredefinedDocumentTypeIdentifier.PEPPOL_MLS_1_0.getURIEncoded (),
+                                                 EPredefinedProcessIdentifier.urn_peppol_edec_mls.getURIEncoded (),
                                                  sMlsSbdhInstanceID,
                                                  ESourceType.RAW_XML,
                                                  sDocumentPath,
                                                  aMlsBytes.length,
-                                                 "",
+                                                 HashHelper.sha256Hex (aMlsBytes),
                                                  APCoreConfig.getPeppolOwnerCountryCode (),
                                                  aAS4SendingDT,
                                                  null,
@@ -103,10 +108,24 @@ public final class MlsHandler
     aInboundMgr.updateMlsFields (aTx.getID (), eResponseCode, sMlsTxID);
   }
 
-  public static void handleIncomingMls (@NonNull final String sSbdhInstanceID,
-                                        @NonNull final EPeppolMLSResponseCode eResponseCode,
-                                        @NonNull final OffsetDateTime aMlsAS4ReceivedDT,
-                                        @Nullable final String sMlsID)
+  /**
+   * Correlate an incoming MLS to a previous outbound transaction.
+   *
+   * @param sSbdhInstanceID
+   *        SBDH Instance ID. May not be <code>null</code>.
+   * @param eResponseCode
+   *        The MLS response code received. May not be <code>null</code>.
+   * @param aMlsAS4ReceivedDT
+   *        The MLS AS4 receiving date time for the SLR. May not be <code>null</code>.
+   * @param sMlsID
+   *        The MLS document ID received. May not be <code>null</code>.
+   * @return {@link ESuccess}
+   */
+  @NonNull
+  public static ESuccess handleIncomingMls (@NonNull final String sSbdhInstanceID,
+                                            @NonNull final EPeppolMLSResponseCode eResponseCode,
+                                            @NonNull final OffsetDateTime aMlsAS4ReceivedDT,
+                                            @Nullable final String sMlsID)
   {
     LOGGER.info ("Received MLS response (" + eResponseCode.getID () + ") for SBDH '" + sSbdhInstanceID + "'");
 
@@ -114,8 +133,8 @@ public final class MlsHandler
     final IOutboundTransaction aTx = aOutboundMgr.getBySbdhInstanceID (sSbdhInstanceID);
     if (aTx == null)
     {
-      LOGGER.warn ("No outbound transaction found for SBDH Instance ID '" + sSbdhInstanceID + "'");
-      return;
+      LOGGER.warn ("No outbound transaction found for SBDH '" + sSbdhInstanceID + "'");
+      return ESuccess.FAILURE;
     }
 
     final EMlsReceptionStatus eMlsStatus = switch (eResponseCode)
@@ -124,7 +143,12 @@ public final class MlsHandler
       case ACKNOWLEDGING -> EMlsReceptionStatus.RECEIVED_AB;
       case REJECTION -> EMlsReceptionStatus.RECEIVED_RE;
     };
-    aOutboundMgr.updateMlsStatus (aTx.getID (), eMlsStatus, aMlsAS4ReceivedDT, sMlsID);
+
+    // Store in DB
+    if (aOutboundMgr.updateMlsStatus (aTx.getID (), eMlsStatus, aMlsAS4ReceivedDT, sMlsID).isFailure ())
+      return ESuccess.FAILURE;
+
     LOGGER.info ("Updated MLS status for transaction '" + aTx.getID () + "' to '" + eMlsStatus.getID () + "'");
+    return ESuccess.SUCCESS;
   }
 }

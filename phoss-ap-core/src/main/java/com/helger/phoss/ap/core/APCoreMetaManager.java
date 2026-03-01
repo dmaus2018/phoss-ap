@@ -36,9 +36,9 @@ import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
 import com.helger.phoss.ap.api.spi.SafeNotificationHandler;
 
-public final class APMetaManager
+public final class APCoreMetaManager
 {
-  private static final Logger LOGGER = LoggerFactory.getLogger (APMetaManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger (APCoreMetaManager.class);
 
   private static IDocumentForwarderSPI s_aForwarder;
   private static final ICommonsList <IInboundDocumentVerifierSPI> s_aInboundVerifiers = new CommonsArrayList <> ();
@@ -46,7 +46,7 @@ public final class APMetaManager
   private static final ICommonsList <IPeppolReceiverCheckSPI> s_aReceiverChecks = new CommonsArrayList <> ();
   private static final ICommonsList <INotificationHandlerSPI> s_aNotificationHandlers = new CommonsArrayList <> ();
 
-  private APMetaManager ()
+  private APCoreMetaManager ()
   {}
 
   public static void init ()

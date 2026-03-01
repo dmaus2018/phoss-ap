@@ -27,6 +27,7 @@ import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.httpclient.HttpClientSettings;
 import com.helger.httpclient.HttpClientSettingsConfig;
 import com.helger.phoss.ap.api.config.APConfigProvider;
+import com.helger.phoss.ap.api.config.APConfigurationProperties;
 
 @Immutable
 public final class APBasicConfig
@@ -40,6 +41,21 @@ public final class APBasicConfig
   private static IConfigWithFallback _getConfig ()
   {
     return APConfigProvider.getConfig ();
+  }
+
+  // Document storage
+  @NonNull
+  public static String getStorageInboundPath ()
+  {
+    return _getConfig ().getAsString (APConfigurationProperties.STORAGE_INBOUND_PATH,
+                                      APConfigurationProperties.STORAGE_INBOUND_PATH_DEFAULT);
+  }
+
+  @NonNull
+  public static String getStorageOutboundPath ()
+  {
+    return _getConfig ().getAsString (APConfigurationProperties.STORAGE_OUTBOUND_PATH,
+                                      APConfigurationProperties.STORAGE_OUTBOUND_PATH_DEFAULT);
   }
 
   private static final AtomicBoolean PROXY_INITED = new AtomicBoolean (false);

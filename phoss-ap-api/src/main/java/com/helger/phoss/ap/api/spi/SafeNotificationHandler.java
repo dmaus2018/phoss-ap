@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.tostring.ToStringGenerator;
+import com.helger.peppol.mls.EPeppolMLSResponseCode;
 
 /**
  * This is a wrapper class around another {@link INotificationHandlerSPI} implementation that wraps
@@ -82,6 +83,32 @@ public final class SafeNotificationHandler implements INotificationHandlerSPI
     catch (final Exception ex)
     {
       LOGGER.error ("Internal error invoking onPermanentForwardingFailure on " + m_aHdl, ex);
+    }
+  }
+
+  public void onInboundMLSCorrelationError (@NonNull final String sTxID,
+                                            @NonNull final String sReferencedSbdhInstanceID,
+                                            @NonNull final EPeppolMLSResponseCode eMlsResponseCode)
+  {
+    try
+    {
+      m_aHdl.onInboundMLSCorrelationError (sTxID, sReferencedSbdhInstanceID, eMlsResponseCode);
+    }
+    catch (final Exception ex)
+    {
+      LOGGER.error ("Internal error invoking onInboundMLSCorrelationError on " + m_aHdl, ex);
+    }
+  }
+
+  public void onInboundForwardingError (@NonNull final String sTxID)
+  {
+    try
+    {
+      m_aHdl.onInboundForwardingError (sTxID);
+    }
+    catch (final Exception ex)
+    {
+      LOGGER.error ("Internal error invoking onInboundForwardingError on " + m_aHdl, ex);
     }
   }
 

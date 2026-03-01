@@ -234,21 +234,6 @@ public final class APCoreConfig
                                        APConfigurationProperties.NOTIFICATION_ENABLED_DEFAULT);
   }
 
-  // Document storage
-  @NonNull
-  public static String getStorageInboundPath ()
-  {
-    return _getConfig ().getAsString (APConfigurationProperties.STORAGE_INBOUND_PATH,
-                                      APConfigurationProperties.STORAGE_INBOUND_PATH_DEFAULT);
-  }
-
-  @NonNull
-  public static String getStorageOutboundPath ()
-  {
-    return _getConfig ().getAsString (APConfigurationProperties.STORAGE_OUTBOUND_PATH,
-                                      APConfigurationProperties.STORAGE_OUTBOUND_PATH_DEFAULT);
-  }
-
   // Startup recovery
   public static boolean isStartupRecoveryEnabled ()
   {

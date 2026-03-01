@@ -34,6 +34,7 @@ import com.helger.phoss.ap.api.codelist.ETransactionType;
 import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
+import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
@@ -62,7 +63,7 @@ public final class OutboundOrchestrator
     // Optional verification
     if (APCoreConfig.isVerificationOutboundEnabled ())
     {
-      for (final IOutboundDocumentVerifierSPI aVerifier : APMetaManager.getAllOutboundVerifiers ())
+      for (final IOutboundDocumentVerifierSPI aVerifier : APCoreMetaManager.getAllOutboundVerifiers ())
       {
         if (aVerifier.verifyDocument (aDocumentBytes, sDocTypeID, sProcessID).isFailure ())
         {
@@ -78,7 +79,7 @@ public final class OutboundOrchestrator
     final OffsetDateTime aAS4SendingDT = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
 
     // Store document to disk
-    final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APCoreConfig.getStorageOutboundPath ()),
+    final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APBasicConfig.getStorageOutboundPath ()),
                                                                       aAS4SendingDT,
                                                                       sSbdhInstanceID + ".out",
                                                                       aDocumentBytes);
@@ -119,7 +120,7 @@ public final class OutboundOrchestrator
     final OffsetDateTime aAS4SendingDT = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
 
     // Store document to disk
-    final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APCoreConfig.getStorageOutboundPath ()),
+    final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APBasicConfig.getStorageOutboundPath ()),
                                                                       aAS4SendingDT,
                                                                       sSbdhInstanceID + ".sbd",
                                                                       aSbdBytes);
@@ -181,7 +182,7 @@ public final class OutboundOrchestrator
       {
         aTxMgr.updateStatusAndRetry (sID, EOutboundStatus.PERMANENTLY_FAILED, nNewAttemptCount, null, ex.getMessage ());
         // Notify
-        for (final var aHandler : APMetaManager.getAllNotificationHandlers ())
+        for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
           aHandler.onPermanentSendingFailure (sID, aTx.getSbdhInstanceID (), ex.getMessage ());
       }
       else
