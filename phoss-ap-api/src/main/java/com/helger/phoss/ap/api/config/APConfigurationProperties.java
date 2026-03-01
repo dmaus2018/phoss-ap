@@ -129,18 +129,11 @@ public final class APConfigurationProperties
   public static final String NOTIFICATION_ENABLED = "notification.enabled";
   public static final boolean NOTIFICATION_ENABLED_DEFAULT = true;
 
-  // HTTP Proxy
-  public static final String HTTP_PROXY_ENABLED = "http.proxy.enabled";
-  public static final boolean HTTP_PROXY_ENABLED_DEFAULT = false;
-  public static final String HTTP_PROXY_HOST = "http.proxy.host";
-  public static final String HTTP_PROXY_PORT = "http.proxy.port";
-  public static final String HTTP_PROXY_USERNAME = "http.proxy.username";
-  public static final String HTTP_PROXY_PASSWORD = "http.proxy.password";
-  public static final String HTTP_PROXY_NON_PROXY_HOSTS = "http.proxy.nonProxyHosts";
-
   // Document storage
   public static final String STORAGE_INBOUND_PATH = "storage.inbound.path";
+  public static final String STORAGE_INBOUND_PATH_DEFAULT = "/var/phoss-ap/inbound";
   public static final String STORAGE_OUTBOUND_PATH = "storage.outbound.path";
+  public static final String STORAGE_OUTBOUND_PATH_DEFAULT = "/var/phoss-ap/outbound";
 
   // Shutdown / Startup
   public static final String SHUTDOWN_TIMEOUT_MS = "shutdown.timeout.ms";

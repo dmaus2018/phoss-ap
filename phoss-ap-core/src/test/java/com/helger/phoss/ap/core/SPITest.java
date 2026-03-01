@@ -14,16 +14,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.helger.phoss.ap.webapp;
+package com.helger.phoss.ap.core;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.junit.Test;
 
-@SpringBootApplication
-public class PhossAPApplication
+import com.helger.unittestext.SPITestHelper;
+
+/**
+ * Test SPI definitions
+ *
+ * @author Philip Helger
+ */
+public final class SPITest
 {
-  public static void main (final String [] args)
+  @Test
+  public void testBasic () throws Exception
   {
-    SpringApplication.run (PhossAPApplication.class, args);
+    SPITestHelper.testIfAllSPIImplementationsAreValid ();
   }
 }

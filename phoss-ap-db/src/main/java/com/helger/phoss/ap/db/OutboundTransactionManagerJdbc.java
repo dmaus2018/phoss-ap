@@ -78,11 +78,11 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
                         @Nonnegative final long nDocumentSize,
                         @NonNull final String sDocumentHash,
                         @NonNull final String sC1CountryCode,
+                        @NonNull final OffsetDateTime aCreationTD,
                         @Nullable final String sMlsTo,
                         @Nullable final String sMlsInboundTransactionID)
   {
     final String sID = createUniqueRowID ();
-    final OffsetDateTime aNow = now ();
 
     final DBExecutor aExecutor = newExecutor ();
     final long nRowsAffected = aExecutor.insertOrUpdateOrDelete ("INSERT INTO " +
@@ -105,7 +105,7 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
                                                                                                             sC1CountryCode,
                                                                                                             EOutboundStatus.PENDING.getID (),
                                                                                                             Integer.valueOf (0),
-                                                                                                            aNow,
+                                                                                                            aCreationTD,
                                                                                                             null,
                                                                                                             EReportingStatus.PENDING.getID (),
                                                                                                             null,

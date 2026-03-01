@@ -16,6 +16,7 @@
  */
 package com.helger.phoss.ap.core;
 
+import java.io.File;
 import java.time.OffsetDateTime;
 
 import org.jspecify.annotations.NonNull;
@@ -23,11 +24,9 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
-import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
 import com.helger.peppol.sbdh.EPeppolMLSType;
+import com.helger.peppol.sbdh.PeppolSBDHData;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EMlsReceptionStatus;
@@ -35,6 +34,8 @@ import com.helger.phoss.ap.api.codelist.ESourceType;
 import com.helger.phoss.ap.api.codelist.ETransactionType;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
+import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 
 public final class MlsHandler
@@ -51,7 +52,7 @@ public final class MlsHandler
     final IInboundTransactionManager aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
 
     // Determine if we should send MLS
-    if (eMlsType == EPeppolMLSType.FAILURE_ONLY && eResponseCode != EPeppolMLSResponseCode.REJECTION)
+    if (eMlsType == EPeppolMLSType.FAILURE_ONLY && eResponseCode.isSuccess ())
     {
       LOGGER.info ("MLS not required for transaction " +
                    aTx.getID () +
@@ -62,19 +63,25 @@ public final class MlsHandler
       return;
     }
 
-    LOGGER.info ("Creating MLS response (" + eResponseCode.getID () + ") for inbound transaction: " + aTx.getID ());
+    LOGGER.info ("Creating MLS response (" +
+                 eResponseCode.getID () +
+                 ") for inbound transaction '" +
+                 aTx.getID () +
+                 "'");
 
     // Create an outbound transaction for the MLS response
     final IOutboundTransactionManager aOutboundMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
 
-    // MLS response bytes would be created from peppol-mls library
+    // TODO MLS response bytes would be created from peppol-mls library
     // For now, placeholder
     final byte [] aMlsBytes = {};
-    final String sMlsSbdhInstanceID = "mls-" + java.util.UUID.randomUUID ().toString ();
+    final String sMlsSbdhInstanceID = PeppolSBDHData.createRandomSBDHInstanceIdentifier ();
+    final OffsetDateTime aAS4SendingDT = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
 
     // Store MLS document to disk
     final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APCoreConfig.getStorageOutboundPath ()),
-                                                                      sMlsSbdhInstanceID + ".sbd",
+                                                                      aAS4SendingDT,
+                                                                      sMlsSbdhInstanceID + ".mls",
                                                                       aMlsBytes);
 
     final String sMlsTxID = aOutboundMgr.create (ETransactionType.MLS_RESPONSE,
@@ -88,6 +95,7 @@ public final class MlsHandler
                                                  aMlsBytes.length,
                                                  "",
                                                  APCoreConfig.getPeppolOwnerCountryCode (),
+                                                 aAS4SendingDT,
                                                  null,
                                                  aTx.getID ());
 

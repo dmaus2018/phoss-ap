@@ -47,11 +47,13 @@ public class InboundController
     if (aTx == null)
       return ResponseEntity.notFound ().build ();
 
-    // Store the country code
+    // Store the country code for C4 and create the reporting entry
     aTxMgr.updateC4CountryCode (aTx.getID (), sC4CountryCode);
     ReportingManager.storeInboundForReporting (aTx);
 
-    return ResponseEntity.ok (new ReportResponse (aTx.getID (), "updated", "C4 country code set to " + sC4CountryCode));
+    return ResponseEntity.ok (new ReportResponse (aTx.getID (),
+                                                  "updated",
+                                                  "C4 country code set to '" + sC4CountryCode + "'"));
   }
 
   @GetMapping ("/status/{sbdhInstanceID}")

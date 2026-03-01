@@ -18,8 +18,6 @@ package com.helger.phoss.ap.core;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonnegative;
 import com.helger.annotation.concurrent.Immutable;
@@ -33,8 +31,6 @@ import com.helger.phoss.ap.api.config.APConfigurationProperties;
 @Immutable
 public final class APCoreConfig
 {
-  private static final Logger LOGGER = LoggerFactory.getLogger (APCoreConfig.class);
-
   private APCoreConfig ()
   {}
 
@@ -242,13 +238,15 @@ public final class APCoreConfig
   @NonNull
   public static String getStorageInboundPath ()
   {
-    return _getConfig ().getAsString (APConfigurationProperties.STORAGE_INBOUND_PATH, "/var/phoss-ap/inbound");
+    return _getConfig ().getAsString (APConfigurationProperties.STORAGE_INBOUND_PATH,
+                                      APConfigurationProperties.STORAGE_INBOUND_PATH_DEFAULT);
   }
 
   @NonNull
   public static String getStorageOutboundPath ()
   {
-    return _getConfig ().getAsString (APConfigurationProperties.STORAGE_OUTBOUND_PATH, "/var/phoss-ap/outbound");
+    return _getConfig ().getAsString (APConfigurationProperties.STORAGE_OUTBOUND_PATH,
+                                      APConfigurationProperties.STORAGE_OUTBOUND_PATH_DEFAULT);
   }
 
   // Startup recovery

@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.helger.phoss.ap.core;
+package com.helger.phoss.ap.core.inbound;
 
 import java.io.File;
 import java.security.cert.X509Certificate;
@@ -29,7 +29,6 @@ import org.unece.cefact.namespaces.sbdh.StandardBusinessDocument;
 
 import com.helger.annotation.style.IsSPIImplementation;
 import com.helger.base.string.StringHelper;
-import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
 import com.helger.http.header.HttpHeaderMap;
 import com.helger.peppol.reporting.api.CPeppolReporting;
 import com.helger.peppol.sbdh.PeppolSBDHData;
@@ -51,6 +50,10 @@ import com.helger.phoss.ap.api.spi.IDocumentForwarderSPI;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
+import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
+import com.helger.phoss.ap.core.APCoreConfig;
+import com.helger.phoss.ap.core.APMetaManager;
+import com.helger.phoss.ap.core.ReportingManager;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
 import com.helger.phoss.ap.core.helper.HashHelper;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
@@ -241,7 +244,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
         aAS4Timestamp = aIncomingState.getMessageTimestamp ().toOffsetDateTime ();
       else
       {
-        // Default to UTC as per spec
+        // Default to UTC as per AS4 specification
         aAS4Timestamp = OffsetDateTime.of (aIncomingState.getMessageTimestamp ().toLocalDateTime (), ZoneOffset.UTC);
       }
     }
@@ -253,6 +256,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
 
     // Store document to disk
     final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APCoreConfig.getStorageInboundPath ()),
+                                                                      aAS4Timestamp,
                                                                       sSbdhInstanceID + ".sbd",
                                                                       aSBDBytes);
 

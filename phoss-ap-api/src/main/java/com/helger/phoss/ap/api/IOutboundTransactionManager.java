@@ -65,6 +65,8 @@ public interface IOutboundTransactionManager
    *        SHA-256 hash of the document. Never <code>null</code>.
    * @param sC1CountryCode
    *        Country code of the sender (C1). Never <code>null</code>.
+   * @param aCreationTD
+   *        The date and time when the message was created. Never <code>null</code>.
    * @param sMlsTo
    *        Optional MLS_TO override. May be <code>null</code>.
    * @param sMlsInboundTransactionID
@@ -83,6 +85,7 @@ public interface IOutboundTransactionManager
                  @Nonnegative long nDocumentSize,
                  @NonNull String sDocumentHash,
                  @NonNull String sC1CountryCode,
+                 @NonNull OffsetDateTime aCreationTD,
                  @Nullable String sMlsTo,
                  @Nullable String sMlsInboundTransactionID);
 

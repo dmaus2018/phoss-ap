@@ -16,6 +16,7 @@
  */
 package com.helger.phoss.ap.core;
 
+import java.io.File;
 import java.time.OffsetDateTime;
 
 import org.jspecify.annotations.NonNull;
@@ -23,10 +24,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-
 import com.helger.phase4.model.message.MessageHelperMethods;
-import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
 import com.helger.phoss.ap.api.IOutboundSendingAttemptManager;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EAttemptStatus;
@@ -37,6 +35,7 @@ import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
+import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
 import com.helger.phoss.ap.core.helper.HashHelper;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
@@ -60,8 +59,6 @@ public final class OutboundOrchestrator
   {
     LOGGER.info ("Submitting raw document with SBDH Instance ID '" + sSbdhInstanceID + "'");
 
-    final String sDocumentHash = HashHelper.sha256Hex (aDocumentBytes);
-
     // Optional verification
     if (APCoreConfig.isVerificationOutboundEnabled ())
     {
@@ -77,9 +74,13 @@ public final class OutboundOrchestrator
 
     final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
 
+    final String sDocumentHash = HashHelper.sha256Hex (aDocumentBytes);
+    final OffsetDateTime aAS4SendingDT = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
+
     // Store document to disk
     final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APCoreConfig.getStorageOutboundPath ()),
-                                                                      sSbdhInstanceID + ".sbd",
+                                                                      aAS4SendingDT,
+                                                                      sSbdhInstanceID + ".out",
                                                                       aDocumentBytes);
 
     // Create in pending state
@@ -94,6 +95,7 @@ public final class OutboundOrchestrator
                                                aDocumentBytes.length,
                                                sDocumentHash,
                                                sC1CountryCode,
+                                               aAS4SendingDT,
                                                sMlsTo,
                                                null);
     return aMgr.getByID (sTransactionID);
@@ -111,12 +113,14 @@ public final class OutboundOrchestrator
   {
     LOGGER.info ("Submitting pre-built SBD with SBDH Instance ID '" + sSbdhInstanceID + "'");
 
-    final String sDocumentHash = HashHelper.sha256Hex (aSbdBytes);
-
     final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+
+    final String sDocumentHash = HashHelper.sha256Hex (aSbdBytes);
+    final OffsetDateTime aAS4SendingDT = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
 
     // Store document to disk
     final String sDocumentPath = DocumentStorageHelper.storeDocument (new File (APCoreConfig.getStorageOutboundPath ()),
+                                                                      aAS4SendingDT,
                                                                       sSbdhInstanceID + ".sbd",
                                                                       aSbdBytes);
 
@@ -132,6 +136,7 @@ public final class OutboundOrchestrator
                                                aSbdBytes.length,
                                                sDocumentHash,
                                                sC1CountryCode,
+                                               aAS4SendingDT,
                                                sMlsTo,
                                                null);
     return aMgr.getByID (sTransactionID);
