@@ -16,7 +16,6 @@
  */
 package com.helger.phoss.ap.core;
 
-import java.util.List;
 import java.util.ServiceLoader;
 
 import org.jspecify.annotations.NonNull;
@@ -25,22 +24,26 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.exception.InitializationException;
-import com.helger.base.spi.ServiceLoaderHelper;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
+import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.config.APConfigProvider;
-import com.helger.phoss.ap.api.spi.IDocumentForwarderSPI;
+import com.helger.phoss.ap.api.config.APConfigurationProperties;
+import com.helger.phoss.ap.api.spi.IDocumentForwarder;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.INotificationHandlerSPI;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
 import com.helger.phoss.ap.api.spi.SafeNotificationHandler;
+import com.helger.phoss.ap.forwarding.http.HttpDocumentForwarder;
+import com.helger.phoss.ap.forwarding.s3.S3DocumentForwarder;
+import com.helger.phoss.ap.forwarding.sftp.SftpDocumentForwarder;
 
 public final class APCoreMetaManager
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (APCoreMetaManager.class);
 
-  private static IDocumentForwarderSPI s_aForwarder;
+  private static IDocumentForwarder s_aForwarder;
   private static final ICommonsList <IInboundDocumentVerifierSPI> s_aInboundVerifiers = new CommonsArrayList <> ();
   private static final ICommonsList <IOutboundDocumentVerifierSPI> s_aOutboundVerifiers = new CommonsArrayList <> ();
   private static final ICommonsList <IPeppolReceiverCheckSPI> s_aReceiverChecks = new CommonsArrayList <> ();
@@ -53,17 +56,20 @@ public final class APCoreMetaManager
   {
     LOGGER.info ("Initializing APMetaManager");
 
-    // Load SPI implementations
+    // Create forwarder based on configuration
     {
-      final List <IDocumentForwarderSPI> aForwarders = ServiceLoaderHelper.getAllSPIImplementations (IDocumentForwarderSPI.class);
-      if (aForwarders.isEmpty ())
-        throw new InitializationException ("No SPI forwarder is configured");
-      if (aForwarders.size () != 1)
-        throw new InitializationException ("Expected exactly on SPI forwarder but found " +
-                                           aForwarders.size () +
-                                           ": " +
-                                           aForwarders);
-      final IDocumentForwarderSPI aForwarder = aForwarders.get (0);
+      final String sForwardingMode = APConfigProvider.getConfig ()
+                                                     .getAsString (APConfigurationProperties.FORWARDING_MODE);
+      final EForwardingMode eForwardingMode = EForwardingMode.getFromIDOrNull (sForwardingMode);
+      if (eForwardingMode == null)
+        throw new InitializationException ("The configured Forwarding Mode '" + sForwardingMode + "' is invalid");
+
+      final IDocumentForwarder aForwarder = switch (eForwardingMode)
+      {
+        case HTTP_POST_SYNC, HTTP_POST_ASYNC -> new HttpDocumentForwarder (eForwardingMode);
+        case S3_LINK -> new S3DocumentForwarder ();
+        case SFTP -> new SftpDocumentForwarder ();
+      };
       aForwarder.initFromConfiguration (APConfigProvider.getConfig ());
       s_aForwarder = aForwarder;
       LOGGER.info ("Loaded document forwarder: " + aForwarder.toString ());
@@ -102,7 +108,7 @@ public final class APCoreMetaManager
   }
 
   @NonNull
-  public static IDocumentForwarderSPI getForwarder ()
+  public static IDocumentForwarder getForwarder ()
   {
     return s_aForwarder;
   }

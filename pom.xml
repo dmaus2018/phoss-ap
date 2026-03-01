@@ -121,17 +121,7 @@
       </dependency>
       <dependency>
         <groupId>com.helger.phoss.ap</groupId>
-        <artifactId>phoss-ap-forwarding-http</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.helger.phoss.ap</groupId>
-        <artifactId>phoss-ap-forwarding-s3</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.helger.phoss.ap</groupId>
-        <artifactId>phoss-ap-forwarding-sftp</artifactId>
+        <artifactId>phoss-ap-forwarding</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -237,10 +227,8 @@
     <module>phoss-ap-api</module>
     <module>phoss-ap-basic</module>
     <module>phoss-ap-db</module>
+    <module>phoss-ap-forwarding</module>
     <module>phoss-ap-core</module>
-    <module>phoss-ap-forwarding-http</module>
-    <module>phoss-ap-forwarding-s3</module>
-    <module>phoss-ap-forwarding-sftp</module>
     <module>phoss-ap-webapp</module>
     <module>phoss-ap-testbackend</module>
   </modules>

@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.helger.base.string.StringHelper;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
@@ -47,9 +48,13 @@ public class InboundController
     if (aTx == null)
       return ResponseEntity.notFound ().build ();
 
+    // Does the transaction already have a C4 Country Code?
+    if (StringHelper.isNotEmpty (aTx.getC4CountryCode ()))
+      return ResponseEntity.badRequest ().build ();
+
     // Store the country code for C4 and create the reporting entry
     aTxMgr.updateC4CountryCode (aTx.getID (), sC4CountryCode);
-    ReportingManager.storeInboundForReporting (aTx);
+    ReportingManager.storeInboundForReporting (aTx.getID ());
 
     return ResponseEntity.ok (new ReportResponse (aTx.getID (),
                                                   "updated",

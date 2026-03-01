@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.base.enforce.ValueEnforcer;
+import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
 import com.helger.peppol.reporting.api.PeppolReportingItem;
 import com.helger.peppol.reporting.api.backend.PeppolReportingBackend;
@@ -31,7 +32,6 @@ import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EReportingStatus;
 import com.helger.phoss.ap.api.config.APConfigProvider;
-import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 
 public final class ReportingManager
@@ -41,19 +41,27 @@ public final class ReportingManager
   private ReportingManager ()
   {}
 
-  public static void storeOutboundForReporting (@NonNull final String sTransactionID)
+  @NonNull
+  public static ESuccess storeOutboundForReporting (@NonNull final String sTransactionID)
   {
     LOGGER.info ("Marking outbound transaction as reported: " + sTransactionID);
     final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
-    aTxMgr.updateReportingStatus (sTransactionID, EReportingStatus.REPORTED);
+    return aTxMgr.updateReportingStatus (sTransactionID, EReportingStatus.REPORTED);
   }
 
-  public static void storeInboundForReporting (@NonNull final IInboundTransaction aTx)
+  @NonNull
+  public static ESuccess storeInboundForReporting (@NonNull final String sTransactionID)
   {
-    ValueEnforcer.notNull (aTx, "InboundTransaction");
+    ValueEnforcer.notNull (sTransactionID, "TransactionID");
 
-    final String sTransactionID = aTx.getID ();
-    LOGGER.info ("Marking inbound transaction as reported '" + sTransactionID + "'");
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+
+    // Re-read the transaction to get the latest data
+    final var aTx = aTxMgr.getByID (sTransactionID);
+    if (aTx == null)
+      throw new IllegalArgumentException ("The provided transaction ID '" + sTransactionID + "' does not exist");
+
+    LOGGER.info ("Counting inbound transaction '" + sTransactionID + "' for Peppol Reporting");
 
     if (StringHelper.isEmpty (aTx.getC4CountryCode ()))
       throw new IllegalStateException ("Inbound transaction '" + sTransactionID + "' has no C4 country code yet");
@@ -93,12 +101,12 @@ public final class ReportingManager
                                             aBackend -> aBackend.storeReportingItem (aReportingItem));
 
       // Remember that we did it
-      final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
-      aTxMgr.updateReportingStatus (sTransactionID, EReportingStatus.REPORTED);
+      return aTxMgr.updateReportingStatus (sTransactionID, EReportingStatus.REPORTED);
     }
     catch (final Exception ex)
     {
-      LOGGER.error ("Failed to store reporting item for inbound transaction '" + sTransactionID + "'");
+      LOGGER.error ("Failed to store Peppol Reporting data for inbound transaction '" + sTransactionID + "'");
     }
+    return ESuccess.FAILURE;
   }
 }

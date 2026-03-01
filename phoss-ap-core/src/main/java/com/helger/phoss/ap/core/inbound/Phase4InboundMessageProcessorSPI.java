@@ -54,7 +54,7 @@ import com.helger.phoss.ap.api.codelist.EDuplicateDetectionMode;
 import com.helger.phoss.ap.api.codelist.EInboundStatus;
 import com.helger.phoss.ap.api.model.ForwardingResult;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
-import com.helger.phoss.ap.api.spi.IDocumentForwarderSPI;
+import com.helger.phoss.ap.api.spi.IDocumentForwarder;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
 import com.helger.phoss.ap.basic.APBasicConfig;
@@ -86,7 +86,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
     final String sCircuitBreakerID = "phoss-ap-forwarder";
     if (CircuitBreakerManager.tryAcquirePermit (sCircuitBreakerID))
     {
-      final IDocumentForwarderSPI aForwarder = APCoreMetaManager.getForwarder ();
+      final IDocumentForwarder aForwarder = APCoreMetaManager.getForwarder ();
       if (aForwarder == null)
       {
         LOGGER.error ("Internal error - No document forwarder configured");
@@ -121,17 +121,16 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
         aAttemptMgr.createSuccess (aTx.getID ());
 
         aTxMgr.updateStatusCompleted (aTx.getID (), EInboundStatus.FORWARDED);
-        LOGGER.info ("Forwarding successful for transaction: " + aTx);
+        LOGGER.info ("Forwarding successful for transaction '" + aTx.getID () + "'");
 
         if (aResult.hasCountryCodeC4 ())
         {
           // We can store the reporting item immediately
           aTxMgr.updateC4CountryCode (aTx.getID (), aResult.getCountryCodeC4 ());
-
-          // Re-read the transaction to get the updated data
-          final IInboundTransaction aTx2 = aTxMgr.getByID (aTx.getID ());
-
-          ReportingManager.storeInboundForReporting (aTx2);
+          if (ReportingManager.storeInboundForReporting (aTx.getID ()).isFailure ())
+            LOGGER.error ("Forwarding successful, but failed to store Peppol Reporting entry for '" +
+                          aTx.getID () +
+                          "'");
         }
 
         return ESuccess.SUCCESS;

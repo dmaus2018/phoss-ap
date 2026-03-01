@@ -26,61 +26,49 @@
     <artifactId>phoss-ap-parent-pom</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>phoss-ap-core</artifactId>
+  <artifactId>phoss-ap-forwarding</artifactId>
   <packaging>jar</packaging>
-  <name>phoss-ap-core</name>
-  <description>Peppol Access Point - Core business logic</description>
+  <name>phoss-ap-forwarding</name>
+  <description>Peppol Access Point - Document forwarding implementations (HTTP, S3, SFTP)</description>
 
   <dependencies>
-    <dependency>
-      <groupId>com.helger.peppol</groupId>
-      <artifactId>peppol-commons</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.helger.peppol</groupId>
-      <artifactId>peppol-mls</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.helger.phase4</groupId>
-      <artifactId>phase4-peppol-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.helger.phase4</groupId>
-      <artifactId>phase4-peppol-servlet</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.helger.peppol</groupId>
-      <artifactId>peppol-reporting</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.helger.peppol</groupId>
-      <artifactId>peppol-reporting-support</artifactId>
-      <version>${peppol-ap-support.version}</version>
-    </dependency>
+    <!-- Shared -->
     <dependency>
       <groupId>com.helger.phoss.ap</groupId>
       <artifactId>phoss-ap-api</artifactId>
     </dependency>
     <dependency>
       <groupId>com.helger.phoss.ap</groupId>
-      <artifactId>phoss-ap-db</artifactId>
+      <artifactId>phoss-ap-basic</artifactId>
+    </dependency>
+
+    <!-- HTTP forwarding -->
+    <dependency>
+      <groupId>com.helger.commons</groupId>
+      <artifactId>ph-json</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.helger.phoss.ap</groupId>
-      <artifactId>phoss-ap-forwarding</artifactId>
+      <groupId>com.helger.web</groupId>
+      <artifactId>ph-httpclient</artifactId>
     </dependency>
-    
+
+    <!-- S3 forwarding -->
     <dependency>
-      <groupId>dev.failsafe</groupId>
-      <artifactId>failsafe</artifactId>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
     </dependency>
-    
+
+    <!-- SFTP forwarding -->
     <dependency>
-      <groupId>jakarta.servlet</groupId>
-      <artifactId>jakarta.servlet-api</artifactId>
-      <scope>provided</scope>
+      <groupId>com.helger.web</groupId>
+      <artifactId>ph-jsch</artifactId>
     </dependency>
-    
+    <dependency>
+      <groupId>com.helger.photon</groupId>
+      <artifactId>ph-oton-connect</artifactId>
+      <version>${ph-oton.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>

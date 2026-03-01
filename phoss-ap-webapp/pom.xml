@@ -49,6 +49,10 @@
       <artifactId>phoss-ap-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.helger.phoss.ap</groupId>
+      <artifactId>phoss-ap-forwarding</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.helger.peppol</groupId>
       <artifactId>peppol-reporting-backend-sql</artifactId>
       <version>${peppol-reporting.version}</version>
@@ -81,39 +85,6 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
-  <profiles>
-    <profile>
-      <id>forwarding-http</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>com.helger.phoss.ap</groupId>
-          <artifactId>phoss-ap-forwarding-http</artifactId>
-        </dependency>
-      </dependencies>
-    </profile>
-    <profile>
-      <id>forwarding-s3</id>
-      <dependencies>
-        <dependency>
-          <groupId>com.helger.phoss.ap</groupId>
-          <artifactId>phoss-ap-forwarding-s3</artifactId>
-        </dependency>
-      </dependencies>
-    </profile>
-    <profile>
-      <id>forwarding-sftp</id>
-      <dependencies>
-        <dependency>
-          <groupId>com.helger.phoss.ap</groupId>
-          <artifactId>phoss-ap-forwarding-sftp</artifactId>
-        </dependency>
-      </dependencies>
-    </profile>
-  </profiles>
 
   <build>
     <plugins>
