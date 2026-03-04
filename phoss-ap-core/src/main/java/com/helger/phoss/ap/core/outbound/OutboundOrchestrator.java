@@ -30,6 +30,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.annotation.WillNotClose;
 import com.helger.base.io.stream.CountingInputStream;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.base.state.ESuccess;
@@ -88,7 +89,7 @@ public final class OutboundOrchestrator
                                                         @NonNull final IProcessIdentifier aProcessID,
                                                         @NonNull final String sSbdhInstanceID,
                                                         @NonNull final String sC1CountryCode,
-                                                        @NonNull final InputStream aDocumentIS,
+                                                        @NonNull @WillNotClose final InputStream aDocumentIS,
                                                         @Nullable final String sMlsTo)
   {
     LOGGER.info ("Submitting raw document with SBDH Instance ID '" + sSbdhInstanceID + "'");
@@ -119,12 +120,19 @@ public final class OutboundOrchestrator
                       .isFailure ())
       {
         LOGGER.error ("Failed to store incoming document to disk");
+
+        // No need to keep the temporary file
+        StreamHelper.close (aFileOS);
+        if (aTempFileHolder.isSet ())
+          FileOperationManager.INSTANCE.deleteFileIfExisting (aTempFileHolder.get ());
+        return null;
       }
       nDocumentBytes = aCountingIS.getBytesRead ();
     }
     catch (final Exception ex)
     {
       LOGGER.error ("Failed to process document to submit", ex);
+
       // No need to keep the temporary file
       if (aTempFileHolder.isSet ())
         FileOperationManager.INSTANCE.deleteFileIfExisting (aTempFileHolder.get ());
@@ -139,13 +147,11 @@ public final class OutboundOrchestrator
     if (APCoreConfig.isVerificationOutboundEnabled ())
     {
       for (final IOutboundDocumentVerifierSPI aVerifier : APCoreMetaManager.getAllOutboundVerifiers ())
-      {
         if (aVerifier.verifyDocument (aDocumentFile, aDocTypeID, aProcessID).isFailure ())
         {
           LOGGER.warn ("Outbound document verification failed for SBDH: " + sSbdhInstanceID);
           return null;
         }
-      }
     }
 
     final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
@@ -257,6 +263,7 @@ public final class OutboundOrchestrator
     final String sAS4MessageID = MessageHelperMethods.createRandomMessageID ();
     final OffsetDateTime aAS4Timestamp = aTimestampMgr.getCurrentDateTime ();
 
+    // Callback on recoverable error
     final Consumer <String> onFailed = sErrMsg -> {
       aAttemptMgr.create (sTxID, sAS4MessageID, aAS4Timestamp, null, null, EAttemptStatus.FAILED, sErrMsg);
       final OffsetDateTime aNextRetry = BackoffCalculator.calculateNextRetry (nNewAttemptCount,
@@ -266,6 +273,7 @@ public final class OutboundOrchestrator
       aTxMgr.updateStatusAndRetry (sTxID, EOutboundStatus.FAILED, nNewAttemptCount, aNextRetry, sErrMsg);
     };
 
+    // Callback on permanent failure
     final Consumer <String> onPermanentFailure = sErrMsg -> {
       aAttemptMgr.create (sTxID, sAS4MessageID, aAS4Timestamp, null, null, EAttemptStatus.FAILED, sErrMsg);
       aTxMgr.updateStatusAndRetry (sTxID, EOutboundStatus.PERMANENTLY_FAILED, nNewAttemptCount, null, sErrMsg);
@@ -309,7 +317,7 @@ public final class OutboundOrchestrator
     // Perform SMP lookup
     final X509Certificate aReceiverCert;
     final String sReceiverAPURL;
-    final String sCircuitBreakerKeySMP = "smp::" + aSMPClient.getSMPHostURI ();
+    final String sCircuitBreakerKeySMP = "smp$" + aSMPClient.getSMPHostURI ();
     if (CircuitBreakerManager.tryAcquirePermit (sCircuitBreakerKeySMP))
     {
       final AS4EndpointDetailProviderPeppol aEndpointDetails = AS4EndpointDetailProviderPeppol.create (aSMPClient);

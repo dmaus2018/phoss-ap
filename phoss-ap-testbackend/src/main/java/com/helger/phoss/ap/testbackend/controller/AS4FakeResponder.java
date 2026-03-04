@@ -20,10 +20,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Receives HTTP-forwarded documents from phoss-ap's {@code HttpDocumentForwarderSPI}. Handles both
@@ -44,30 +47,15 @@ public class AS4FakeResponder
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (AS4FakeResponder.class);
 
-  @PostMapping (path = "/plaintext/200",
+  // Must use "HttpServletRequest" to avoid going through other filter layers
+  @PostMapping (path = "/plaintext/{status}",
                 consumes = MediaType.MULTIPART_RELATED_VALUE,
                 produces = MediaType.TEXT_PLAIN_VALUE)
-  public ResponseEntity <String> plainText200 (@SuppressWarnings ("unused") @RequestBody final byte [] aBody)
+  public ResponseEntity <String> plainTextResponse (@SuppressWarnings ("unused") final HttpServletRequest aServletRequest,
+                                                    @SuppressWarnings ("unused") @RequestHeader ("Content-Type") final String sContentType,
+                                                    @PathVariable (value = "status") final int nStatus)
   {
-    LOGGER.info ("In plaintext/200");
-    return ResponseEntity.ok ("Any crap");
-  }
-
-  @PostMapping (path = "/plaintext/403",
-                consumes = MediaType.MULTIPART_RELATED_VALUE,
-                produces = MediaType.TEXT_PLAIN_VALUE)
-  public ResponseEntity <String> plainText403 (@SuppressWarnings ("unused") @RequestBody final byte [] aBody)
-  {
-    LOGGER.info ("In plaintext/403");
-    return ResponseEntity.status (403).body ("Any crap");
-  }
-
-  @PostMapping (path = "/plaintext/500",
-                consumes = MediaType.MULTIPART_RELATED_VALUE,
-                produces = MediaType.TEXT_PLAIN_VALUE)
-  public ResponseEntity <String> plainText500 (@SuppressWarnings ("unused") @RequestBody final byte [] aBody)
-  {
-    LOGGER.info ("In plaintext/500");
-    return ResponseEntity.internalServerError ().body ("Any crap");
+    LOGGER.info ("In plaintext/" + nStatus);
+    return ResponseEntity.status (nStatus).body ("Plain text response with status " + nStatus);
   }
 }

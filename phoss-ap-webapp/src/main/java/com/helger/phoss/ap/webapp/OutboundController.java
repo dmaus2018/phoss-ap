@@ -16,8 +16,10 @@
  */
 package com.helger.phoss.ap.webapp;
 
+import java.io.InputStream;
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,7 +27,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
 import com.helger.base.string.StringHelper;
 import com.helger.collection.commons.ICommonsList;
@@ -42,17 +43,19 @@ import com.helger.phoss.ap.db.APJdbcMetaManager;
 import com.helger.phoss.ap.webapp.dto.OutboundTransactionResponse;
 import com.helger.phoss.ap.webapp.dto.SubmitResponse;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 @RestController
 @RequestMapping ("/api/outbound")
 public class OutboundController
 {
-  @PostMapping ("/submit")
-  public ResponseEntity <SubmitResponse> submitRawDocument (@RequestParam ("senderID") final String sSenderID,
-                                                            @RequestParam ("receiverID") final String sReceiverID,
-                                                            @RequestParam ("docTypeID") final String sDocTypeID,
-                                                            @RequestParam ("processID") final String sProcessID,
-                                                            @RequestParam ("c1CountryCode") final String sC1CountryCode,
-                                                            @RequestParam ("document") final MultipartFile aDocument,
+  @PostMapping ("/submit/{senderID}/{receiverID}/{docTypeID}/{processID}/{c1CountryCode}")
+  public ResponseEntity <SubmitResponse> submitRawDocument (@PathVariable ("senderID") final String sSenderID,
+                                                            @PathVariable ("receiverID") final String sReceiverID,
+                                                            @PathVariable ("docTypeID") final String sDocTypeID,
+                                                            @PathVariable ("processID") final String sProcessID,
+                                                            @PathVariable ("c1CountryCode") final String sC1CountryCode,
+                                                            @NonNull final HttpServletRequest aServletRequest,
                                                             @RequestParam (value = "sbdhInstanceID",
                                                                            required = false) final String sSbdhInstanceID,
                                                             @RequestParam (value = "mlsTo",
@@ -127,44 +130,58 @@ public class OutboundController
                                                            "Failed to parse the process ID '" + sProcessID + "'"));
     }
 
-    final IOutboundTransaction aTx = OutboundOrchestrator.submitRawDocument (aSenderID,
-                                                                             aReceiverID,
-                                                                             aDocTypeID,
-                                                                             aProcessID,
-                                                                             sEffectiveSbdhInstanceID,
-                                                                             sC1CountryCode,
-                                                                             aDocument.getInputStream (),
-                                                                             sMlsTo);
-    if (aTx == null)
+    // Read the InputStream only once
+    try (final InputStream aIS = aServletRequest.getInputStream ())
     {
-      return ResponseEntity.unprocessableContent ()
-                           .body (SubmitResponse.rejected (null,
-                                                           sEffectiveSbdhInstanceID,
-                                                           "Failed to submit outbound transaction"));
+      final IOutboundTransaction aTx = OutboundOrchestrator.submitRawDocument (aSenderID,
+                                                                               aReceiverID,
+                                                                               aDocTypeID,
+                                                                               aProcessID,
+                                                                               sEffectiveSbdhInstanceID,
+                                                                               sC1CountryCode,
+                                                                               aIS,
+                                                                               sMlsTo);
+      if (aTx == null)
+      {
+        return ResponseEntity.unprocessableContent ()
+                             .body (SubmitResponse.rejected (null,
+                                                             sEffectiveSbdhInstanceID,
+                                                             "Failed to submit outbound transaction"));
+      }
+
+      // Perform actual sending
+      if (OutboundOrchestrator.processPendingOutbound ("[SubmitRaw] ", aTx).isFailure ())
+      {
+        return ResponseEntity.unprocessableContent ()
+                             .body (SubmitResponse.rejected (aTx.getID (),
+                                                             sEffectiveSbdhInstanceID,
+                                                             "Failed to process pending outbound transaction"));
+      }
+
+      return ResponseEntity.ok (SubmitResponse.success (aTx.getID (), aTx.getSbdhInstanceID (), aTx.getStatus ()));
     }
-
-    // Perform actual sending
-    OutboundOrchestrator.processPendingOutbound ("[SubmitRaw] ", aTx);
-
-    return ResponseEntity.ok (SubmitResponse.success (aTx.getID (), aTx.getSbdhInstanceID (), aTx.getStatus ()));
   }
 
   @PostMapping ("/submit-sbd")
-  public ResponseEntity <SubmitResponse> submitPrebuiltSBD (@RequestParam ("document") final MultipartFile aDocument,
+  public ResponseEntity <SubmitResponse> submitPrebuiltSBD (@NonNull final HttpServletRequest aServletRequest,
                                                             @RequestParam (value = "mlsTo",
                                                                            required = false) final String sMlsTo) throws Exception
   {
-    final IOutboundTransaction aTx = OutboundOrchestrator.submitPrebuiltSBD (aDocument.getInputStream (), sMlsTo);
-    if (aTx == null)
+    // Read the InputStream only once
+    try (final InputStream aIS = aServletRequest.getInputStream ())
     {
-      return ResponseEntity.unprocessableContent ()
-                           .body (SubmitResponse.rejected (null, null, "Failed to submit outbound transaction"));
+      final IOutboundTransaction aTx = OutboundOrchestrator.submitPrebuiltSBD (aIS, sMlsTo);
+      if (aTx == null)
+      {
+        return ResponseEntity.unprocessableContent ()
+                             .body (SubmitResponse.rejected (null, null, "Failed to submit outbound SBD transaction"));
+      }
+
+      // Perform actual sending
+      OutboundOrchestrator.processPendingOutbound ("[SubmitPrebuiltSBD] ", aTx);
+
+      return ResponseEntity.ok (SubmitResponse.success (aTx.getID (), aTx.getSbdhInstanceID (), aTx.getStatus ()));
     }
-
-    // Perform actual sending
-    OutboundOrchestrator.processPendingOutbound ("[SubmitPrebuiltSBD] ", aTx);
-
-    return ResponseEntity.ok (SubmitResponse.success (aTx.getID (), aTx.getSbdhInstanceID (), aTx.getStatus ()));
   }
 
   @GetMapping ("/status/{sbdhInstanceID}")

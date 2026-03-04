@@ -57,7 +57,9 @@ public final class APFlywayMigrator
     {
       public void handle (@NonNull final Event aEvent, @Nullable final Context aContext)
       {
-        LOGGER.info ("Flyway: Event " + aEvent.getId ());
+        if (LOGGER.isDebugEnabled ())
+          LOGGER.debug ("Flyway: Event " + aEvent.getId ());
+
         if (aEvent == Event.AFTER_EACH_MIGRATE && aContext != null)
         {
           final MigrationInfo aMI = aContext.getMigrationInfo ();
