@@ -44,7 +44,6 @@ import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.outbound.OutboundOrchestrator;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 import com.helger.phoss.ap.webapp.dto.OutboundTransactionResponse;
-import com.helger.phoss.ap.webapp.dto.SubmitResponse;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -136,6 +135,7 @@ public class OutboundController
     // Read the InputStream only once
     try (final InputStream aIS = aServletRequest.getInputStream ())
     {
+      // Store in DB
       final IOutboundTransaction aTx = OutboundOrchestrator.submitRawDocument (aSenderID,
                                                                                aReceiverID,
                                                                                aDocTypeID,
@@ -162,29 +162,37 @@ public class OutboundController
         return ResponseEntity.unprocessableContent ().body (aSendingReport.getAsJsonString ());
       }
 
+      // Sending success
       return ResponseEntity.ok (aSendingReport.getAsJsonString ());
     }
   }
 
   @PostMapping (value = "/submit-sbd", produces = MediaType.APPLICATION_JSON_VALUE)
-  public ResponseEntity <SubmitResponse> submitPrebuiltSBD (@NonNull final HttpServletRequest aServletRequest,
-                                                            @RequestParam (value = "mlsTo",
-                                                                           required = false) final String sMlsTo) throws Exception
+  public ResponseEntity <String> submitPrebuiltSBD (@NonNull final HttpServletRequest aServletRequest,
+                                                    @RequestParam (value = "mlsTo",
+                                                                   required = false) final String sMlsTo) throws Exception
   {
     // Read the InputStream only once
     try (final InputStream aIS = aServletRequest.getInputStream ())
     {
+      // Store in DB
       final IOutboundTransaction aTx = OutboundOrchestrator.submitPrebuiltSBD (aIS, sMlsTo);
       if (aTx == null)
       {
-        return ResponseEntity.unprocessableContent ()
-                             .body (SubmitResponse.rejected (null, null, "Failed to submit outbound SBD transaction"));
+        return ResponseEntity.badRequest ()
+                             .body (JsonValue.create ("Failed to submit outbound SBD transaction").getAsJsonString ());
       }
 
       // Perform actual sending
-      OutboundOrchestrator.processPendingOutbound ("[SubmitPrebuiltSBD] ", aTx);
+      final Phase4PeppolSendingReport aSendingReport = OutboundOrchestrator.processPendingOutbound ("[SubmitPrebuiltSBD] ",
+                                                                                                    aTx);
+      if (!aSendingReport.isOverallSuccess ())
+      {
+        return ResponseEntity.unprocessableContent ().body (aSendingReport.getAsJsonString ());
+      }
 
-      return ResponseEntity.ok (SubmitResponse.success (aTx.getID (), aTx.getSbdhInstanceID (), aTx.getStatus ()));
+      // Sending success
+      return ResponseEntity.ok (aSendingReport.getAsJsonString ());
     }
   }
 
