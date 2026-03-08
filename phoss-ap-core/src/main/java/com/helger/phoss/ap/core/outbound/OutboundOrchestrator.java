@@ -34,6 +34,7 @@ import com.helger.annotation.WillNotClose;
 import com.helger.base.io.stream.CountingInputStream;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.base.string.StringHex;
+import com.helger.base.timing.StopWatch;
 import com.helger.base.wrapper.Wrapper;
 import com.helger.io.file.FileOperationManager;
 import com.helger.peppol.sbdh.PeppolSBDHData;
@@ -281,9 +282,7 @@ public final class OutboundOrchestrator
 
     final int nNewAttemptCount = aTx.getAttemptCount () + 1;
     final String sAS4MessageID = MessageHelperMethods.createRandomMessageID ();
-    aSendingReport.setAS4MessageID (sAS4MessageID);
-    final OffsetDateTime aAS4Timestamp = aTimestampMgr.getCurrentDateTime ();
-    aSendingReport.setAS4SendingDT (aAS4Timestamp);
+    final OffsetDateTime aAS4Timestamp = aTimestampMgr.getCurrentDateTimeUTC ();
 
     // Callback on recoverable error
     final Consumer <String> onFailed = sErrMsg -> {
@@ -328,8 +327,12 @@ public final class OutboundOrchestrator
       throw new IllegalStateException ("Failed to parse process identifier '" + aTx.getProcessID () + "'");
     aSendingReport.setProcessID (aProcessID);
 
+    // Avoid message is taken by another thread
+    aTxMgr.updateStatus (sTxID, EOutboundStatus.SENDING);
+
     // SMP lookup to find endpoint URL
-    // Try to resolve SMP host
+    // Try to resolve SMP host - performs NAPTR lookup
+    final StopWatch aLookupSW = StopWatch.createdStarted ();
     final SMPClientReadOnly aSMPClient;
     try
     {
@@ -342,8 +345,13 @@ public final class OutboundOrchestrator
       final String sMsg = "The participant ID '" + aTx.getReceiverID () + "' is not registered in the Peppol Network";
       aSendingReport.setLookupError (sMsg);
       aSendingReport.setLookupException (ex);
+
+      // Remember duration
+      aLookupSW.stop ();
+      aSendingReport.setLookupDurationMillis (aLookupSW.getMillis ());
+
       onPermanentFailure.accept (sMsg + ". Technical details: " + ex.getMessage ());
-      // aSendingReport.setSend
+
       return aSendingReport;
     }
 
@@ -356,7 +364,9 @@ public final class OutboundOrchestrator
       final AS4EndpointDetailProviderPeppol aEndpointDetails = AS4EndpointDetailProviderPeppol.create (aSMPClient);
       try
       {
+        // Throws an exception in case of error
         aEndpointDetails.init (aDocTypeID, aProcessID, aReceiverID);
+        aLookupSW.stop ();
         aReceiverCert = aEndpointDetails.getReceiverAPCertificate ();
         sReceiverAPURL = aEndpointDetails.getReceiverAPEndpointURL ();
 
@@ -364,6 +374,7 @@ public final class OutboundOrchestrator
         aSendingReport.setC3Cert (aReceiverCert);
         aSendingReport.setC3EndpointURL (sReceiverAPURL);
         aSendingReport.setC3TechnicalContact (aEndpointDetails.getReceiverTechnicalContact ());
+        aSendingReport.setLookupDurationMillis (aLookupSW.getMillis ());
 
         CircuitBreakerManager.recordSuccess (sCircuitBreakerKeySMP);
       }
@@ -371,6 +382,7 @@ public final class OutboundOrchestrator
       {
         CircuitBreakerManager.recordFailure (sCircuitBreakerKeySMP);
 
+        aLookupSW.stop ();
         if (ex instanceof Phase4SMPException)
         {
           aSendingReport.setLookupError (ex.getMessage ());
@@ -381,6 +393,7 @@ public final class OutboundOrchestrator
           aSendingReport.setLookupError ("Error fetching Service Details from SMP");
           aSendingReport.setLookupException (ex);
         }
+        aSendingReport.setLookupDurationMillis (aLookupSW.getMillis ());
 
         if (ex.isRetryFeasible ())
           onFailed.accept (ex.getMessage ());
@@ -391,35 +404,59 @@ public final class OutboundOrchestrator
     }
     else
     {
+      aLookupSW.stop ();
+      aSendingReport.setLookupError ("SMP access limited by Circuit Breaker");
+      aSendingReport.setLookupDurationMillis (aLookupSW.getMillis ());
+
       onFailed.accept ("SMP access limited by Circuit Breaker '" + sCircuitBreakerKeySMP + "'");
       return aSendingReport;
     }
 
-    try
+    final StopWatch aSendingSW = StopWatch.createdStarted ();
+    final String sCircuitBreakerKeyAP = "ap$" + sReceiverAPURL;
+    if (CircuitBreakerManager.tryAcquirePermit (sCircuitBreakerKeyAP))
     {
-      // TODO: Circuit breaker check
+      // Only add it here to the sending report, otherwise the interpretation of the report gets
+      // more difficult
+      aSendingReport.setAS4MessageID (sAS4MessageID);
+      aSendingReport.setAS4SendingDT (aAS4Timestamp);
 
-      aTxMgr.updateStatus (sTxID, EOutboundStatus.SENDING);
+      try
+      {
+        // Actual sending using Phase4PeppolSender
+        // TODO: phase4 sending via Phase4PeppolSender.builder()
 
-      // TODO: phase4 sending via Phase4PeppolSender.builder()
+        // On success:
+        final String sAS4ReceiptID = null; // TODO
+        aAttemptMgr.createSuccess (sTxID, sAS4MessageID, aAS4Timestamp, sAS4ReceiptID);
+        aTxMgr.updateStatusCompleted (sTxID, EOutboundStatus.SENT);
 
-      // Actual sending would happen here using Phase4PeppolSender
+        LOGGER.info (sLogPrefix + "Outbound transaction sent successfully '" + sTxID + "'");
+      }
+      catch (final Exception ex)
+      {
+        LOGGER.error (sLogPrefix + "Outbound sending failed for transaction '" + sTxID + "'", ex);
 
-      // On success:
-      final String sAS4ReceiptID = null; // TODO
-      aAttemptMgr.createSuccess (sTxID, sAS4MessageID, aAS4Timestamp, sAS4ReceiptID);
-      aTxMgr.updateStatusCompleted (sTxID, EOutboundStatus.SENT);
+        aSendingSW.stop ();
+        aSendingReport.setSendingError ("Failed to transmit outbound message to '" + sReceiverAPURL + "'");
+        aSendingReport.setSendingException (ex);
+        aSendingReport.setSendingDurationMillis (aSendingSW.getMillis ());
 
-      LOGGER.info (sLogPrefix + "Outbound transaction sent successfully '" + sTxID + "'");
+        if (nNewAttemptCount >= APCoreConfig.getRetrySendingMaxAttempts ())
+          onPermanentFailure.accept (ex.getMessage ());
+        else
+          onFailed.accept (ex.getMessage ());
+      }
     }
-    catch (final Exception ex)
+    else
     {
-      LOGGER.error (sLogPrefix + "Outbound sending failed for transaction '" + sTxID + "'", ex);
-      if (nNewAttemptCount >= APCoreConfig.getRetrySendingMaxAttempts ())
-        onPermanentFailure.accept (ex.getMessage ());
-      else
-        onFailed.accept (ex.getMessage ());
+      aSendingSW.stop ();
+      aSendingReport.setSendingError ("AP access limited by Circuit Breaker");
+      aSendingReport.setSendingDurationMillis (aSendingSW.getMillis ());
+
+      onFailed.accept ("AP access limited by Circuit Breaker '" + sCircuitBreakerKeyAP + "'");
     }
+
     return aSendingReport;
   }
 }

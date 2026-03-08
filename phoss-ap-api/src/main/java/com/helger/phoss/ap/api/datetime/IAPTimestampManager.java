@@ -22,7 +22,6 @@ import java.time.OffsetTime;
 
 import org.jspecify.annotations.NonNull;
 
-import com.helger.datetime.helper.PDTFactory;
 import com.helger.datetime.xml.XMLOffsetDateTime;
 
 /**
@@ -37,6 +36,12 @@ public interface IAPTimestampManager
    */
   @NonNull
   OffsetDateTime getCurrentDateTime ();
+
+  /**
+   * @return The current date in time in UTC. Never <code>null</code>.
+   */
+  @NonNull
+  OffsetDateTime getCurrentDateTimeUTC ();
 
   /**
    * @return The current date in time in the current time zone for XML processing. Never
@@ -64,12 +69,5 @@ public interface IAPTimestampManager
   default OffsetTime getCurrentTime ()
   {
     return getCurrentDateTime ().toOffsetTime ();
-  }
-
-  @NonNull
-  static IAPTimestampManager createDefaultInstance ()
-  {
-    // Use maximum precision
-    return PDTFactory::getCurrentOffsetDateTime;
   }
 }

@@ -30,6 +30,7 @@ import com.helger.io.file.FileOperationManager;
 import com.helger.io.file.IFileOperationManager;
 import com.helger.peppolid.factory.IIdentifierFactory;
 import com.helger.peppolid.factory.PeppolIdentifierFactory;
+import com.helger.phoss.ap.api.datetime.APTimestampManager;
 import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
 import com.helger.scope.IScope;
 import com.helger.scope.singleton.AbstractGlobalSingleton;
@@ -93,7 +94,7 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
                                              "' is not writable by the application user");
       }
 
-      m_aTimestampMgr = IAPTimestampManager.createDefaultInstance ();
+      m_aTimestampMgr = new APTimestampManager ();
 
       LOGGER.info (ClassHelper.getClassLocalName (this) + " was initialized");
     }
