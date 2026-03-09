@@ -34,6 +34,7 @@
     <DocumentIdentification>
       <Standard>urn:oasis:names:specification:ubl:schema:xsd:Invoice-2</Standard>
       <TypeVersion>2.1</TypeVersion>
+      <!-- The following ID is referenced in the source code, so don't change! -->
       <InstanceIdentifier>92f7e6a5-c392-4e66-b786-fd2b7c535eb2</InstanceIdentifier>
       <Type>Invoice</Type>
       <CreationDateAndTime>2026-03-09T12:00:00.000Z</CreationDateAndTime>

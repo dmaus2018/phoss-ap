@@ -104,6 +104,8 @@ public class DocumentSender
    * @param sSbdhInstanceID
    *        The SBDH Instance ID to be used.
    * @return Sending result
+   * @throws IOException
+   *         in case of error
    */
   @NonNull
   public SendResult sendXml (@NonNull final Path aXmlFile, @NonNull final String sSbdhInstanceID) throws IOException
@@ -124,7 +126,7 @@ public class DocumentSender
     return doSend ("xml", sSbdhInstanceID, sUrl, aBody, "application/xml");
   }
 
-  /**
+  /*
    * Send a PDF document via POST /api/outbound/submit/{ids} with PDF-specific parameters.
    */
   @NonNull
@@ -147,7 +149,7 @@ public class DocumentSender
     return doSend ("pdf", sSbdhInstanceID, sUrl, aBody, "application/pdf");
   }
 
-  /**
+  /*
    * Send a prebuilt SBD via POST /api/outbound/submit-sbd.
    */
   @NonNull
@@ -155,13 +157,15 @@ public class DocumentSender
                                                                                                           throws IOException
   {
     final String sUrl = m_sBaseUrl + "/api/outbound/submit-sbd";
-    final byte [] aBody = Files.readAllBytes (aSbdFile);
-    return doSend ("sbd", sSbdhInstanceID, sUrl, aBody, "application/xml");
+    String sBody = Files.readString (aSbdFile, StandardCharsets.UTF_8);
+    // Inject custom SBDH ID
+    sBody = sBody.replace ("92f7e6a5-c392-4e66-b786-fd2b7c535eb2", sSbdhInstanceID);
+
+    return doSend ("sbd", sSbdhInstanceID, sUrl, sBody.getBytes (StandardCharsets.UTF_8), "application/xml");
   }
 
-  /**
+  /*
    * Poll the transaction status until a terminal state is reached or timeout.
-   *
    * @return The final status string, or {@code null} if not found or timed out.
    */
   @Nullable

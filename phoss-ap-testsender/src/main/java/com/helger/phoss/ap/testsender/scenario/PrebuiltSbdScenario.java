@@ -20,10 +20,7 @@ import java.nio.file.Path;
 
 import org.jspecify.annotations.NonNull;
 
-import com.helger.io.resource.FileSystemResource;
-import com.helger.peppol.sbdh.PeppolSBDHDataReadException;
-import com.helger.peppol.sbdh.PeppolSBDHDataReader;
-import com.helger.peppolid.factory.PeppolIdentifierFactory;
+import com.helger.peppol.sbdh.PeppolSBDHData;
 import com.helger.phoss.ap.testsender.sender.DocumentSender;
 import com.helger.phoss.ap.testsender.sender.SendResult;
 
@@ -33,20 +30,10 @@ import com.helger.phoss.ap.testsender.sender.SendResult;
 public class PrebuiltSbdScenario implements ITestScenario
 {
   private final Path m_aSbdFile;
-  private final String m_sSbdhID;
 
   public PrebuiltSbdScenario (@NonNull final Path aSbdFile)
   {
     m_aSbdFile = aSbdFile;
-    try
-    {
-      m_sSbdhID = new PeppolSBDHDataReader (PeppolIdentifierFactory.INSTANCE).extractData (new FileSystemResource (aSbdFile.toFile ()))
-                                                                             .getInstanceIdentifier ();
-    }
-    catch (final PeppolSBDHDataReadException ex)
-    {
-      throw new IllegalStateException ("Failed to parse SBD", ex);
-    }
   }
 
   @Override
@@ -60,13 +47,14 @@ public class PrebuiltSbdScenario implements ITestScenario
   @NonNull
   public SendResult execute (@NonNull final DocumentSender aSender, final int nIteration)
   {
+    final String sSbdhInstanceID = PeppolSBDHData.createRandomSBDHInstanceIdentifier ();
     try
     {
-      return aSender.sendPrebuiltSbd (m_aSbdFile, m_sSbdhID);
+      return aSender.sendPrebuiltSbd (m_aSbdFile, sSbdhInstanceID);
     }
     catch (final Exception ex)
     {
-      return SendResult.failure ("sbd", m_sSbdhID, 0, 0, null, ex.getMessage ());
+      return SendResult.failure ("sbd", sSbdhInstanceID, 0, 0, null, ex.getMessage ());
     }
   }
 }
