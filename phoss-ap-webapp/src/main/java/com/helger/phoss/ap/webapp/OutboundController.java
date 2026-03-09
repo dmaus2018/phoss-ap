@@ -20,6 +20,8 @@ import java.io.InputStream;
 import java.util.List;
 
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +43,7 @@ import com.helger.phase4.peppol.Phase4PeppolSendingReport;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
+import com.helger.phoss.ap.core.APCoreConfig;
 import com.helger.phoss.ap.core.outbound.OutboundOrchestrator;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 import com.helger.phoss.ap.webapp.dto.OutboundTransactionResponse;
@@ -51,6 +54,8 @@ import jakarta.servlet.http.HttpServletRequest;
 @RequestMapping ("/api/outbound")
 public class OutboundController
 {
+  private static final Logger LOGGER = LoggerFactory.getLogger (OutboundController.class);
+
   @PostMapping (value = "/submit/{senderID}/{receiverID}/{docTypeID}/{processID}/{c1CountryCode}",
                 produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity <String> submitRawDocument (@PathVariable ("senderID") final String sSenderID,
@@ -72,6 +77,12 @@ public class OutboundController
                                                     @RequestParam (value = "payloadMimeType",
                                                                    required = false) final String sPayloadMimeType) throws Exception
   {
+    if (!APCoreConfig.isSendingEnabled ())
+    {
+      LOGGER.info ("Peppol AP sending is disabled");
+      return ResponseEntity.notFound ().build ();
+    }
+
     final String sEffectiveSbdhInstanceID = StringHelper.isNotEmpty (sSbdhInstanceID) ? sSbdhInstanceID
                                                                                       : PeppolSBDHData.createRandomSBDHInstanceIdentifier ();
 
@@ -173,6 +184,12 @@ public class OutboundController
                                                     @RequestParam (value = "mlsTo",
                                                                    required = false) final String sMlsTo) throws Exception
   {
+    if (!APCoreConfig.isSendingEnabled ())
+    {
+      LOGGER.info ("Peppol AP sending is disabled");
+      return ResponseEntity.notFound ().build ();
+    }
+
     // Read the InputStream only once
     try (final InputStream aIS = aServletRequest.getInputStream ())
     {

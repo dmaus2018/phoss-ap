@@ -44,6 +44,8 @@ public class InboundController
                                                         @RequestParam ("c4CountryCode") final String sC4CountryCode)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+
+    // Does a transaction exist for the provided SBDH Instance ID?
     final IInboundTransaction aTx = aTxMgr.getBySbdhInstanceID (sSbdhInstanceID);
     if (aTx == null)
       return ResponseEntity.notFound ().build ();

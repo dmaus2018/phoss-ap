@@ -729,9 +729,16 @@ public final class OutboundOrchestrator
             {
               bReportingItemStored = ReportingManager.createOutboundPeppolReportingItem (sTxID, aReportingItem)
                                                      .isSuccess ();
+              if (bReportingItemStored)
+                LOGGER.info (sRealLogPrefix + "Successfully stored for Peppol Reporting");
+              else
+                LOGGER.error (sRealLogPrefix + "Failed to store for Peppol Reporting");
             }
             else
+            {
               bReportingItemStored = false;
+              LOGGER.error (sRealLogPrefix + "No Reporting Item could be created so cannot store for Peppol Reporting");
+            }
 
             // Set as last activity
             aSendingReport.setOverallSuccess (bSendingSuccess && bReportingItemStored);
@@ -739,6 +746,7 @@ public final class OutboundOrchestrator
         }
         catch (final Exception ex)
         {
+          // Unexpected exception - not a Phase4Exception
           LOGGER.error (sRealLogPrefix + "Outbound sending exception for transaction '" + sTxID + "'", ex);
 
           aSendingSW.stop ();
@@ -774,8 +782,11 @@ public final class OutboundOrchestrator
     }
     finally
     {
+      // Finalize overall stuff
       aOverallSW.stop ();
       aSendingReport.setOverallDurationMillis (aOverallSW.getMillis ());
+
+      // Don't forget to clean up
       Phase4LogCustomizer.clearThreadLocals ();
     }
 

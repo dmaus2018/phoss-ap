@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2026 Philip Helger (www.helger.com)
+ * Copyright (C) 2026 Philip Helger (www.helger.com)
  * philip[at]helger[dot]com
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +16,7 @@
  */
 package com.helger.phoss.ap.core.reporting;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
 
@@ -24,15 +25,15 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import com.helger.base.enforce.ValueEnforcer;
+import com.helger.base.io.nonblocking.NonBlockingByteArrayInputStream;
 import com.helger.base.state.ESuccess;
-import com.helger.base.string.StringHelper;
 import com.helger.base.timing.StopWatch;
 import com.helger.base.wrapper.Wrapper;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.datetime.helper.PDTFactory;
+import com.helger.peppol.mls.CPeppolMLS;
 import com.helger.peppol.reporting.api.CPeppolReporting;
-import com.helger.peppol.reporting.api.PeppolReportingHelper;
 import com.helger.peppol.reporting.api.PeppolReportingItem;
 import com.helger.peppol.reporting.api.backend.PeppolReportingBackend;
 import com.helger.peppol.reporting.api.backend.PeppolReportingBackendException;
@@ -45,22 +46,26 @@ import com.helger.peppol.reportingsupport.IPeppolReportSenderCallback;
 import com.helger.peppol.reportingsupport.PeppolReportingSupport;
 import com.helger.peppol.reportingsupport.sql.PeppolReportSQLHandler;
 import com.helger.peppol.reportingsupport.sql.PeppolReportStorageSQL;
-import com.helger.peppol.security.PeppolTrustedCA;
+import com.helger.peppol.sbdh.PeppolSBDHData;
 import com.helger.peppol.servicedomain.EPeppolNetwork;
-import com.helger.peppol.sml.ISMLInfo;
+import com.helger.peppolid.IParticipantIdentifier;
+import com.helger.peppolid.factory.IIdentifierFactory;
 import com.helger.phase4.logging.Phase4LoggerFactory;
+import com.helger.phase4.peppol.Phase4PeppolSendingReport;
 import com.helger.phoss.ap.api.config.APConfigProvider;
+import com.helger.phoss.ap.api.model.IOutboundTransaction;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.APCoreConfig;
-import com.helger.security.certificate.TrustedCAChecker;
+import com.helger.phoss.ap.core.outbound.OutboundOrchestrator;
 
 /**
  * Helper class for report generation
  *
  * @author Philip Helger
  */
-public final class AppReportingHelper
+public final class APReportingHelper
 {
-  private static final Logger LOGGER = Phase4LoggerFactory.getLogger (AppReportingHelper.class);
+  private static final Logger LOGGER = Phase4LoggerFactory.getLogger (APReportingHelper.class);
 
   @NonNull
   public static YearMonth getValidYearMonthInAPI (final int nYear, final int nMonth)
@@ -142,36 +147,44 @@ public final class AppReportingHelper
 
     // How to do AS4 sending
     final IPeppolReportSenderCallback aPeppolSender = (aDocTypeID, aProcessID, sMessagePayload) -> {
-      // Make Network decisions
+      final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
       final EPeppolNetwork ePeppolStage = APCoreConfig.getPeppolStage ();
-      final ISMLInfo aSMLInfo = ePeppolStage.getSMLInfo ();
-      final TrustedCAChecker aAPCA = ePeppolStage.isProduction () ? PeppolTrustedCA.peppolProductionAP ()
-                                                            : PeppolTrustedCA.peppolTestAP ();
+
       // Sender: your company participant ID
-      final String sSenderID = "0242:" + APCoreConfig.getPeppolSeatID ().substring (3);
-      if (StringHelper.isEmpty (sSenderID))
-        throw new IllegalStateException ("No Peppol Reporting Sender ID is configured");
+      final IParticipantIdentifier aSenderID = aIF.createParticipantIdentifierWithDefaultScheme (CPeppolMLS.SPIS_PARTICIPANT_ID_SCHEME +
+                                                                                                 ":" +
+                                                                                                 APCoreConfig.getPeppolSeatID ()
+                                                                                                             .substring (3));
 
       // Receiver: production OpenPeppol; test Helger
       // OpenPeppol doesn't offer this participant ID on test :-/
-      final String sReceiverID = ePeppolStage.isProduction () ? CPeppolReporting.OPENPEPPOL_PARTICIPANT_ID : "9915:helger";
+      final IParticipantIdentifier aReceiverID = aIF.createParticipantIdentifierWithDefaultScheme (ePeppolStage.isProduction () ? CPeppolReporting.OPENPEPPOL_PARTICIPANT_ID
+                                                                                                                                : "9915:helger");
 
-      final String sCountryC1 = APCoreConfig.getPeppolOwnerCountryCode ();
-      if (!PeppolReportingHelper.isValidCountryCode (sCountryC1))
-        throw new IllegalStateException ("Invalid country code of Peppol owner is defined: '" + sCountryC1 + "'");
+      final String sC1CountryCode = APCoreConfig.getPeppolOwnerCountryCode ();
+      // Validity of country code was checked on startup
 
-      // Returns the sending report
-      // final Phase4PeppolSendingReport aSendingReport = PeppolSender.sendPeppolMessageCreatingSbdh
-      // (aSMLInfo,
-      // aAPCA,
-      // sMessagePayload.getBytes (StandardCharsets.UTF_8),
-      // sSenderID,
-      // sReceiverID,
-      // aDocTypeID.getURIEncoded (),
-      // aProcessID.getURIEncoded (),
-      // sCountryC1);
-      // String ret = aSendingReport.getAsXMLString ();
-      return "";
+      // Store in DB
+      final IOutboundTransaction aTx = OutboundOrchestrator.submitRawDocument ("[PeppolReporting] ",
+                                                                               aSenderID,
+                                                                               aReceiverID,
+                                                                               aDocTypeID,
+                                                                               aProcessID,
+                                                                               PeppolSBDHData.createRandomSBDHInstanceIdentifier (),
+                                                                               sC1CountryCode,
+                                                                               new NonBlockingByteArrayInputStream (sMessagePayload.getBytes (StandardCharsets.UTF_8)),
+                                                                               (String) null,
+                                                                               (String) null,
+                                                                               (String) null,
+                                                                               (String) null,
+                                                                               (String) null);
+      if (aTx == null)
+        throw new IllegalStateException ("Failed to submit Peppol Reporting document for transmission");
+
+      // Perform actual sending
+      final Phase4PeppolSendingReport aSendingReport = OutboundOrchestrator.processPendingOutbound ("[PeppolReporting] ",
+                                                                                                    aTx);
+      return aSendingReport.getAsJsonString ();
     };
 
     try (final PeppolReportSQLHandler aHdl = new PeppolReportSQLHandler (APConfigProvider.getConfig ()))

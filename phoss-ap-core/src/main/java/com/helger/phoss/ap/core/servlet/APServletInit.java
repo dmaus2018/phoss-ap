@@ -208,7 +208,7 @@ public class APServletInit
     final String sOwnerCountry = APCoreConfig.getPeppolOwnerCountryCode ();
     if (!PeppolReportingHelper.isValidCountryCode (sOwnerCountry))
     {
-      throw new InitializationException ("The configured Peppol owner Country Code '" +
+      throw new InitializationException ("The configured Peppol Owner Country Code '" +
                                          sOwnerCountry +
                                          "' does not match the syntactial requirements.");
     }

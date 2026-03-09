@@ -158,7 +158,7 @@ public final class OutboundTransactionRowTest
     final OffsetDateTime aMlsReceived = aNow.plusMinutes (10);
 
     final DBResultRow aRow = DBResultRowHelper.createRow ("tx-full",
-                                                          ETransactionType.MLS_RESPONSE,
+                                                          ETransactionType.MLS_RESPONSE.getID (),
                                                           "sender-full",
                                                           "receiver-full",
                                                           "doctype-full",

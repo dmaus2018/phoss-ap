@@ -68,7 +68,7 @@
     <ph-oton.version>10.2.2</ph-oton.version>
     <peppol-ap-support.version>2.1.1</peppol-ap-support.version>
     <peppol-commons.version>12.3.11</peppol-commons.version>
-    <peppol-reporting.version>4.1.0</peppol-reporting.version>
+    <peppol-reporting.version>4.1.1</peppol-reporting.version>
     <phase4.version>4.3.2-SNAPSHOT</phase4.version>
     <ph-db.version>8.1.2</ph-db.version>
   </properties>
@@ -231,5 +231,6 @@
     <module>phoss-ap-core</module>
     <module>phoss-ap-webapp</module>
     <module>phoss-ap-testbackend</module>
+    <module>phoss-ap-testsender</module>
   </modules>
 </project>
