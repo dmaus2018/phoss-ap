@@ -20,6 +20,8 @@ import java.time.OffsetDateTime;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonnegative;
 import com.helger.base.enforce.ValueEnforcer;
@@ -48,6 +50,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                      " status, attempt_count, received_dt, completed_dt," +
                                      " reporting_status, next_retry_dt, error_details," +
                                      " mls_to, mls_type, mls_response_code, mls_outbound_transaction_id";
+  private static final Logger LOGGER = LoggerFactory.getLogger (InboundTransactionManagerJdbc.class);
 
   private final String m_sTableName;
 
@@ -132,8 +135,12 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       m_sTableName +
                                                                       " WHERE id=?",
                                                                       new ConstantPreparedStatementDataProvider (sID));
-    if (aRows != null && aRows.size () == 1)
-      return new InboundTransactionRow (aRows.getFirstOrNull ());
+    if (aRows != null)
+    {
+      if (aRows.size () == 1)
+        return new InboundTransactionRow (aRows.getFirstOrNull ());
+      LOGGER.warn ("Found " + aRows.size () + " transactions that all match the Transaction Identifier '" + sID + "'");
+    }
     return null;
   }
 
@@ -141,7 +148,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
   {
     final long nAffectedRows = newExecutor ().queryCount ("SELECT COUNT(*)" + " FROM " + m_sTableName + " WHERE id=?",
                                                           new ConstantPreparedStatementDataProvider (sID));
-    return nAffectedRows == 1;
+    return nAffectedRows > 0;
   }
 
   public boolean containsByAS4MessageID (@NonNull final String sAS4MessageID)
@@ -163,8 +170,16 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       m_sTableName +
                                                                       " WHERE as4_message_id=?",
                                                                       new ConstantPreparedStatementDataProvider (sAS4MessageID));
-    if (aRows != null && aRows.size () == 1)
-      return new InboundTransactionRow (aRows.getFirstOrNull ());
+    if (aRows != null)
+    {
+      if (aRows.size () == 1)
+        return new InboundTransactionRow (aRows.getFirstOrNull ());
+      LOGGER.warn ("Found " +
+                   aRows.size () +
+                   " transactions that all match the AS4 Message ID '" +
+                   sAS4MessageID +
+                   "'");
+    }
     return null;
   }
 
@@ -187,8 +202,16 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       m_sTableName +
                                                                       " WHERE sbdh_instance_id=?",
                                                                       new ConstantPreparedStatementDataProvider (sSbdhInstanceID));
-    if (aRows != null && aRows.size () == 1)
-      return new InboundTransactionRow (aRows.getFirstOrNull ());
+    if (aRows != null)
+    {
+      if (aRows.size () == 1)
+        return new InboundTransactionRow (aRows.getFirstOrNull ());
+      LOGGER.warn ("Found " +
+                   aRows.size () +
+                   " transactions that all match the SBDH Instance Identifier '" +
+                   sSbdhInstanceID +
+                   "'");
+    }
     return null;
   }
 
@@ -257,8 +280,9 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       m_sTableName +
                                                                       " SET mls_response_code=?, mls_outbound_transaction_id=?" +
                                                                       " WHERE id=?",
-                                                                      new ConstantPreparedStatementDataProvider (eMlsResponseCode != null ? eMlsResponseCode.getID ()
-                                                                                                                                          : null,
+                                                                      new ConstantPreparedStatementDataProvider (eMlsResponseCode !=
+                                                                                                                 null ? eMlsResponseCode.getID ()
+                                                                                                                      : null,
                                                                                                                  sMlsOutboundTransactionID,
                                                                                                                  sID));
     return ESuccess.valueOf (nRowsAffected == 1);

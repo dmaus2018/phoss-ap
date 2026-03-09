@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.helger.io.file.FilenameHelper;
 import com.helger.phoss.ap.testbackend.model.ReceivedDocument;
 
 import jakarta.annotation.PostConstruct;
@@ -60,14 +61,16 @@ public class DocumentStore
 
   public ReceivedDocument storeDocument (final String sChannel,
                                          final String sFilename,
-                                         final byte [] aContent)
+                                         final byte [] aContent,
+                                         final String sSbdhID)
   {
     final String sID = UUID.randomUUID ().toString ();
     final File aChannelDir = new File (m_sBaseDir, sChannel);
     if (!aChannelDir.exists ())
       aChannelDir.mkdirs ();
 
-    final File aTargetFile = new File (aChannelDir, sID + "_" + sFilename);
+    final File aTargetFile = new File (aChannelDir,
+                                       FilenameHelper.getAsSecureValidASCIIFilename (sID + "_" + sFilename));
     try
     {
       Files.write (aTargetFile.toPath (), aContent);
@@ -85,7 +88,17 @@ public class DocumentStore
                                                         OffsetDateTime.now (),
                                                         aTargetFile.getAbsolutePath ());
     m_aDocuments.put (sID, aDoc);
-    LOGGER.info ("Stored document [" + sChannel + "] '" + sFilename + "' (" + aContent.length + " bytes) as " + sID);
+    LOGGER.info ("Stored document [" +
+                 sChannel +
+                 "] '" +
+                 sFilename +
+                 "' (" +
+                 aContent.length +
+                 " bytes) as '" +
+                 sID +
+                 "' from SBDH '" +
+                 sSbdhID +
+                 "'");
     return aDoc;
   }
 
@@ -118,10 +131,7 @@ public class DocumentStore
 
   public List <ReceivedDocument> getAllByChannel (final String sChannel)
   {
-    return m_aDocuments.values ()
-                       .stream ()
-                       .filter (d -> d.getChannel ().equals (sChannel))
-                       .toList ();
+    return m_aDocuments.values ().stream ().filter (d -> d.getChannel ().equals (sChannel)).toList ();
   }
 
   public byte [] readContent (final String sID) throws IOException

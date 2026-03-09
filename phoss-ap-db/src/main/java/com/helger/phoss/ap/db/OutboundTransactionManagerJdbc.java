@@ -116,8 +116,9 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
                                                                                                             null,
                                                                                                             null,
                                                                                                             sMlsTo,
-                                                                                                            eTransactionType == ETransactionType.BUSINESS_DOCUMENT ? EMlsReceptionStatus.PENDING.getID ()
-                                                                                                                                                                   : null,
+                                                                                                            eTransactionType ==
+                                                                                                                    ETransactionType.BUSINESS_DOCUMENT ? EMlsReceptionStatus.PENDING.getID ()
+                                                                                                                                                       : null,
                                                                                                             null,
                                                                                                             null,
                                                                                                             sMlsInboundTransactionID,
@@ -140,8 +141,12 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
                                                                       m_sTableName +
                                                                       " WHERE id=?",
                                                                       new ConstantPreparedStatementDataProvider (sID));
-    if (aRows != null && aRows.size () == 1)
-      return new OutboundTransactionRow (aRows.getFirstOrNull ());
+    if (aRows != null)
+    {
+      if (aRows.size () == 1)
+        return new OutboundTransactionRow (aRows.getFirstOrNull ());
+      LOGGER.warn ("Found " + aRows.size () + " transactions that all match the Transaction Identifier '" + sID + "'");
+    }
     return null;
   }
 
@@ -149,7 +154,7 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
   {
     final long nAffectedRows = newExecutor ().queryCount ("SELECT COUNT(*)" + " FROM " + m_sTableName + " WHERE id=?",
                                                           new ConstantPreparedStatementDataProvider (sID));
-    return nAffectedRows == 1;
+    return nAffectedRows > 0;
   }
 
   @Nullable

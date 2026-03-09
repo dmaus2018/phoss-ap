@@ -18,6 +18,8 @@ package com.helger.phoss.ap.webapp;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +41,8 @@ import com.helger.phoss.ap.webapp.dto.ReportResponse;
 @RequestMapping ("/api/inbound")
 public class InboundController
 {
+  private static final Logger LOGGER = LoggerFactory.getLogger (InboundController.class);
+
   @PostMapping ("/report")
   public ResponseEntity <ReportResponse> reportInbound (@RequestParam ("sbdhInstanceID") final String sSbdhInstanceID,
                                                         @RequestParam ("c4CountryCode") final String sC4CountryCode)
@@ -53,6 +57,14 @@ public class InboundController
     // Does the transaction already have a C4 Country Code?
     if (StringHelper.isNotEmpty (aTx.getC4CountryCode ()))
       return ResponseEntity.badRequest ().build ();
+
+    LOGGER.info ("Storing C4 Country Code '" +
+                 sC4CountryCode +
+                 "' to inbound transaction '" +
+                 aTx.getID () +
+                 "' with SBDH ID '" +
+                 sSbdhInstanceID +
+                 "'");
 
     // Store the country code for C4 and create the reporting entry
     aTxMgr.updateC4CountryCode (aTx.getID (), sC4CountryCode);
