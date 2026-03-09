@@ -82,7 +82,7 @@ public final class JdbcManagerIntegrationTest
                                      "busdox-docid-qns::urn:test:invoice",
                                      "cenbii-procid-ubl::urn:test:process",
                                      _uniqueID (),
-                                     ESourceType.RAW_XML,
+                                     ESourceType.PAYLOAD_ONLY,
                                      "/tmp/test-outbound.sbd",
                                      1024L,
                                      "abc123hash012345678901234567890123456789012345678901234567890123",
@@ -111,7 +111,7 @@ public final class JdbcManagerIntegrationTest
     assertEquals ("iso6523-actorid-upis::9915:receiver", aTx.getReceiverID ());
     assertEquals ("busdox-docid-qns::urn:test:invoice", aTx.getDocTypeID ());
     assertEquals ("cenbii-procid-ubl::urn:test:process", aTx.getProcessID ());
-    assertEquals (ESourceType.RAW_XML, aTx.getSourceType ());
+    assertEquals (ESourceType.PAYLOAD_ONLY, aTx.getSourceType ());
     assertEquals ("/tmp/test-outbound.sbd", aTx.getDocumentPath ());
     assertEquals (1024L, aTx.getDocumentSize ());
     assertEquals ("abc123hash012345678901234567890123456789012345678901234567890123", aTx.getDocumentHash ());
@@ -147,7 +147,7 @@ public final class JdbcManagerIntegrationTest
                                      "busdox-docid-qns::urn:test:invoice",
                                      "cenbii-procid-ubl::urn:test:process",
                                      sSbdhID,
-                                     ESourceType.RAW_XML,
+                                     ESourceType.PAYLOAD_ONLY,
                                      "/tmp/test.sbd",
                                      512L,
                                      "hash456",
@@ -183,7 +183,7 @@ public final class JdbcManagerIntegrationTest
                                      "busdox-docid-qns::urn:test:invoice",
                                      "cenbii-procid-ubl::urn:test:process",
                                      _uniqueID (),
-                                     ESourceType.RAW_XML,
+                                     ESourceType.PAYLOAD_ONLY,
                                      "/tmp/test.sbd",
                                      256L,
                                      "hashMls",
@@ -213,7 +213,7 @@ public final class JdbcManagerIntegrationTest
                                      "mls-doc-type",
                                      "mls-process",
                                      _uniqueID (),
-                                     ESourceType.RAW_XML,
+                                     ESourceType.PAYLOAD_ONLY,
                                      "/tmp/test-mls.sbd",
                                      128L,
                                      "hashMlsResp",
@@ -244,7 +244,7 @@ public final class JdbcManagerIntegrationTest
                                      "busdox-docid-qns::urn:test:facturx",
                                      "cenbii-procid-ubl::urn:test:process",
                                      _uniqueID (),
-                                     ESourceType.RAW_XML,
+                                     ESourceType.PAYLOAD_ONLY,
                                      "/tmp/test-pdf.pdf",
                                      4096L,
                                      "hashPdf01234567890123456789012345678901234567890123456789012345",

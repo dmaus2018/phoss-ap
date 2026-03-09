@@ -77,23 +77,23 @@ public final class OutboundTransactionRowTest
     // 22 mlsID (nullable)
     // 23 mlsInboundTransactionID (nullable)
     return DBResultRowHelper.createRow ("tx-001",
-                                        "business_document",
+                                        ETransactionType.BUSINESS_DOCUMENT.getID (),
                                         "iso6523-actorid-upis::sender",
                                         "iso6523-actorid-upis::recv",
                                         "busdox-docid-qns::inv",
                                         "cenbii-procid-ubl::proc",
                                         "sbdh-001",
-                                        "raw_xml",
+                                        ESourceType.PAYLOAD_ONLY.getID (),
                                         "/tmp/test-outbound.sbd",
                                         Long.valueOf (3L),
                                         // 10
                                         "abc123hash",
                                         "DE",
-                                        "pending",
+                                        EOutboundStatus.PENDING.getID (),
                                         Integer.valueOf (0),
                                         aNow,
                                         null,
-                                        EOutboundStatus.PENDING.getID (),
+                                        EReportingStatus.PENDING.getID (),
                                         null,
                                         null,
                                         null,
@@ -121,7 +121,7 @@ public final class OutboundTransactionRowTest
     assertEquals ("busdox-docid-qns::inv", aTx.getDocTypeID ());
     assertEquals ("cenbii-procid-ubl::proc", aTx.getProcessID ());
     assertEquals ("sbdh-001", aTx.getSbdhInstanceID ());
-    assertEquals (ESourceType.RAW_XML, aTx.getSourceType ());
+    assertEquals (ESourceType.PAYLOAD_ONLY, aTx.getSourceType ());
     assertEquals ("/tmp/test-outbound.sbd", aTx.getDocumentPath ());
     assertEquals (3L, aTx.getDocumentSize ());
     assertEquals ("abc123hash", aTx.getDocumentHash ());
@@ -158,22 +158,22 @@ public final class OutboundTransactionRowTest
     final OffsetDateTime aMlsReceived = aNow.plusMinutes (10);
 
     final DBResultRow aRow = DBResultRowHelper.createRow ("tx-full",
-                                                          "mls_response",
+                                                          ETransactionType.MLS_RESPONSE,
                                                           "sender-full",
                                                           "receiver-full",
                                                           "doctype-full",
                                                           "process-full",
                                                           "sbdh-full",
-                                                          "prebuilt_sbd",
+                                                          ESourceType.PREBUILT_SBD.getID (),
                                                           "/tmp/test-full.sbd",
                                                           Long.valueOf (2L),
                                                           "hash-full",
                                                           "AT",
-                                                          "sent",
+                                                          EOutboundStatus.SENT.getID (),
                                                           Integer.valueOf (2),
                                                           aNow,
                                                           aCompleted,
-                                                          "reported",
+                                                          EReportingStatus.REPORTED.getID (),
                                                           aNow.plusMinutes (1),
                                                           "some error",
                                                           "mls-to-value",

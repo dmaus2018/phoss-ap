@@ -96,7 +96,7 @@ public final class MlsHandler
                                                  EPredefinedDocumentTypeIdentifier.PEPPOL_MLS_1_0.getURIEncoded (),
                                                  EPredefinedProcessIdentifier.urn_peppol_edec_mls.getURIEncoded (),
                                                  sMlsSbdhInstanceID,
-                                                 ESourceType.RAW_XML,
+                                                 ESourceType.PAYLOAD_ONLY,
                                                  sDocumentPath,
                                                  aMlsBytes.length,
                                                  HashHelper.sha256Hex (aMlsBytes),
@@ -116,6 +116,8 @@ public final class MlsHandler
   /**
    * Correlate an incoming MLS to a previous outbound transaction.
    *
+   * @param sLogPrefix
+   *        Log prefix. Never <code>null</code>.
    * @param sSbdhInstanceID
    *        SBDH Instance ID. May not be <code>null</code>.
    * @param eResponseCode

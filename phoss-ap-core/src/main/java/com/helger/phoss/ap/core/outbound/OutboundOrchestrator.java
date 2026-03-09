@@ -32,22 +32,32 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.WillNotClose;
 import com.helger.base.io.stream.CountingInputStream;
+import com.helger.base.io.stream.HasInputStream;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.base.string.StringHex;
 import com.helger.base.timing.StopWatch;
 import com.helger.base.wrapper.Wrapper;
+import com.helger.io.file.FileHelper;
 import com.helger.io.file.FileOperationManager;
 import com.helger.peppol.sbdh.PeppolSBDHData;
 import com.helger.peppol.sbdh.PeppolSBDHDataReader;
+import com.helger.peppol.security.PeppolTrustedCA;
+import com.helger.peppol.servicedomain.EPeppolNetwork;
 import com.helger.peppol.sml.ISMLInfo;
 import com.helger.peppolid.IDocumentTypeIdentifier;
 import com.helger.peppolid.IParticipantIdentifier;
 import com.helger.peppolid.IProcessIdentifier;
 import com.helger.peppolid.factory.IIdentifierFactory;
+import com.helger.phase4.client.IAS4ClientBuildMessageCallback;
 import com.helger.phase4.dynamicdiscovery.AS4EndpointDetailProviderPeppol;
 import com.helger.phase4.dynamicdiscovery.Phase4SMPException;
+import com.helger.phase4.model.message.AS4UserMessage;
+import com.helger.phase4.model.message.AbstractAS4Message;
 import com.helger.phase4.model.message.MessageHelperMethods;
+import com.helger.phase4.peppol.Phase4PeppolSender;
+import com.helger.phase4.peppol.Phase4PeppolSender.PeppolUserMessageBuilder;
 import com.helger.phase4.peppol.Phase4PeppolSendingReport;
+import com.helger.phase4.profile.peppol.Phase4PeppolHttpClientSettings;
 import com.helger.phase4.util.Phase4Exception;
 import com.helger.phoss.ap.api.IOutboundSendingAttemptManager;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
@@ -68,6 +78,7 @@ import com.helger.phoss.ap.core.helper.BackoffCalculator;
 import com.helger.phoss.ap.core.helper.CopyingInputStream;
 import com.helger.phoss.ap.core.helper.HashHelper;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
+import com.helger.security.certificate.TrustedCAChecker;
 import com.helger.smpclient.peppol.CachingSMPClientReadOnly;
 import com.helger.smpclient.peppol.SMPClientReadOnly;
 import com.helger.smpclient.url.PeppolNaptrURLProvider;
@@ -156,7 +167,7 @@ public final class OutboundOrchestrator
       for (final IOutboundDocumentVerifierSPI aVerifier : APCoreMetaManager.getAllOutboundVerifiers ())
         if (aVerifier.verifyDocument (aDocumentFile, aDocTypeID, aProcessID).isFailure ())
         {
-          LOGGER.warn ("Outbound document verification failed for SBDH: " + sSbdhInstanceID);
+          LOGGER.warn ("Outbound document verification failed for SBDH '" + sSbdhInstanceID + "'");
           return null;
         }
     }
@@ -170,14 +181,14 @@ public final class OutboundOrchestrator
                                                aDocTypeID.getURIEncoded (),
                                                aProcessID.getURIEncoded (),
                                                sSbdhInstanceID,
-                                               ESourceType.RAW_XML,
+                                               ESourceType.PAYLOAD_ONLY,
                                                sDocumentPath,
                                                nDocumentBytes,
                                                sDocumentHash,
                                                sC1CountryCode,
                                                aAS4SendingDT,
                                                sMlsTo,
-                                               null,
+                                               (String) null,
                                                sSbdhStandard,
                                                sSbdhTypeVersion,
                                                sSbdhType,
@@ -202,7 +213,8 @@ public final class OutboundOrchestrator
     final MessageDigest aMD = HashHelper.MD_ALGO.createMessageDigest ();
     // 1. Count size
     // 2. Create message digest
-    // 3. Copy SBDH to a temporary file
+    // 3. Copy SBDH to a temporary file - the final name can only be deduced after reading the SBDH
+    // as it contains the InstanceIdentifier
     // 4. Parse the SBDH
     try (final CountingInputStream aCountingIS = new CountingInputStream (aSbdIS);
          final DigestInputStream aDigestIS = new DigestInputStream (aCountingIS, aMD);
@@ -271,8 +283,9 @@ public final class OutboundOrchestrator
     final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
     final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
     final IOutboundSendingAttemptManager aAttemptMgr = APJdbcMetaManager.getOutboundSendingAttemptMgr ();
+    final EPeppolNetwork eStage = APCoreConfig.getPeppolStage ();
+    final ISMLInfo aSMLInfo = eStage.getSMLInfo ();
 
-    final ISMLInfo aSMLInfo = APCoreConfig.getPeppolStage ().getSMLInfo ();
     final Phase4PeppolSendingReport aSendingReport = new Phase4PeppolSendingReport (aSMLInfo);
     aSendingReport.setSBDHInstanceIdentifier (aTx.getSbdhInstanceID ());
     aSendingReport.setCountryC1 (aTx.getC1CountryCode ());
@@ -337,8 +350,10 @@ public final class OutboundOrchestrator
     try
     {
       aSMPClient = new CachingSMPClientReadOnly (PeppolNaptrURLProvider.INSTANCE, aReceiverID, aSMLInfo);
-      aSendingReport.setC3SMPURL (aSMPClient.getSMPHostURI ());
       APBasicConfig.applyHttpProxySettings (aSMPClient.httpClientSettings ());
+
+      // Remember the host URL from NAPTR lookup
+      aSendingReport.setC3SMPURL (aSMPClient.getSMPHostURI ());
     }
     catch (final SMPDNSResolutionException ex)
     {
@@ -421,10 +436,72 @@ public final class OutboundOrchestrator
       aSendingReport.setAS4MessageID (sAS4MessageID);
       aSendingReport.setAS4SendingDT (aAS4Timestamp);
 
+      final TrustedCAChecker aAPCA = eStage.isProduction () ? PeppolTrustedCA.peppolProductionAP ()
+                                                            : PeppolTrustedCA.peppolTestAP ();
+
       try
       {
         // Actual sending using Phase4PeppolSender
-        // TODO: phase4 sending via Phase4PeppolSender.builder()
+        final Phase4PeppolHttpClientSettings aHCS = new Phase4PeppolHttpClientSettings ();
+        APBasicConfig.applyHttpProxySettings (aHCS);
+
+        switch (aTx.getSourceType ())
+        {
+          case PAYLOAD_ONLY:
+            final PeppolUserMessageBuilder aBuilder = Phase4PeppolSender.builder ()
+                                                                        .httpClientFactory (aHCS)
+                                                                        .documentTypeID (aDocTypeID)
+                                                                        .processID (aProcessID)
+                                                                        .senderParticipantID (aSenderID)
+                                                                        .receiverParticipantID (aReceiverID)
+                                                                        .senderPartyID (APCoreConfig.getPeppolSeatID ())
+                                                                        .countryC1 (aTx.getC1CountryCode ())
+                                                                        .payload (HasInputStream.multiple ( () -> FileHelper.getBufferedInputStream (new File (aTx.getDocumentPath ()))))
+                                                                        .peppolAP_CAChecker (aAPCA)
+                                                                        .receiverEndpointDetails (aReceiverCert,
+                                                                                                  sReceiverAPURL)
+                                                                        .sbdDocumentConsumer (aSBD -> {
+                                                                          // Remember SBDH Instance
+                                                                          // Identifier
+                                                                          aSendingReport.setSBDHInstanceIdentifier (aSBD.getStandardBusinessDocumentHeader ()
+                                                                                                                        .getDocumentIdentification ()
+                                                                                                                        .getInstanceIdentifier ());
+                                                                        })
+                                                                        .certificateConsumer ( (aAPCertificate,
+                                                                                                aCheckDT,
+                                                                                                eCertCheckResult) -> {
+                                                                          // Determined by SMP
+                                                                          // lookup
+                                                                          aSendingReport.setC3CertCheckDT (aCheckDT);
+                                                                          aSendingReport.setC3CertCheckResult (eCertCheckResult);
+                                                                        })
+                                                                        .sendingDateTime (aAS4Timestamp)
+                                                                        .buildMessageCallback (new IAS4ClientBuildMessageCallback ()
+                                                                        {
+                                                                          public void onAS4Message (@NonNull final AbstractAS4Message <?> aMsg)
+                                                                          {
+                                                                            // Created AS4 fields
+                                                                            final AS4UserMessage aUserMsg = (AS4UserMessage) aMsg;
+                                                                            aSendingReport.setAS4ConversationID (aUserMsg.getEbms3UserMessage ()
+                                                                                                                         .getCollaborationInfo ()
+                                                                                                                         .getConversationId ());
+                                                                          }
+                                                                        })
+                                                                        .rawResponseConsumer (aSendingReport::setRawHttpResponse)
+                                                                        .signalMsgConsumer ( (aSignalMsg,
+                                                                                              aMessageMetadata,
+                                                                                              aState) -> {
+                                                                          aSendingReport.setAS4ReceivedSignalMsg (aSignalMsg);
+                                                                        })
+                                                                        .disableValidation ();
+            break;
+          case PREBUILT_SBD:
+            // TODO
+            break;
+        }
+
+        aSendingSW.stop ();
+        aSendingReport.setSendingDurationMillis (aSendingSW.getMillis ());
 
         // On success:
         final String sAS4ReceiptID = null; // TODO

@@ -26,10 +26,9 @@ import com.helger.base.lang.EnumHelper;
 /**
  * Indicates how the outbound document was submitted by the Sender Backend.
  * <ul>
- * <li>{@link #RAW_XML} &mdash; Raw business document; the AP creates the SBDH
- * envelope.</li>
- * <li>{@link #PREBUILT_SBD} &mdash; Complete Standard Business Document with
- * SBDH already present.</li>
+ * <li>{@link #PAYLOAD_ONLY} &mdash; Raw business document; the AP creates the SBDH envelope.</li>
+ * <li>{@link #PREBUILT_SBD} &mdash; Complete Standard Business Document with SBDH already
+ * present.</li>
  * </ul>
  *
  * @author Philip Helger
@@ -37,7 +36,7 @@ import com.helger.base.lang.EnumHelper;
 public enum ESourceType implements IHasID <String>
 {
   /** Raw business document &mdash; the AP creates the SBDH envelope. */
-  RAW_XML ("raw_xml"),
+  PAYLOAD_ONLY ("payload_only"),
   /** Complete Standard Business Document with SBDH already present. */
   PREBUILT_SBD ("prebuilt_sbd");
 
