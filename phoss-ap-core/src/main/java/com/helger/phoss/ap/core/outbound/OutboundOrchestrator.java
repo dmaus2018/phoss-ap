@@ -155,7 +155,7 @@ public final class OutboundOrchestrator
     final IAPTimestampManager aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
 
     final File aStorageBasePath = new File (APBasicConfig.getStorageOutboundPath ());
-    final OffsetDateTime aCreationDT = aTimestampMgr.getCurrentDateTime ();
+    final OffsetDateTime aCreationDT = aTimestampMgr.getCurrentDateTimeUTC ();
     final Wrapper <File> aTempFileHolder = Wrapper.empty ();
 
     long nDocumentBytes = -1;
@@ -264,7 +264,7 @@ public final class OutboundOrchestrator
     final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
 
     final File aStorageBasePath = new File (APBasicConfig.getStorageOutboundPath ());
-    final OffsetDateTime aCreationDT = aTimestampMgr.getCurrentDateTime ();
+    final OffsetDateTime aCreationDT = aTimestampMgr.getCurrentDateTimeUTC ();
     final Wrapper <File> aTempFileHolder = Wrapper.empty ();
 
     final PeppolSBDHData aSbdData;
@@ -290,7 +290,7 @@ public final class OutboundOrchestrator
       LOGGER.error (sLogPrefix + "Failed to parse provided SBDH", ex);
       // No need to keep the temporary file
       if (aTempFileHolder.isSet ())
-        DocumentStorageHelper.deleteDocument (aTempFileHolder.get ().toString ());
+        DocumentStorageHelper.deleteDocument (aTempFileHolder.get ().getAbsolutePath ());
       return null;
     }
 
@@ -362,8 +362,8 @@ public final class OutboundOrchestrator
     final IOutboundSendingAttemptManager aAttemptMgr = APJdbcMetaManager.getOutboundSendingAttemptMgr ();
 
     final String sTxID = aTx.getID ();
-    final EPeppolNetwork eStage = APCoreConfig.getPeppolStage ();
-    final ISMLInfo aSMLInfo = eStage.getSMLInfo ();
+    final EPeppolNetwork ePeppolStage = APCoreConfig.getPeppolStage ();
+    final ISMLInfo aSMLInfo = ePeppolStage.getSMLInfo ();
     final String sC2SeatID = APCoreConfig.getPeppolSeatID ();
     final StopWatch aOverallSW = StopWatch.createdStarted ();
 
@@ -524,8 +524,8 @@ public final class OutboundOrchestrator
         final String sAS4ConversationID = MessageHelperMethods.createRandomConversationID ();
         aSendingReport.setAS4ConversationID (sAS4ConversationID);
 
-        final TrustedCAChecker aAPCA = eStage.isProduction () ? PeppolTrustedCA.peppolProductionAP ()
-                                                              : PeppolTrustedCA.peppolTestAP ();
+        final TrustedCAChecker aAPCAChecker = ePeppolStage.isProduction () ? PeppolTrustedCA.peppolProductionAP ()
+                                                                           : PeppolTrustedCA.peppolTestAP ();
 
         EAS4UserMessageSendResult eResult = null;
         PeppolReportingItem aReportingItem = null;
@@ -556,7 +556,7 @@ public final class OutboundOrchestrator
                                            .senderPartyID (sC2SeatID)
                                            .sbdhInstanceIdentifier (aTx.getSbdhInstanceID ())
                                            // Certificate stuff
-                                           .peppolAP_CAChecker (aAPCA)
+                                           .peppolAP_CAChecker (aAPCAChecker)
                                            .endpointDetailProvider (new AS4EndpointDetailProviderConstant (aReceiverCert,
                                                                                                            sReceiverAPURL,
                                                                                                            sReceiverTechnicalContact))
@@ -660,7 +660,7 @@ public final class OutboundOrchestrator
                                            // Remaining IDs
                                            .senderPartyID (sC2SeatID)
                                            // Certificate stuff
-                                           .peppolAP_CAChecker (aAPCA)
+                                           .peppolAP_CAChecker (aAPCAChecker)
                                            .endpointDetailProvider (new AS4EndpointDetailProviderConstant (aReceiverCert,
                                                                                                            sReceiverAPURL,
                                                                                                            sReceiverTechnicalContact))
@@ -690,11 +690,12 @@ public final class OutboundOrchestrator
 
           if (aCaughtSendingEx.isSet ())
           {
+            // Some exception occurred in phase4
             final Phase4Exception ex = aCaughtSendingEx.get ();
 
-            LOGGER.error (sRealLogPrefix + "Outbound sending failed for transaction '" + sTxID + "'", ex);
+            LOGGER.error (sRealLogPrefix + "Outbound transaction '" + sTxID + "' could not be sent with phase4", ex);
 
-            aSendingReport.setAS4SendingError ("An error occurred during the AS4 transmission to '" +
+            aSendingReport.setAS4SendingError ("An error occurred during the phase4 transmission to '" +
                                                sReceiverAPURL +
                                                "'");
             aSendingReport.setAS4SendingException (ex);
@@ -709,6 +710,7 @@ public final class OutboundOrchestrator
           else
           {
             // On success
+            LOGGER.info (sRealLogPrefix + "Outbound transaction '" + sTxID + "' sent successfully with phase4");
 
             // Sending result may be null
             final boolean bSendingSuccess = eResult != null && eResult.isSuccess ();
@@ -733,8 +735,6 @@ public final class OutboundOrchestrator
 
             // Set as last activity
             aSendingReport.setOverallSuccess (bSendingSuccess && bReportingItemStored);
-
-            LOGGER.info (sRealLogPrefix + "Outbound transaction sent successfully '" + sTxID + "'");
           }
         }
         catch (final Exception ex)
@@ -742,7 +742,7 @@ public final class OutboundOrchestrator
           LOGGER.error (sRealLogPrefix + "Outbound sending exception for transaction '" + sTxID + "'", ex);
 
           aSendingSW.stop ();
-          aSendingReport.setAS4SendingError ("Failed to transmit outbound message to '" + sReceiverAPURL + "'");
+          aSendingReport.setAS4SendingError ("Failed to transmit outbound AS4 message to '" + sReceiverAPURL + "'");
           aSendingReport.setAS4SendingException (ex);
           aSendingReport.setAS4SendingDurationMillis (aSendingSW.getMillis ());
           aSendingReport.setSendingSuccess (false);
@@ -753,9 +753,16 @@ public final class OutboundOrchestrator
           else
             onFailed.accept (ex.getMessage ());
         }
+
+        // Update circuit breaker based on sending result only
+        if (aSendingReport.isSendingSuccess ())
+          CircuitBreakerManager.recordSuccess (sCircuitBreakerKeyAP);
+        else
+          CircuitBreakerManager.recordFailure (sCircuitBreakerKeyAP);
       }
       else
       {
+        // Circuit Breaker not acquired
         aSendingSW.stop ();
         aSendingReport.setAS4SendingError ("AP access limited by Circuit Breaker");
         aSendingReport.setAS4SendingDurationMillis (aSendingSW.getMillis ());
@@ -764,12 +771,6 @@ public final class OutboundOrchestrator
 
         onFailed.accept ("AP access limited by Circuit Breaker '" + sCircuitBreakerKeyAP + "'");
       }
-
-      // Update circuit breaker based on sending result only
-      if (aSendingReport.isSendingSuccess ())
-        CircuitBreakerManager.recordSuccess (sCircuitBreakerKeyAP);
-      else
-        CircuitBreakerManager.recordFailure (sCircuitBreakerKeyAP);
     }
     finally
     {

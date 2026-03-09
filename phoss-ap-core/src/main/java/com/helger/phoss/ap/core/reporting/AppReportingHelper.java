@@ -143,9 +143,9 @@ public final class AppReportingHelper
     // How to do AS4 sending
     final IPeppolReportSenderCallback aPeppolSender = (aDocTypeID, aProcessID, sMessagePayload) -> {
       // Make Network decisions
-      final EPeppolNetwork eStage = APCoreConfig.getPeppolStage ();
-      final ISMLInfo aSMLInfo = eStage.getSMLInfo ();
-      final TrustedCAChecker aAPCA = eStage.isProduction () ? PeppolTrustedCA.peppolProductionAP ()
+      final EPeppolNetwork ePeppolStage = APCoreConfig.getPeppolStage ();
+      final ISMLInfo aSMLInfo = ePeppolStage.getSMLInfo ();
+      final TrustedCAChecker aAPCA = ePeppolStage.isProduction () ? PeppolTrustedCA.peppolProductionAP ()
                                                             : PeppolTrustedCA.peppolTestAP ();
       // Sender: your company participant ID
       final String sSenderID = "0242:" + APCoreConfig.getPeppolSeatID ().substring (3);
@@ -154,7 +154,7 @@ public final class AppReportingHelper
 
       // Receiver: production OpenPeppol; test Helger
       // OpenPeppol doesn't offer this participant ID on test :-/
-      final String sReceiverID = eStage.isProduction () ? CPeppolReporting.OPENPEPPOL_PARTICIPANT_ID : "9915:helger";
+      final String sReceiverID = ePeppolStage.isProduction () ? CPeppolReporting.OPENPEPPOL_PARTICIPANT_ID : "9915:helger";
 
       final String sCountryC1 = APCoreConfig.getPeppolOwnerCountryCode ();
       if (!PeppolReportingHelper.isValidCountryCode (sCountryC1))

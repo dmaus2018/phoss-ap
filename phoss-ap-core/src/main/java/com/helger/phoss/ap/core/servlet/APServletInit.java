@@ -166,15 +166,15 @@ public class APServletInit
                  "') from the crypto factory");
 
     // Configure the stage correctly
-    final EPeppolNetwork eStage = APCoreConfig.getPeppolStage ();
-    if (eStage == null)
-      throw new InitializationException ("The Peppol stage configuration is missing or invalid");
+    final EPeppolNetwork ePeppolStage = APCoreConfig.getPeppolStage ();
+    if (ePeppolStage == null)
+      throw new InitializationException ("The Peppol Stage configuration is missing or invalid");
 
     // Check if the private key is a proper Peppol AP certificate
     final X509Certificate aAPCert = (X509Certificate) aPKE.getCertificate ();
     {
-      final TrustedCAChecker aAPCAChecker = eStage.isProduction () ? PeppolTrustedCA.peppolProductionAP ()
-                                                                   : PeppolTrustedCA.peppolTestAP ();
+      final TrustedCAChecker aAPCAChecker = ePeppolStage.isProduction () ? PeppolTrustedCA.peppolProductionAP ()
+                                                                         : PeppolTrustedCA.peppolTestAP ();
 
       // Check the configured Peppol AP certificate
       // * No caching
