@@ -145,6 +145,13 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
     return null;
   }
 
+  public boolean containsTransactionWithID (@NonNull final String sID)
+  {
+    final long nAffectedRows = newExecutor ().queryCount ("SELECT COUNT(*)" + " FROM " + m_sTableName + " WHERE id=?",
+                                                          new ConstantPreparedStatementDataProvider (sID));
+    return nAffectedRows == 1;
+  }
+
   @Nullable
   public IOutboundTransaction getBySbdhInstanceID (@NonNull final String sSbdhInstanceID)
   {

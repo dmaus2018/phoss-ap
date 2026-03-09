@@ -35,6 +35,11 @@ import com.helger.phoss.ap.api.config.APConfigProvider;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 
+/**
+ * Manager to handle Peppol Reporting items for inbound and outbound data.
+ *
+ * @author Philip Helger
+ */
 public final class ReportingManager
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (ReportingManager.class);
@@ -43,12 +48,35 @@ public final class ReportingManager
   {}
 
   @NonNull
-  public static ESuccess createOutboundPeppolReportingItem (@NonNull final String sTransactionID)
+  public static ESuccess createOutboundPeppolReportingItem (@NonNull final String sTransactionID,
+                                                            @NonNull final PeppolReportingItem aReportingItem)
   {
-    LOGGER.info ("Marking outbound transaction as reported: " + sTransactionID);
+    ValueEnforcer.notNull (sTransactionID, "TransactionID");
+    ValueEnforcer.notNull (aReportingItem, "ReportingItem");
+
     final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
-    // TODO outbound reporting
-    return aTxMgr.updateReportingStatus (sTransactionID, EReportingStatus.REPORTED);
+
+    LOGGER.info ("Counting outbound transaction '" + sTransactionID + "' for Peppol Reporting");
+
+    // Re-read the transaction to get the latest data
+    if (!aTxMgr.containsTransactionWithID (sTransactionID))
+      throw new IllegalArgumentException ("The provided outbound transaction ID '" +
+                                          sTransactionID +
+                                          "' does not exist");
+
+    try
+    {
+      PeppolReportingBackend.withBackendDo (APConfigProvider.getConfig (),
+                                            aBackend -> aBackend.storeReportingItem (aReportingItem));
+
+      // Remember that we did it
+      return aTxMgr.updateReportingStatus (sTransactionID, EReportingStatus.REPORTED);
+    }
+    catch (final Exception ex)
+    {
+      LOGGER.error ("Failed to store Peppol Reporting data for outbound transaction '" + sTransactionID + "'");
+    }
+    return ESuccess.FAILURE;
   }
 
   @NonNull
@@ -59,12 +87,12 @@ public final class ReportingManager
     final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
 
+    LOGGER.info ("Counting inbound transaction '" + sTransactionID + "' for Peppol Reporting");
+
     // Re-read the transaction to get the latest data
     final var aTx = aTxMgr.getByID (sTransactionID);
     if (aTx == null)
       throw new IllegalArgumentException ("The provided transaction ID '" + sTransactionID + "' does not exist");
-
-    LOGGER.info ("Counting inbound transaction '" + sTransactionID + "' for Peppol Reporting");
 
     if (StringHelper.isEmpty (aTx.getC4CountryCode ()))
       throw new IllegalStateException ("Inbound transaction '" + sTransactionID + "' has no C4 country code yet");

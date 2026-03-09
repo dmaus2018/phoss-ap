@@ -112,6 +112,15 @@ public interface IInboundTransactionManager
   IInboundTransaction getByID (@NonNull String sID);
 
   /**
+   * Check if the transaction with the provided ID exists in the DB or not.
+   *
+   * @param sID
+   *        The ID to check. May not be <code>null</code>.
+   * @return <code>true</code> if the transaction exists, <code>false</code> if not.
+   */
+  boolean containsTransactionWithID (@NonNull String sID);
+
+  /**
    * Check if a transaction with the provided AS4 Message ID exists.
    *
    * @param sAS4MessageID

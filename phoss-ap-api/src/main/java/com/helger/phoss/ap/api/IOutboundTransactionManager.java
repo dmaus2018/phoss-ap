@@ -116,6 +116,15 @@ public interface IOutboundTransactionManager
   IOutboundTransaction getByID (@NonNull String sID);
 
   /**
+   * Check if the transaction with the provided ID exists in the DB or not.
+   *
+   * @param sID
+   *        The ID to check. May not be <code>null</code>.
+   * @return <code>true</code> if the transaction exists, <code>false</code> if not.
+   */
+  boolean containsTransactionWithID (@NonNull String sID);
+
+  /**
    * Look up a transaction by its SBDH Instance Identifier.
    *
    * @param sSbdhInstanceID

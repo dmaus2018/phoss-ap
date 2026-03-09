@@ -35,11 +35,10 @@ import com.helger.base.io.stream.CountingInputStream;
 import com.helger.base.io.stream.HasInputStream;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.base.string.StringHelper;
-import com.helger.base.string.StringHex;
 import com.helger.base.timing.StopWatch;
 import com.helger.base.wrapper.Wrapper;
-import com.helger.io.file.FileOperationManager;
 import com.helger.mime.CMimeType;
+import com.helger.peppol.reporting.api.PeppolReportingItem;
 import com.helger.peppol.sbdh.PeppolSBDHData;
 import com.helger.peppol.sbdh.PeppolSBDHDataReader;
 import com.helger.peppol.security.PeppolTrustedCA;
@@ -52,6 +51,7 @@ import com.helger.peppolid.factory.IIdentifierFactory;
 import com.helger.phase4.dynamicdiscovery.AS4EndpointDetailProviderConstant;
 import com.helger.phase4.dynamicdiscovery.AS4EndpointDetailProviderPeppol;
 import com.helger.phase4.dynamicdiscovery.Phase4SMPException;
+import com.helger.phase4.logging.Phase4LogCustomizer;
 import com.helger.phase4.model.message.MessageHelperMethods;
 import com.helger.phase4.peppol.Phase4PeppolSender;
 import com.helger.phase4.peppol.Phase4PeppolSender.PeppolUserMessageBuilder;
@@ -78,6 +78,7 @@ import com.helger.phoss.ap.core.CircuitBreakerManager;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
 import com.helger.phoss.ap.core.helper.CopyingInputStream;
 import com.helger.phoss.ap.core.helper.HashHelper;
+import com.helger.phoss.ap.core.reporting.ReportingManager;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 import com.helger.security.certificate.TrustedCAChecker;
 import com.helger.smpclient.peppol.CachingSMPClientReadOnly;
@@ -94,9 +95,46 @@ public final class OutboundOrchestrator
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (OutboundOrchestrator.class);
 
+  /** Private constructor to prevent instantiation of this utility class. */
   private OutboundOrchestrator ()
   {}
 
+  /**
+   * Submit a raw (payload-only) document for outbound sending. The document is stored to disk,
+   * optionally verified, and a new outbound transaction is created in
+   * {@link EOutboundStatus#PENDING} state.
+   *
+   * @param sLogPrefix
+   *        Log message prefix for traceability. May not be <code>null</code>.
+   * @param aSenderID
+   *        The Peppol sender participant identifier. May not be <code>null</code>.
+   * @param aReceiverID
+   *        The Peppol receiver participant identifier. May not be <code>null</code>.
+   * @param aDocTypeID
+   *        The Peppol document type identifier. May not be <code>null</code>.
+   * @param aProcessID
+   *        The Peppol process identifier. May not be <code>null</code>.
+   * @param sSbdhInstanceID
+   *        The SBDH instance identifier to use. May not be <code>null</code>.
+   * @param sC1CountryCode
+   *        The C1 country code of the sender. May not be <code>null</code>.
+   * @param aDocumentIS
+   *        The input stream of the raw document payload. Will not be closed by this method. May not
+   *        be <code>null</code>.
+   * @param sMlsTo
+   *        Optional MLS "To" address. May be <code>null</code>.
+   * @param sSbdhStandard
+   *        Optional SBDH standard identifier. May be <code>null</code>.
+   * @param sSbdhTypeVersion
+   *        Optional SBDH type version. May be <code>null</code>.
+   * @param sSbdhType
+   *        Optional SBDH type. May be <code>null</code>.
+   * @param sPayloadMimeType
+   *        Optional payload MIME type (e.g. "application/pdf"). May be <code>null</code> for XML
+   *        payloads.
+   * @return The created {@link IOutboundTransaction} or <code>null</code> if the document could not
+   *         be stored or verification failed.
+   */
   @Nullable
   public static IOutboundTransaction submitRawDocument (@NonNull final String sLogPrefix,
                                                         @NonNull final IParticipantIdentifier aSenderID,
@@ -114,12 +152,14 @@ public final class OutboundOrchestrator
   {
     LOGGER.info (sLogPrefix + "Submitting raw document with SBDH Instance ID '" + sSbdhInstanceID + "'");
 
+    final IAPTimestampManager aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
+
     final File aStorageBasePath = new File (APBasicConfig.getStorageOutboundPath ());
-    final OffsetDateTime aAS4SendingDT = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
+    final OffsetDateTime aCreationDT = aTimestampMgr.getCurrentDateTime ();
     final Wrapper <File> aTempFileHolder = Wrapper.empty ();
 
     long nDocumentBytes = -1;
-    final MessageDigest aMD = HashHelper.MD_ALGO.createMessageDigest ();
+    final MessageDigest aMD = HashHelper.createMessageDigest ();
     // 1. Count size
     // 2. Create message digest
     // 3. Copy to a temporary file
@@ -127,8 +167,9 @@ public final class OutboundOrchestrator
     try (final CountingInputStream aCountingIS = new CountingInputStream (aDocumentIS);
          final DigestInputStream aDigestIS = new DigestInputStream (aCountingIS, aMD);
          final OutputStream aFileOS = DocumentStorageHelper.openDocumentStream (aStorageBasePath,
-                                                                                aAS4SendingDT,
-                                                                                sSbdhInstanceID + ".out",
+                                                                                aCreationDT,
+                                                                                sSbdhInstanceID,
+                                                                                ".out",
                                                                                 aTempFileHolder::set))
     {
       if (StreamHelper.copyByteStream ()
@@ -144,7 +185,7 @@ public final class OutboundOrchestrator
         // No need to keep the temporary file
         StreamHelper.close (aFileOS);
         if (aTempFileHolder.isSet ())
-          FileOperationManager.INSTANCE.deleteFileIfExisting (aTempFileHolder.get ());
+          DocumentStorageHelper.deleteDocument (aTempFileHolder.get ().getAbsolutePath ());
         return null;
       }
       nDocumentBytes = aCountingIS.getBytesRead ();
@@ -155,11 +196,11 @@ public final class OutboundOrchestrator
 
       // No need to keep the temporary file
       if (aTempFileHolder.isSet ())
-        FileOperationManager.INSTANCE.deleteFileIfExisting (aTempFileHolder.get ());
+        DocumentStorageHelper.deleteDocument (aTempFileHolder.get ().getAbsolutePath ());
       return null;
     }
 
-    final String sDocumentHash = StringHex.getHexEncoded (aMD.digest ());
+    final String sDocumentHash = HashHelper.getDigestHex (aMD);
     final File aDocumentFile = aTempFileHolder.get ().getAbsoluteFile ();
     final String sDocumentPath = aDocumentFile.toString ();
 
@@ -188,7 +229,7 @@ public final class OutboundOrchestrator
                                                nDocumentBytes,
                                                sDocumentHash,
                                                sC1CountryCode,
-                                               aAS4SendingDT,
+                                               aCreationDT,
                                                sMlsTo,
                                                (String) null,
                                                sSbdhStandard,
@@ -198,6 +239,20 @@ public final class OutboundOrchestrator
     return aMgr.getByID (sTransactionID);
   }
 
+  /**
+   * Submit a pre-built Standard Business Document (SBD) for outbound sending. The SBD is parsed to
+   * extract Peppol metadata, stored to disk, and a new outbound transaction is created in
+   * {@link EOutboundStatus#PENDING} state.
+   *
+   * @param sLogPrefix
+   *        Log message prefix for traceability. May not be <code>null</code>.
+   * @param aSbdIS
+   *        The input stream containing the complete pre-built SBD. May not be <code>null</code>.
+   * @param sMlsTo
+   *        Optional MLS "To" address. May be <code>null</code>.
+   * @return The created {@link IOutboundTransaction} or <code>null</code> if the SBD could not be
+   *         parsed.
+   */
   @Nullable
   public static IOutboundTransaction submitPrebuiltSBD (@NonNull final String sLogPrefix,
                                                         @NonNull final InputStream aSbdIS,
@@ -205,10 +260,11 @@ public final class OutboundOrchestrator
   {
     LOGGER.info (sLogPrefix + "Submitting pre-built SBD");
 
+    final IAPTimestampManager aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
     final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
 
     final File aStorageBasePath = new File (APBasicConfig.getStorageOutboundPath ());
-    final OffsetDateTime aAS4SendingDT = APBasicMetaManager.getTimestampMgr ().getCurrentDateTime ();
+    final OffsetDateTime aCreationDT = aTimestampMgr.getCurrentDateTime ();
     final Wrapper <File> aTempFileHolder = Wrapper.empty ();
 
     final PeppolSBDHData aSbdData;
@@ -222,7 +278,7 @@ public final class OutboundOrchestrator
     try (final CountingInputStream aCountingIS = new CountingInputStream (aSbdIS);
          final DigestInputStream aDigestIS = new DigestInputStream (aCountingIS, aMD);
          final OutputStream aFileOS = DocumentStorageHelper.openTemporaryDocumentStream (aStorageBasePath,
-                                                                                         aAS4SendingDT,
+                                                                                         aCreationDT,
                                                                                          aTempFileHolder::set);
          final CopyingInputStream aCopyIS = new CopyingInputStream (aDigestIS, aFileOS))
     {
@@ -248,8 +304,10 @@ public final class OutboundOrchestrator
     {
       // Rename temp file to final name
       final File aTempFile = aTempFileHolder.get ();
-      final File aDstFile = new File (aTempFile.getParentFile (), sSbdhInstanceID + ".sbd");
-      FileOperationManager.INSTANCE.renameFile (aTempFile, aDstFile);
+      final File aDstFile = DocumentStorageHelper.renameFile (aTempFile,
+                                                              aTempFile.getParentFile (),
+                                                              sSbdhInstanceID,
+                                                              ".sbd");
       sDocumentPath = aDstFile.getAbsolutePath ().toString ();
     }
 
@@ -267,7 +325,7 @@ public final class OutboundOrchestrator
                                                nSbdByteCount,
                                                sDocumentHash,
                                                aSbdData.getCountryC1 (),
-                                               aAS4SendingDT,
+                                               aCreationDT,
                                                sMlsTo,
                                                (String) null,
                                                (String) null,
@@ -277,6 +335,23 @@ public final class OutboundOrchestrator
     return aMgr.getByID (sTransactionID);
   }
 
+  /**
+   * Process a pending outbound transaction by performing SMP lookup and sending the document via
+   * AS4/Peppol. This method handles dynamic discovery (NAPTR + SMP), certificate validation,
+   * circuit breaker checks, and the actual AS4 transmission. On success, the transaction status is
+   * updated to {@link EOutboundStatus#SENT}. On failure, the transaction is either marked as
+   * {@link EOutboundStatus#FAILED} (with retry scheduling) or
+   * {@link EOutboundStatus#PERMANENTLY_FAILED} depending on the error type and attempt count.
+   *
+   * @param sLogPrefix
+   *        Log message prefix for traceability. May not be <code>null</code>.
+   * @param aTx
+   *        The outbound transaction to process. Must be in pending state. May not be
+   *        <code>null</code>.
+   * @return The {@link Phase4PeppolSendingReport} containing the full details of the sending
+   *         attempt including lookup results, AS4 message IDs, and timing information. Never
+   *         <code>null</code>.
+   */
   @NonNull
   public static Phase4PeppolSendingReport processPendingOutbound (@NonNull final String sLogPrefix,
                                                                   @NonNull final IOutboundTransaction aTx)
@@ -294,7 +369,9 @@ public final class OutboundOrchestrator
 
     final Phase4PeppolSendingReport aSendingReport = new Phase4PeppolSendingReport (aSMLInfo);
 
-    LOGGER.info (sLogPrefix + "Processing outbound transaction '" + sTxID + "'");
+    final String sRealLogPrefix = sLogPrefix + "[" + sTxID + "] ";
+    LOGGER.info (sRealLogPrefix + "Processing outbound transaction");
+    Phase4LogCustomizer.setThreadLocalLogPrefix (sRealLogPrefix);
 
     // try-catch for overall duration only
     try
@@ -451,7 +528,7 @@ public final class OutboundOrchestrator
                                                               : PeppolTrustedCA.peppolTestAP ();
 
         EAS4UserMessageSendResult eResult = null;
-        boolean bExceptionCaught = false;
+        PeppolReportingItem aReportingItem = null;
         try
         {
           // Actual sending using Phase4PeppolSender
@@ -463,42 +540,39 @@ public final class OutboundOrchestrator
           {
             case PAYLOAD_ONLY:
             {
-              final PeppolUserMessageBuilder aBuilder = Phase4PeppolSender.builder ()
-                                                                          .httpClientFactory (aHCS)
-                                                                          // AS4 input
-                                                                          .messageID (sAS4MessageID)
-                                                                          .conversationID (sAS4ConversationID)
-                                                                          .sendingDateTime (aAS4Timestamp)
-                                                                          // Peppol IDs
-                                                                          .senderParticipantID (aSenderID)
-                                                                          .receiverParticipantID (aReceiverID)
-                                                                          .documentTypeID (aDocTypeID)
-                                                                          .processID (aProcessID)
-                                                                          .countryC1 (aTx.getC1CountryCode ())
-                                                                          .senderPartyID (sC2SeatID)
-                                                                          .sbdhInstanceIdentifier (aTx.getSbdhInstanceID ())
-                                                                          // Certificate stuff
-                                                                          .peppolAP_CAChecker (aAPCA)
-                                                                          .endpointDetailProvider (new AS4EndpointDetailProviderConstant (aReceiverCert,
-                                                                                                                                          sReceiverAPURL,
-                                                                                                                                          sReceiverTechnicalContact))
-                                                                          .certificateConsumer ( (aAPCertificate,
-                                                                                                  aCheckDT,
-                                                                                                  eCertCheckResult) -> {
-                                                                            // Take specifically the
-                                                                            // AP certificate
-                                                                            // verification
-                                                                            aSendingReport.setC3CertCheckDT (aCheckDT);
-                                                                            aSendingReport.setC3CertCheckResult (eCertCheckResult);
-                                                                          })
-                                                                          // Response stuff
-                                                                          .rawResponseConsumer (aSendingReport::setRawHttpResponse)
-                                                                          .signalMsgConsumer ( (aSignalMsg,
-                                                                                                aMessageMetadata,
-                                                                                                aState) -> {
-                                                                            aSendingReport.setAS4ReceivedSignalMsg (aSignalMsg);
-                                                                          })
-                                                                          .disableValidation ();
+              final PeppolUserMessageBuilder aBuilder;
+              aBuilder = Phase4PeppolSender.builder ()
+                                           .httpClientFactory (aHCS)
+                                           // AS4 input
+                                           .messageID (sAS4MessageID)
+                                           .conversationID (sAS4ConversationID)
+                                           .sendingDateTime (aAS4Timestamp)
+                                           // Peppol IDs
+                                           .senderParticipantID (aSenderID)
+                                           .receiverParticipantID (aReceiverID)
+                                           .documentTypeID (aDocTypeID)
+                                           .processID (aProcessID)
+                                           .countryC1 (aTx.getC1CountryCode ())
+                                           .senderPartyID (sC2SeatID)
+                                           .sbdhInstanceIdentifier (aTx.getSbdhInstanceID ())
+                                           // Certificate stuff
+                                           .peppolAP_CAChecker (aAPCA)
+                                           .endpointDetailProvider (new AS4EndpointDetailProviderConstant (aReceiverCert,
+                                                                                                           sReceiverAPURL,
+                                                                                                           sReceiverTechnicalContact))
+                                           .certificateConsumer ( (aAPCertificate, aCheckDT, eCertCheckResult) -> {
+                                             // Take specifically the
+                                             // AP certificate
+                                             // verification
+                                             aSendingReport.setC3CertCheckDT (aCheckDT);
+                                             aSendingReport.setC3CertCheckResult (eCertCheckResult);
+                                           })
+                                           // Response stuff
+                                           .rawResponseConsumer (aSendingReport::setRawHttpResponse)
+                                           .signalMsgConsumer ( (aSignalMsg, aMessageMetadata, aState) -> {
+                                             aSendingReport.setAS4ReceivedSignalMsg (aSignalMsg);
+                                           })
+                                           .disableValidation ();
 
               // Add the optional SBDH parameters required for e.g. PDF sending
               if (StringHelper.isNotEmpty (aTx.getSbdhStandard ()))
@@ -522,7 +596,7 @@ public final class OutboundOrchestrator
 
                 // Default is XML
                 if (StringHelper.isNotEmpty (sPayloadMimeType))
-                  LOGGER.warn (sLogPrefix +
+                  LOGGER.warn (sRealLogPrefix +
                                "Ignoring unsupported payload MIME type '" +
                                sPayloadMimeType +
                                "' for transaction '" +
@@ -534,7 +608,9 @@ public final class OutboundOrchestrator
               }
 
               eResult = aBuilder.sendMessageAndCheckForReceipt (aCaughtSendingEx::set);
-              LOGGER.info (sLogPrefix + "Peppol SBDH-building client send result: " + eResult);
+              LOGGER.info (sRealLogPrefix + "Peppol SBDH-building client send result: " + eResult);
+
+              aReportingItem = aBuilder.createPeppolReportingItemAfterSending (aReceiverID.getURIEncoded ());
               break;
             }
             case PREBUILT_SBD:
@@ -572,38 +648,37 @@ public final class OutboundOrchestrator
                                                    "'");
               }
 
-              final PeppolUserMessageSBDHBuilder aBuilder = Phase4PeppolSender.sbdhBuilder ()
-                                                                              .httpClientFactory (aHCS)
-                                                                              // AS4 input
-                                                                              .messageID (sAS4MessageID)
-                                                                              .conversationID (sAS4ConversationID)
-                                                                              .sendingDateTime (aAS4Timestamp)
-                                                                              // SBD
-                                                                              .payloadAndMetadata (aSbdData)
-                                                                              // Remaining IDs
-                                                                              .senderPartyID (sC2SeatID)
-                                                                              // Certificate stuff
-                                                                              .peppolAP_CAChecker (aAPCA)
-                                                                              .endpointDetailProvider (new AS4EndpointDetailProviderConstant (aReceiverCert,
-                                                                                                                                              sReceiverAPURL,
-                                                                                                                                              sReceiverTechnicalContact))
-                                                                              .certificateConsumer ( (aAPCertificate,
-                                                                                                      aCheckDT,
-                                                                                                      eCertCheckResult) -> {
-                                                                                // Determined by SMP
-                                                                                // lookup
-                                                                                aSendingReport.setC3CertCheckDT (aCheckDT);
-                                                                                aSendingReport.setC3CertCheckResult (eCertCheckResult);
-                                                                              })
-                                                                              // Response stuff
-                                                                              .rawResponseConsumer (aSendingReport::setRawHttpResponse)
-                                                                              .signalMsgConsumer ( (aSignalMsg,
-                                                                                                    aMessageMetadata,
-                                                                                                    aState) -> {
-                                                                                aSendingReport.setAS4ReceivedSignalMsg (aSignalMsg);
-                                                                              });
+              final PeppolUserMessageSBDHBuilder aBuilder;
+              aBuilder = Phase4PeppolSender.sbdhBuilder ()
+                                           .httpClientFactory (aHCS)
+                                           // AS4 input
+                                           .messageID (sAS4MessageID)
+                                           .conversationID (sAS4ConversationID)
+                                           .sendingDateTime (aAS4Timestamp)
+                                           // SBD
+                                           .payloadAndMetadata (aSbdData)
+                                           // Remaining IDs
+                                           .senderPartyID (sC2SeatID)
+                                           // Certificate stuff
+                                           .peppolAP_CAChecker (aAPCA)
+                                           .endpointDetailProvider (new AS4EndpointDetailProviderConstant (aReceiverCert,
+                                                                                                           sReceiverAPURL,
+                                                                                                           sReceiverTechnicalContact))
+                                           .certificateConsumer ( (aAPCertificate, aCheckDT, eCertCheckResult) -> {
+                                             // Determined by SMP
+                                             // lookup
+                                             aSendingReport.setC3CertCheckDT (aCheckDT);
+                                             aSendingReport.setC3CertCheckResult (eCertCheckResult);
+                                           })
+                                           // Response stuff
+                                           .rawResponseConsumer (aSendingReport::setRawHttpResponse)
+                                           .signalMsgConsumer ( (aSignalMsg, aMessageMetadata, aState) -> {
+                                             aSendingReport.setAS4ReceivedSignalMsg (aSignalMsg);
+                                           });
               eResult = aBuilder.sendMessageAndCheckForReceipt (aCaughtSendingEx::set);
-              LOGGER.info (sLogPrefix + "Peppol Prebuilt-SBDH client send result: " + eResult);
+              LOGGER.info (sRealLogPrefix + "Peppol Prebuilt-SBDH client send result: " + eResult);
+
+              aReportingItem = aBuilder.createPeppolReportingItemAfterSending (aReceiverID.getURIEncoded ());
               break;
             }
             default:
@@ -617,13 +692,14 @@ public final class OutboundOrchestrator
           {
             final Phase4Exception ex = aCaughtSendingEx.get ();
 
-            bExceptionCaught = true;
-            LOGGER.error (sLogPrefix + "Outbound sending failed for transaction '" + sTxID + "'", ex);
+            LOGGER.error (sRealLogPrefix + "Outbound sending failed for transaction '" + sTxID + "'", ex);
 
             aSendingReport.setAS4SendingError ("An error occurred during the AS4 transmission to '" +
                                                sReceiverAPURL +
                                                "'");
             aSendingReport.setAS4SendingException (ex);
+            aSendingReport.setSendingSuccess (false);
+            aSendingReport.setOverallSuccess (false);
 
             if (nNewAttemptCount >= APCoreConfig.getRetrySendingMaxAttempts ())
               onPermanentFailure.accept (ex.getMessage ());
@@ -637,7 +713,6 @@ public final class OutboundOrchestrator
             // Sending result may be null
             final boolean bSendingSuccess = eResult != null && eResult.isSuccess ();
             aSendingReport.setSendingSuccess (bSendingSuccess);
-            aSendingReport.setOverallSuccess (bSendingSuccess && !bExceptionCaught);
 
             // Store successful attempt
             final String sAS4ReceiptID = aSendingReport.getAS4ReceivedSignalMsg ().getMessageInfo ().getMessageId ();
@@ -646,18 +721,32 @@ public final class OutboundOrchestrator
             // Update in DB
             aTxMgr.updateStatusCompleted (sTxID, EOutboundStatus.SENT);
 
-            LOGGER.info (sLogPrefix + "Outbound transaction sent successfully '" + sTxID + "'");
+            // Store Reporting data on success only
+            final boolean bReportingItemStored;
+            if (aReportingItem != null)
+            {
+              bReportingItemStored = ReportingManager.createOutboundPeppolReportingItem (sTxID, aReportingItem)
+                                                     .isSuccess ();
+            }
+            else
+              bReportingItemStored = false;
+
+            // Set as last activity
+            aSendingReport.setOverallSuccess (bSendingSuccess && bReportingItemStored);
+
+            LOGGER.info (sRealLogPrefix + "Outbound transaction sent successfully '" + sTxID + "'");
           }
         }
         catch (final Exception ex)
         {
-          bExceptionCaught = true;
-          LOGGER.error (sLogPrefix + "Outbound sending exception for transaction '" + sTxID + "'", ex);
+          LOGGER.error (sRealLogPrefix + "Outbound sending exception for transaction '" + sTxID + "'", ex);
 
           aSendingSW.stop ();
           aSendingReport.setAS4SendingError ("Failed to transmit outbound message to '" + sReceiverAPURL + "'");
           aSendingReport.setAS4SendingException (ex);
           aSendingReport.setAS4SendingDurationMillis (aSendingSW.getMillis ());
+          aSendingReport.setSendingSuccess (false);
+          aSendingReport.setOverallSuccess (false);
 
           if (nNewAttemptCount >= APCoreConfig.getRetrySendingMaxAttempts ())
             onPermanentFailure.accept (ex.getMessage ());
@@ -670,14 +759,23 @@ public final class OutboundOrchestrator
         aSendingSW.stop ();
         aSendingReport.setAS4SendingError ("AP access limited by Circuit Breaker");
         aSendingReport.setAS4SendingDurationMillis (aSendingSW.getMillis ());
+        aSendingReport.setSendingSuccess (false);
+        aSendingReport.setOverallSuccess (false);
 
         onFailed.accept ("AP access limited by Circuit Breaker '" + sCircuitBreakerKeyAP + "'");
       }
+
+      // Update circuit breaker based on sending result only
+      if (aSendingReport.isSendingSuccess ())
+        CircuitBreakerManager.recordSuccess (sCircuitBreakerKeyAP);
+      else
+        CircuitBreakerManager.recordFailure (sCircuitBreakerKeyAP);
     }
     finally
     {
       aOverallSW.stop ();
       aSendingReport.setOverallDurationMillis (aOverallSW.getMillis ());
+      Phase4LogCustomizer.clearThreadLocals ();
     }
 
     return aSendingReport;

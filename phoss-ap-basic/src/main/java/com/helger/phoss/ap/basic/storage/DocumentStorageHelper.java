@@ -27,11 +27,14 @@ import java.util.function.Consumer;
 
 import org.jspecify.annotations.NonNull;
 
+import com.helger.annotation.Nonempty;
 import com.helger.annotation.concurrent.Immutable;
+import com.helger.annotation.misc.DevelopersNote;
 import com.helger.base.enforce.ValueEnforcer;
-import com.helger.base.io.nonblocking.NonBlockingBufferedOutputStream;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.base.string.StringHelper;
+import com.helger.io.file.FileHelper;
+import com.helger.io.file.FileOperationManager;
 
 /**
  * Utility class for reading and writing document files on disk. Documents are stored as flat files
@@ -103,22 +106,60 @@ public final class DocumentStorageHelper
   }
 
   @NonNull
+  private static File _ensureUniqueFile (@NonNull final File aBaseDir,
+                                         @NonNull @Nonempty final String sFilename,
+                                         @NonNull @Nonempty final String sFileExt)
+  {
+    File aFilePath = new File (aBaseDir, sFilename + sFileExt);
+
+    // Make sure the file does not exist yet
+    if (aFilePath.exists ())
+    {
+      // Filename is not unique
+      int nSuffix = 1;
+      do
+      {
+        aFilePath = new File (aBaseDir, sFilename + "-" + nSuffix + sFileExt);
+        nSuffix++;
+        if (nSuffix >= 1_000)
+        {
+          // Avoid endless loop
+          throw new IllegalStateException ("The filename '" +
+                                           sFileExt +
+                                           "' exists alreay with too many suffixes (" +
+                                           nSuffix +
+                                           ")");
+        }
+      } while (aFilePath.exists ());
+    }
+    return aFilePath;
+  }
+
+  @NonNull
   public static OutputStream openDocumentStream (@NonNull final File aBaseDir,
                                                  @NonNull final OffsetDateTime aReferenceDT,
-                                                 @NonNull final String sFilename,
+                                                 @NonNull @DevelopersNote final String sFilename,
+                                                 @NonNull final String sFileExt,
                                                  @NonNull final Consumer <File> aFileConsumer)
   {
     ValueEnforcer.notNull (aBaseDir, "BaseDir");
     ValueEnforcer.notNull (aReferenceDT, "ReferenceDT");
+    ValueEnforcer.notEmpty (sFilename, "Filename");
+    ValueEnforcer.notEmpty (sFileExt, "FileExt");
+    ValueEnforcer.isTrue ( () -> sFileExt.startsWith ("."), "FileExt must start with a dot");
     ValueEnforcer.notNull (aFileConsumer, "FileConsumer");
 
     final File aEffectiveBaseDir = _getStorageDir (aBaseDir, aReferenceDT);
     try
     {
+      // Create base directory structure if needed
       Files.createDirectories (aEffectiveBaseDir.toPath ());
-      final Path aFilePath = aEffectiveBaseDir.toPath ().resolve (sFilename);
-      aFileConsumer.accept (aFilePath.toFile ());
-      return new NonBlockingBufferedOutputStream (Files.newOutputStream (aFilePath));
+
+      // Get the absolute path
+      final File aFilePath = _ensureUniqueFile (aEffectiveBaseDir, sFilename, sFileExt);
+
+      aFileConsumer.accept (aFilePath);
+      return FileHelper.getBufferedOutputStream (aFilePath);
     }
     catch (final Exception ex)
     {
@@ -136,7 +177,24 @@ public final class DocumentStorageHelper
                                                           @NonNull final OffsetDateTime aReferenceDT,
                                                           @NonNull final Consumer <File> aFileConsumer)
   {
-    return openDocumentStream (aBaseDir, aReferenceDT, UUID.randomUUID ().toString () + ".tmp", aFileConsumer);
+    // Should be always unique
+    return openDocumentStream (aBaseDir, aReferenceDT, UUID.randomUUID ().toString (), ".tmp", aFileConsumer);
+  }
+
+  @NonNull
+  public static File renameFile (@NonNull final File aSrcFile,
+                                 @NonNull final File aTargetDir,
+                                 @NonNull @Nonempty final String sBaseName,
+                                 @NonNull @Nonempty final String sFileExt)
+  {
+    final File aDstFile = _ensureUniqueFile (aTargetDir, sBaseName, sFileExt);
+    if (FileOperationManager.INSTANCE.renameFile (aSrcFile, aDstFile).isFailure ())
+      throw new IllegalStateException ("Failed to rename file '" +
+                                       aSrcFile.getAbsolutePath () +
+                                       "' to '" +
+                                       aDstFile.getAbsolutePath () +
+                                       "'");
+    return aDstFile;
   }
 
   /**
