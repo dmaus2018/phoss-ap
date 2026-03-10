@@ -32,7 +32,6 @@ import com.helger.base.wrapper.Wrapper;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.datetime.helper.PDTFactory;
-import com.helger.peppol.mls.CPeppolMLS;
 import com.helger.peppol.reporting.api.CPeppolReporting;
 import com.helger.peppol.reporting.api.PeppolReportingItem;
 import com.helger.peppol.reporting.api.backend.PeppolReportingBackend;
@@ -50,6 +49,7 @@ import com.helger.peppol.sbdh.PeppolSBDHData;
 import com.helger.peppol.servicedomain.EPeppolNetwork;
 import com.helger.peppolid.IParticipantIdentifier;
 import com.helger.peppolid.factory.IIdentifierFactory;
+import com.helger.peppolid.peppol.spis.SPIDHelper;
 import com.helger.phase4.logging.Phase4LoggerFactory;
 import com.helger.phase4.peppol.Phase4PeppolSendingReport;
 import com.helger.phoss.ap.api.config.APConfigProvider;
@@ -130,8 +130,7 @@ public final class APPeppolReportHelper
   }
 
   /**
-   * Create, validate, store, send and store sending reports for Peppol TSR and
-   * EUSR for one period.
+   * Create, validate, store, send and store sending reports for Peppol TSR and EUSR for one period.
    *
    * @param aYearMonth
    *        The reporting period to use. May not be <code>null</code>.
@@ -151,7 +150,7 @@ public final class APPeppolReportHelper
       final EPeppolNetwork ePeppolStage = APCoreConfig.getPeppolStage ();
 
       // Sender: your company participant ID
-      final IParticipantIdentifier aSenderID = aIF.createParticipantIdentifierWithDefaultScheme (CPeppolMLS.SPIS_PARTICIPANT_ID_SCHEME +
+      final IParticipantIdentifier aSenderID = aIF.createParticipantIdentifierWithDefaultScheme (SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME +
                                                                                                  ":" +
                                                                                                  APCoreConfig.getPeppolSeatID ()
                                                                                                              .substring (3));
