@@ -16,13 +16,9 @@
  */
 package com.helger.phoss.ap.api.datetime;
 
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.OffsetTime;
 
 import org.jspecify.annotations.NonNull;
-
-import com.helger.datetime.xml.XMLOffsetDateTime;
 
 /**
  * Interface for providing time stamps.
@@ -42,32 +38,4 @@ public interface IAPTimestampManager
    */
   @NonNull
   OffsetDateTime getCurrentDateTimeUTC ();
-
-  /**
-   * @return The current date in time in the current time zone for XML processing. Never
-   *         <code>null</code>.
-   */
-  @NonNull
-  default XMLOffsetDateTime getCurrentXMLDateTime ()
-  {
-    return XMLOffsetDateTime.of (getCurrentDateTime ());
-  }
-
-  /**
-   * @return The current date in the current time zone. Never <code>null</code>.
-   */
-  @NonNull
-  default LocalDate getCurrentDate ()
-  {
-    return getCurrentDateTime ().toLocalDate ();
-  }
-
-  /**
-   * @return The current time in the current time zone. Never <code>null</code>.
-   */
-  @NonNull
-  default OffsetTime getCurrentTime ()
-  {
-    return getCurrentDateTime ().toOffsetTime ();
-  }
 }

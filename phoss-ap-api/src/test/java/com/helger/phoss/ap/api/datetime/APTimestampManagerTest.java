@@ -14,33 +14,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.helger.phoss.ap.basic;
+package com.helger.phoss.ap.api.datetime;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.time.OffsetDateTime;
 
-import org.junit.Rule;
 import org.junit.Test;
 
 import com.helger.base.concurrent.ThreadHelper;
-import com.helger.scope.mock.ScopeTestRule;
 
 /**
- * Test class for class {@link APBasicMetaManager}.
+ * Test class for class {@link APTimestampManager}.
  *
  * @author Philip Helger
  */
-public final class APBasicMetaManagerTest
+public final class APTimestampManagerTest
 {
-  @Rule
-  public final ScopeTestRule m_aRule = new ScopeTestRule ();
+  @Test
+  public void testGetCurrentDateTime ()
+  {
+    final var aTimestampMgr = new APTimestampManager ();
+    final OffsetDateTime aDT1 = aTimestampMgr.getCurrentDateTime ();
+    assertNotNull (aDT1);
+    ThreadHelper.sleep (10);
+    final OffsetDateTime aDT2 = aTimestampMgr.getCurrentDateTime ();
+    assertNotNull (aDT2);
+    assertTrue (aDT2.isAfter (aDT1));
+  }
 
   @Test
-  public void testBasic ()
+  public void testGetCurrentDateTimeUTC ()
   {
-    final var aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
+    final var aTimestampMgr = new APTimestampManager ();
     final OffsetDateTime aDT1 = aTimestampMgr.getCurrentDateTimeUTC ();
     assertNotNull (aDT1);
     ThreadHelper.sleep (10);
