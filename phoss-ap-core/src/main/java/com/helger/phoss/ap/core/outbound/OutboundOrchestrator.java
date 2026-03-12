@@ -194,6 +194,11 @@ public final class OutboundOrchestrator
     {
       LOGGER.error (sLogPrefix + "Failed to process document to submit", ex);
 
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("OutboundOrchestrator.submitRawDocument",
+                                        "Failed to process document to submit",
+                                        ex);
+
       // No need to keep the temporary file
       if (aTempPathHolder.isSet ())
         DocumentStorageHelper.deleteDocument (aTempPathHolder.get ());
@@ -288,6 +293,10 @@ public final class OutboundOrchestrator
     catch (final Exception ex)
     {
       LOGGER.error (sLogPrefix + "Failed to parse provided SBDH", ex);
+
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("OutboundOrchestrator.submitPrebuiltSBD", "Failed to parse provided SBDH", ex);
+
       // No need to keep the temporary file
       if (aTempPathHolder.isSet ())
         DocumentStorageHelper.deleteDocument (aTempPathHolder.get ());
@@ -751,6 +760,11 @@ public final class OutboundOrchestrator
         {
           // Unexpected exception - not a Phase4Exception
           LOGGER.error (sRealLogPrefix + "Outbound sending exception for transaction '" + sTxID + "'", ex);
+
+          for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+            aHandler.onUnexpectedException ("OutboundOrchestrator.processPendingOutbound",
+                                            "Outbound sending exception for transaction '" + sTxID + "'",
+                                            ex);
 
           aSendingSW.stop ();
           aSendingReport.setAS4SendingError ("Failed to transmit outbound AS4 message to '" + sReceiverAPURL + "'");

@@ -83,6 +83,11 @@ public final class InboundOrchestrator
                                                                  " (" +
                                                                  ex.getClass ().getName () +
                                                                  ")");
+
+        for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+          aHandler.onUnexpectedException ("InboundOrchestrator.forwardDocument",
+                                          "Internal error forwarding document for transaction '" + aTx.getID () + "'",
+                                          ex);
       }
 
       if (aResult.isSuccess ())
@@ -128,7 +133,9 @@ public final class InboundOrchestrator
                                            aResult.getErrorDetails ());
 
         for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
-          aHandler.onInboundPermanentForwardingFailure (aTx.getID (), aTx.getSbdhInstanceID (), "Max retries exhausted");
+          aHandler.onInboundPermanentForwardingFailure (aTx.getID (),
+                                                        aTx.getSbdhInstanceID (),
+                                                        "Max retries exhausted");
       }
       else
       {

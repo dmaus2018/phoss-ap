@@ -223,6 +223,11 @@ public final class APPeppolReportHelper
       catch (final Exception ex)
       {
         LOGGER.error ("Failed to create TSR for " + aYearMonth, ex);
+
+        for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+          aHandler.onUnexpectedException ("APPeppolReportHelper.createAndSendPeppolReports",
+                                          "Failed to create TSR for " + aYearMonth,
+                                          ex);
       }
 
       if (!bTSRSuccess)
@@ -259,6 +264,11 @@ public final class APPeppolReportHelper
       catch (final Exception ex)
       {
         LOGGER.error ("Failed to create EUSR for " + aYearMonth, ex);
+
+        for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+          aHandler.onUnexpectedException ("APPeppolReportHelper.createAndSendPeppolReports",
+                                          "Failed to create EUSR for " + aYearMonth,
+                                          ex);
       }
 
       if (!bEUSRSuccess)

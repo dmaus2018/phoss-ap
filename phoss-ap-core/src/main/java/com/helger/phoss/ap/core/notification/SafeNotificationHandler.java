@@ -155,6 +155,20 @@ public final class SafeNotificationHandler implements IAPNotificationHandlerSPI
     }
   }
 
+  public void onUnexpectedException (@NonNull final String sContext,
+                                     @NonNull final String sMessage,
+                                     @NonNull final Exception aException)
+  {
+    try
+    {
+      m_aHdl.onUnexpectedException (sContext, sMessage, aException);
+    }
+    catch (final Exception ex)
+    {
+      LOGGER.error ("Internal error invoking onUnexpectedException on " + m_aHdl, ex);
+    }
+  }
+
   @Override
   public String toString ()
   {

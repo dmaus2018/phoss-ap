@@ -138,4 +138,16 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
                        "month",
                        Integer.valueOf (aYearMonth.getMonthValue ())));
   }
+
+  public void onUnexpectedException (@NonNull final String sContext,
+                                     @NonNull final String sMessage,
+                                     @NonNull final Exception aException)
+  {
+    Sentry.withScope (scope -> {
+      scope.setExtra ("context", sContext);
+      scope.setExtra ("message", sMessage);
+      scope.setExtra ("exceptionClass", aException.getClass ().getName ());
+      Sentry.captureException (aException);
+    });
+  }
 }

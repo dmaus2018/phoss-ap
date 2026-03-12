@@ -137,4 +137,18 @@ public interface IAPNotificationHandlerSPI
    *        The year and month for which the reporting should be performed never <code>null</code>.
    */
   void onPeppolReportingEUSRFailure (@NonNull YearMonth aYearMonth);
+
+  /**
+   * Called when an unexpected exception occurs during processing that is not covered by more
+   * specific notification methods.
+   *
+   * @param sContext
+   *        A short description of where the exception occurred (e.g. class and method name). Never
+   *        <code>null</code>.
+   * @param sMessage
+   *        A human-readable description of what went wrong. Never <code>null</code>.
+   * @param aException
+   *        The caught exception. Never <code>null</code>.
+   */
+  void onUnexpectedException (@NonNull String sContext, @NonNull String sMessage, @NonNull Exception aException);
 }

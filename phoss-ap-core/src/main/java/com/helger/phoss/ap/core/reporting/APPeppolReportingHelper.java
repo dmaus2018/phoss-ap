@@ -33,6 +33,7 @@ import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EReportingStatus;
 import com.helger.phoss.ap.api.config.APConfigProvider;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
+import com.helger.phoss.ap.core.APCoreMetaManager;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 
 /**
@@ -74,7 +75,14 @@ public final class APPeppolReportingHelper
     }
     catch (final Exception ex)
     {
-      LOGGER.error ("Failed to store Peppol Reporting data for outbound transaction '" + sTransactionID + "'");
+      LOGGER.error ("Failed to store Peppol Reporting data for outbound transaction '" + sTransactionID + "'", ex);
+
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("APPeppolReportingHelper.createOutboundPeppolReportingItem",
+                                        "Failed to store Peppol Reporting data for outbound transaction '" +
+                                                                                                     sTransactionID +
+                                                                                                     "'",
+                                        ex);
     }
     return ESuccess.FAILURE;
   }
@@ -140,7 +148,14 @@ public final class APPeppolReportingHelper
     }
     catch (final Exception ex)
     {
-      LOGGER.error ("Failed to store Peppol Reporting data for inbound transaction '" + sTransactionID + "'");
+      LOGGER.error ("Failed to store Peppol Reporting data for inbound transaction '" + sTransactionID + "'", ex);
+
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("APPeppolReportingHelper.createInboundPeppolReportingItem",
+                                        "Failed to store Peppol Reporting data for inbound transaction '" +
+                                                                                                    sTransactionID +
+                                                                                                    "'",
+                                        ex);
     }
     return ESuccess.FAILURE;
   }

@@ -48,10 +48,11 @@ public final class RetryScheduler
 
   private static void _retryOutbound ()
   {
+    final var aOutboundMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+
     try
     {
-      final ICommonsList <IOutboundTransaction> aTransactions = APJdbcMetaManager.getOutboundTransactionMgr ()
-                                                                                 .getAllForRetry (BATCH_SIZE);
+      final ICommonsList <IOutboundTransaction> aTransactions = aOutboundMgr.getAllForRetry (BATCH_SIZE);
 
       if (aTransactions.isNotEmpty ())
       {
@@ -67,6 +68,11 @@ public final class RetryScheduler
           catch (final Exception ex)
           {
             LOGGER.error ("Error retrying outbound transaction '" + aTx.getID () + "'", ex);
+
+            for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+              aHandler.onUnexpectedException ("RetryScheduler._retryOutbound",
+                                              "Error retrying outbound transaction '" + aTx.getID () + "'",
+                                              ex);
           }
         }
       }
@@ -79,15 +85,19 @@ public final class RetryScheduler
     catch (final Exception ex)
     {
       LOGGER.error ("Internal error in outbound retry cycle", ex);
+
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("RetryScheduler._retryOutbound", "Internal error in outbound retry cycle", ex);
     }
   }
 
   private static void _retryInbound ()
   {
+    final var aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+
     try
     {
-      final ICommonsList <IInboundTransaction> aTransactions = APJdbcMetaManager.getInboundTransactionMgr ()
-                                                                                .getAllForRetry (BATCH_SIZE);
+      final ICommonsList <IInboundTransaction> aTransactions = aInboundMgr.getAllForRetry (BATCH_SIZE);
 
       if (aTransactions.isNotEmpty ())
       {
@@ -113,6 +123,9 @@ public final class RetryScheduler
     catch (final Exception ex)
     {
       LOGGER.error ("Internal error in inbound retry cycle", ex);
+
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("RetryScheduler._retryInbound", "Internal error in inbound retry cycle", ex);
     }
   }
 

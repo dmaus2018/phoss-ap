@@ -23,10 +23,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.collection.commons.ICommonsList;
-import com.helger.phoss.ap.api.IArchivalManager;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.core.APCoreConfig;
+import com.helger.phoss.ap.core.APCoreMetaManager;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 
 public final class ArchivalScheduler
@@ -41,18 +41,17 @@ public final class ArchivalScheduler
 
   private static void _archiveOutbound ()
   {
+    final var aOutboundMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final var aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
     try
     {
-      final ICommonsList <IOutboundTransaction> aTransactions = APJdbcMetaManager.getOutboundTransactionMgr ()
-                                                                                 .getAllForArchival (BATCH_SIZE);
+      final ICommonsList <IOutboundTransaction> aTransactions = aOutboundMgr.getAllForArchival (BATCH_SIZE);
       if (aTransactions.isNotEmpty ())
       {
         LOGGER.info ("Archiving " + aTransactions.size () + " outbound transactions");
-        final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
         for (final IOutboundTransaction aTx : aTransactions)
-        {
           aArchivalMgr.archiveOutboundTransaction (aTx.getID ());
-        }
       }
       else
       {
@@ -63,23 +62,25 @@ public final class ArchivalScheduler
     catch (final Exception ex)
     {
       LOGGER.error ("Error in outbound archival cycle", ex);
+
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("ArchivalScheduler._archiveOutbound", "Error in outbound archival cycle", ex);
     }
   }
 
   private static void _archiveInbound ()
   {
+    final var aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final var aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
     try
     {
-      final ICommonsList <IInboundTransaction> aTransactions = APJdbcMetaManager.getInboundTransactionMgr ()
-                                                                                .getAllForArchival (BATCH_SIZE);
+      final ICommonsList <IInboundTransaction> aTransactions = aInboundMgr.getAllForArchival (BATCH_SIZE);
       if (aTransactions.isNotEmpty ())
       {
         LOGGER.info ("Archiving " + aTransactions.size () + " inbound transactions");
-        final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
         for (final IInboundTransaction aTx : aTransactions)
-        {
           aArchivalMgr.archiveInboundTransaction (aTx.getID ());
-        }
       }
       else
       {
@@ -90,6 +91,8 @@ public final class ArchivalScheduler
     catch (final Exception ex)
     {
       LOGGER.error ("Error in inbound archival cycle", ex);
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("ArchivalScheduler._archiveInbound", "Error in inbound archival cycle", ex);
     }
   }
 
