@@ -59,14 +59,14 @@ public final class APPeppolReportingHelper
 
     LOGGER.info ("Counting outbound transaction '" + sTransactionID + "' for Peppol Reporting");
 
-    // Re-read the transaction to get the latest data
-    if (!aTxMgr.containsTransactionWithID (sTransactionID))
-      throw new IllegalArgumentException ("The provided outbound transaction ID '" +
-                                          sTransactionID +
-                                          "' does not exist");
-
     try
     {
+      // Re-read the transaction to get the latest data
+      if (!aTxMgr.containsTransactionWithID (sTransactionID))
+        throw new IllegalArgumentException ("The provided outbound transaction ID '" +
+                                            sTransactionID +
+                                            "' does not exist");
+
       PeppolReportingBackend.withBackendDo (APConfigProvider.getConfig (),
                                             aBackend -> aBackend.storeReportingItem (aReportingItem));
 
@@ -97,16 +97,16 @@ public final class APPeppolReportingHelper
 
     LOGGER.info ("Counting inbound transaction '" + sTransactionID + "' for Peppol Reporting");
 
-    // Re-read the transaction to get the latest data
-    final var aTx = aTxMgr.getByID (sTransactionID);
-    if (aTx == null)
-      throw new IllegalArgumentException ("The provided transaction ID '" + sTransactionID + "' does not exist");
-
-    if (StringHelper.isEmpty (aTx.getC4CountryCode ()))
-      throw new IllegalStateException ("Inbound transaction '" + sTransactionID + "' has no C4 country code yet");
-
     try
     {
+      // Re-read the transaction to get the latest data
+      final var aTx = aTxMgr.getByID (sTransactionID);
+      if (aTx == null)
+        throw new IllegalArgumentException ("The provided transaction ID '" + sTransactionID + "' does not exist");
+
+      if (StringHelper.isEmpty (aTx.getC4CountryCode ()))
+        throw new IllegalStateException ("Inbound transaction '" + sTransactionID + "' has no C4 country code yet");
+
       final IDocumentTypeIdentifier aDocTypeID = aIF.parseDocumentTypeIdentifier (aTx.getDocTypeID ());
       if (aDocTypeID == null)
       {

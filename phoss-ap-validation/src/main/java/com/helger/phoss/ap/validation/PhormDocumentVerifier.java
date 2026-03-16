@@ -64,6 +64,7 @@ import com.helger.phoss.ap.basic.APBasicMetaManager;
 @IsSPIImplementation
 public class PhormDocumentVerifier implements IInboundDocumentVerifierSPI, IOutboundDocumentVerifierSPI
 {
+  private static final String HTTP_HEADER_X_TOKEN = "X-Token";
   private static final Logger LOGGER = LoggerFactory.getLogger (PhormDocumentVerifier.class);
 
   @NonNull
@@ -111,7 +112,7 @@ public class PhormDocumentVerifier implements IInboundDocumentVerifierSPI, IOutb
       final HttpPost aPost = new HttpPost (sURL);
       aPost.setEntity (new InputStreamEntity (aDocumentIS, ContentType.APPLICATION_XML));
       aPost.setHeader (CHttpHeader.ACCEPT, ContentType.APPLICATION_JSON.getMimeType ());
-      aPost.setHeader ("X-Token", sPhormToken);
+      aPost.setHeader (HTTP_HEADER_X_TOKEN, sPhormToken);
 
       LOGGER.info ("Calling Phorm at '" + sURL + "' for document '" + sDocumentPath + "'");
 

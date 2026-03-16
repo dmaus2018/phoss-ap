@@ -91,6 +91,7 @@ public final class ArchivalScheduler
     catch (final Exception ex)
     {
       LOGGER.error ("Error in inbound archival cycle", ex);
+
       for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
         aHandler.onUnexpectedException ("ArchivalScheduler._archiveInbound", "Error in inbound archival cycle", ex);
     }
