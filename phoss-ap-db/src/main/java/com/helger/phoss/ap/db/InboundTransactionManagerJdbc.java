@@ -33,6 +33,8 @@ import com.helger.db.jdbc.executor.DBExecutor;
 import com.helger.db.jdbc.executor.DBResultRow;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
 import com.helger.peppol.sbdh.EPeppolMLSType;
+import com.helger.peppolid.peppol.doctype.EPredefinedDocumentTypeIdentifier;
+import com.helger.peppolid.peppol.process.EPredefinedProcessIdentifier;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EInboundStatus;
 import com.helger.phoss.ap.api.codelist.EReportingStatus;
@@ -347,14 +349,36 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
-                                                                      " WHERE status IN (?,?) AND reporting_status=?" +
+                                                                      " WHERE status IN (?,?,?) AND reporting_status=?" +
                                                                       " ORDER BY completed_dt" +
                                                                       " LIMIT " +
                                                                       nBatchSize +
                                                                       " FOR UPDATE SKIP LOCKED",
-                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARDED.getID (),
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.REJECTED.getID (),
+                                                                                                                 EInboundStatus.FORWARDED.getID (),
                                                                                                                  EInboundStatus.PERMANENTLY_FAILED.getID (),
                                                                                                                  EReportingStatus.REPORTED.getID ()));
+    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
+    if (aRows != null)
+      for (final DBResultRow aRow : aRows)
+        ret.add (new InboundTransactionRow (aRow));
+    return ret;
+  }
+
+  @NonNull
+  public ICommonsList <IInboundTransaction> getAllWithoutMlsResponse ()
+  {
+    // Inbound business documents (not MLS) where no MLS response code has been
+    // set yet
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM " +
+                                                                      m_sTableName +
+                                                                      " WHERE mls_response_code IS NULL" +
+                                                                      " AND NOT (doc_type_id=? AND process_id=?)" +
+                                                                      " ORDER BY as4_timestamp",
+                                                                      new ConstantPreparedStatementDataProvider (EPredefinedDocumentTypeIdentifier.PEPPOL_MLS_1_0.getURIEncoded (),
+                                                                                                                 EPredefinedProcessIdentifier.urn_peppol_edec_mls.getURIEncoded ()));
     final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)

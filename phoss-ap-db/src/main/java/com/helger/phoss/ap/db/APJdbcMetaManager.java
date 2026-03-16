@@ -60,6 +60,7 @@ public final class APJdbcMetaManager extends AbstractGlobalSingleton
   private InboundTransactionManagerJdbc m_aInboundTxMgr;
   private IInboundForwardingAttemptManager m_aInboundAttemptMgr;
   private IArchivalManager m_aArchivalMgr;
+  private MlsMetricsManagerJdbc m_aMlsMetricsMgr;
 
   /**
    * @deprecated Only called via reflection
@@ -69,6 +70,10 @@ public final class APJdbcMetaManager extends AbstractGlobalSingleton
   public APJdbcMetaManager ()
   {}
 
+  /**
+   * @return The global singleton instance of this manager. Never
+   *         <code>null</code>.
+   */
   @NonNull
   public static APJdbcMetaManager getInstance ()
   {
@@ -114,6 +119,7 @@ public final class APJdbcMetaManager extends AbstractGlobalSingleton
       m_aInboundTxMgr = new InboundTransactionManagerJdbc (aTimestampMgr, sTableNamePrefix);
       m_aInboundAttemptMgr = new InboundForwardingAttemptManagerJdbc (aTimestampMgr, sTableNamePrefix);
       m_aArchivalMgr = new ArchivalManagerJdbc (aTimestampMgr, sTableNamePrefix);
+      m_aMlsMetricsMgr = new MlsMetricsManagerJdbc (aTimestampMgr, sTableNamePrefix);
 
       LOGGER.info (ClassHelper.getClassLocalName (this) + " was initialized");
     }
@@ -140,39 +146,68 @@ public final class APJdbcMetaManager extends AbstractGlobalSingleton
     }
   }
 
+  /**
+   * @return The JDBC configuration used by this manager. Never
+   *         <code>null</code>.
+   */
   @NonNull
   public static APJdbcConfiguration getJdbcConfig ()
   {
     return getInstance ().m_aJdbcConfig;
   }
 
+  /**
+   * @return The outbound transaction manager. Never <code>null</code>.
+   */
   @NonNull
   public static IOutboundTransactionManager getOutboundTransactionMgr ()
   {
     return getInstance ().m_aOutboundTxMgr;
   }
 
+  /**
+   * @return The outbound sending attempt manager. Never <code>null</code>.
+   */
   @NonNull
   public static IOutboundSendingAttemptManager getOutboundSendingAttemptMgr ()
   {
     return getInstance ().m_aOutboundAttemptMgr;
   }
 
+  /**
+   * @return The inbound transaction manager. Never <code>null</code>.
+   */
   @NonNull
   public static IInboundTransactionManager getInboundTransactionMgr ()
   {
     return getInstance ().m_aInboundTxMgr;
   }
 
+  /**
+   * @return The inbound forwarding attempt manager. Never <code>null</code>.
+   */
   @NonNull
   public static IInboundForwardingAttemptManager getInboundForwardingAttemptMgr ()
   {
     return getInstance ().m_aInboundAttemptMgr;
   }
 
+  /**
+   * @return The archival manager. Never <code>null</code>.
+   */
   @NonNull
   public static IArchivalManager getArchivalMgr ()
   {
     return getInstance ().m_aArchivalMgr;
+  }
+
+  /**
+   * @return The MLS metrics manager for SLA calculations. Never
+   *         <code>null</code>.
+   */
+  @NonNull
+  public static MlsMetricsManagerJdbc getMlsMetricsMgr ()
+  {
+    return getInstance ().m_aMlsMetricsMgr;
   }
 }

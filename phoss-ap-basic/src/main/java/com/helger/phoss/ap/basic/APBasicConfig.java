@@ -30,6 +30,13 @@ import com.helger.phoss.ap.api.codelist.EPeppolIdentifierMode;
 import com.helger.phoss.ap.api.config.APConfigProvider;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 
+/**
+ * Configuration accessor for basic AP settings such as document storage paths,
+ * Peppol identifier mode, and outbound HTTP proxy settings. All values are read
+ * from the central {@link APConfigProvider} configuration.
+ *
+ * @author Philip Helger
+ */
 @Immutable
 public final class APBasicConfig
 {
@@ -44,7 +51,10 @@ public final class APBasicConfig
     return APConfigProvider.getConfig ();
   }
 
-  // Document storage
+  /**
+   * @return The configured filesystem path for storing inbound documents. Never
+   *         <code>null</code>.
+   */
   @NonNull
   public static String getStorageInboundPath ()
   {
@@ -52,6 +62,10 @@ public final class APBasicConfig
                                       APConfigurationProperties.STORAGE_INBOUND_PATH_DEFAULT);
   }
 
+  /**
+   * @return The configured filesystem path for storing outbound documents.
+   *         Never <code>null</code>.
+   */
   @NonNull
   public static String getStorageOutboundPath ()
   {
@@ -59,6 +73,10 @@ public final class APBasicConfig
                                       APConfigurationProperties.STORAGE_OUTBOUND_PATH_DEFAULT);
   }
 
+  /**
+   * @return The configured Peppol identifier mode (strict or lax). Never
+   *         <code>null</code>.
+   */
   @NonNull
   public static EPeppolIdentifierMode getPeppolIdentifierMode ()
   {
@@ -70,9 +88,10 @@ public final class APBasicConfig
   private static HttpClientSettingsConfig.HttpClientConfig s_aHCC = null;
 
   /**
-   * Apply the configured outbound HTTP proxy settings to the provided {@link HttpClientSettings}.
-   * This reads the <code>http.proxy.*</code> configuration properties and applies them to the
-   * general proxy of the provided settings object.
+   * Apply the configured outbound HTTP proxy settings to the provided
+   * {@link HttpClientSettings}. This reads the <code>http.proxy.*</code>
+   * configuration properties and applies them to the general proxy of the
+   * provided settings object.
    *
    * @param aHCS
    *        The HTTP client settings to configure. May not be <code>null</code>.

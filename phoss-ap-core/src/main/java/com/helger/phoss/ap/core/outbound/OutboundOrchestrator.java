@@ -37,6 +37,7 @@ import com.helger.base.io.stream.StreamHelper;
 import com.helger.base.string.StringHelper;
 import com.helger.base.timing.StopWatch;
 import com.helger.base.wrapper.Wrapper;
+import com.helger.io.file.FilenameHelper;
 import com.helger.mime.CMimeType;
 import com.helger.peppol.reporting.api.PeppolReportingItem;
 import com.helger.peppol.sbdh.PeppolSBDHData;
@@ -67,11 +68,11 @@ import com.helger.phoss.ap.api.codelist.EOutboundStatus;
 import com.helger.phoss.ap.api.codelist.ESourceType;
 import com.helger.phoss.ap.api.codelist.ETransactionType;
 import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
+import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
 import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
-import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
 import com.helger.phoss.ap.core.APCoreConfig;
 import com.helger.phoss.ap.core.APCoreMetaManager;
 import com.helger.phoss.ap.core.CircuitBreakerManager;
@@ -100,16 +101,18 @@ public final class OutboundOrchestrator
   {}
 
   /**
-   * Submit a raw (payload-only) document for outbound sending. The document is stored to disk,
-   * optionally verified, and a new outbound transaction is created in
-   * {@link EOutboundStatus#PENDING} state.
+   * Submit a raw (payload-only) document for outbound sending. The document is
+   * stored to disk, optionally verified, and a new outbound transaction is
+   * created in {@link EOutboundStatus#PENDING} state.
    *
    * @param sLogPrefix
    *        Log message prefix for traceability. May not be <code>null</code>.
    * @param aSenderID
-   *        The Peppol sender participant identifier. May not be <code>null</code>.
+   *        The Peppol sender participant identifier. May not be
+   *        <code>null</code>.
    * @param aReceiverID
-   *        The Peppol receiver participant identifier. May not be <code>null</code>.
+   *        The Peppol receiver participant identifier. May not be
+   *        <code>null</code>.
    * @param aDocTypeID
    *        The Peppol document type identifier. May not be <code>null</code>.
    * @param aProcessID
@@ -119,8 +122,8 @@ public final class OutboundOrchestrator
    * @param sC1CountryCode
    *        The C1 country code of the sender. May not be <code>null</code>.
    * @param aDocumentIS
-   *        The input stream of the raw document payload. Will not be closed by this method. May not
-   *        be <code>null</code>.
+   *        The input stream of the raw document payload. Will not be closed by
+   *        this method. May not be <code>null</code>.
    * @param sMlsTo
    *        Optional MLS "To" address. May be <code>null</code>.
    * @param sSbdhStandard
@@ -130,10 +133,10 @@ public final class OutboundOrchestrator
    * @param sSbdhType
    *        Optional SBDH type. May be <code>null</code>.
    * @param sPayloadMimeType
-   *        Optional payload MIME type (e.g. "application/pdf"). May be <code>null</code> for XML
-   *        payloads.
-   * @return The created {@link IOutboundTransaction} or <code>null</code> if the document could not
-   *         be stored or verification failed.
+   *        Optional payload MIME type (e.g. "application/pdf"). May be
+   *        <code>null</code> for XML payloads.
+   * @return The created {@link IOutboundTransaction} or <code>null</code> if
+   *         the document could not be stored or verification failed.
    */
   @Nullable
   public static IOutboundTransaction submitRawDocument (@NonNull final String sLogPrefix,
@@ -153,8 +156,10 @@ public final class OutboundOrchestrator
     LOGGER.info (sLogPrefix + "Submitting raw document with SBDH Instance ID '" + sSbdhInstanceID + "'");
 
     final IAPTimestampManager aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
+    final IOutboundTransactionManager aOutboundMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
 
-    final File aStorageBasePath = new File (APBasicConfig.getStorageOutboundPath ());
+    final String sStorageBasePath = APBasicConfig.getStorageOutboundPath ();
     final OffsetDateTime aCreationDT = aTimestampMgr.getCurrentDateTimeUTC ();
     final Wrapper <String> aTempPathHolder = Wrapper.empty ();
 
@@ -166,11 +171,11 @@ public final class OutboundOrchestrator
     // 4. Parse the SBDH
     try (final CountingInputStream aCountingIS = new CountingInputStream (aDocumentIS);
          final DigestInputStream aDigestIS = new DigestInputStream (aCountingIS, aMD);
-         final OutputStream aFileOS = DocumentStorageHelper.openDocumentStream (aStorageBasePath,
-                                                                                aCreationDT,
-                                                                                sSbdhInstanceID,
-                                                                                ".out",
-                                                                                aTempPathHolder::set))
+         final OutputStream aFileOS = aDocPayloadMgr.openDocumentStreamForWrite (sStorageBasePath,
+                                                                                 aCreationDT,
+                                                                                 sSbdhInstanceID,
+                                                                                 ".out",
+                                                                                 aTempPathHolder::set))
     {
       if (StreamHelper.copyByteStream ()
                       .from (aDigestIS)
@@ -185,7 +190,7 @@ public final class OutboundOrchestrator
         // No need to keep the temporary file
         StreamHelper.close (aFileOS);
         if (aTempPathHolder.isSet ())
-          DocumentStorageHelper.deleteDocument (aTempPathHolder.get ());
+          aDocPayloadMgr.deleteDocument (aTempPathHolder.get ());
         return null;
       }
       nDocumentBytes = aCountingIS.getBytesRead ();
@@ -201,7 +206,7 @@ public final class OutboundOrchestrator
 
       // No need to keep the temporary file
       if (aTempPathHolder.isSet ())
-        DocumentStorageHelper.deleteDocument (aTempPathHolder.get ());
+        aDocPayloadMgr.deleteDocument (aTempPathHolder.get ());
       return null;
     }
 
@@ -219,43 +224,42 @@ public final class OutboundOrchestrator
         }
     }
 
-    final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
-
     // Create in pending state
-    final String sTransactionID = aMgr.create (ETransactionType.BUSINESS_DOCUMENT,
-                                               aSenderID.getURIEncoded (),
-                                               aReceiverID.getURIEncoded (),
-                                               aDocTypeID.getURIEncoded (),
-                                               aProcessID.getURIEncoded (),
-                                               sSbdhInstanceID,
-                                               ESourceType.PAYLOAD_ONLY,
-                                               sDocumentPath,
-                                               nDocumentBytes,
-                                               sDocumentHash,
-                                               sC1CountryCode,
-                                               aCreationDT,
-                                               sMlsTo,
-                                               (String) null,
-                                               sSbdhStandard,
-                                               sSbdhTypeVersion,
-                                               sSbdhType,
-                                               sPayloadMimeType);
-    return aMgr.getByID (sTransactionID);
+    final String sTransactionID = aOutboundMgr.create (ETransactionType.BUSINESS_DOCUMENT,
+                                                       aSenderID.getURIEncoded (),
+                                                       aReceiverID.getURIEncoded (),
+                                                       aDocTypeID.getURIEncoded (),
+                                                       aProcessID.getURIEncoded (),
+                                                       sSbdhInstanceID,
+                                                       ESourceType.PAYLOAD_ONLY,
+                                                       sDocumentPath,
+                                                       nDocumentBytes,
+                                                       sDocumentHash,
+                                                       sC1CountryCode,
+                                                       aCreationDT,
+                                                       sMlsTo,
+                                                       (String) null,
+                                                       sSbdhStandard,
+                                                       sSbdhTypeVersion,
+                                                       sSbdhType,
+                                                       sPayloadMimeType);
+    return aOutboundMgr.getByID (sTransactionID);
   }
 
   /**
-   * Submit a pre-built Standard Business Document (SBD) for outbound sending. The SBD is parsed to
-   * extract Peppol metadata, stored to disk, and a new outbound transaction is created in
-   * {@link EOutboundStatus#PENDING} state.
+   * Submit a pre-built Standard Business Document (SBD) for outbound sending.
+   * The SBD is parsed to extract Peppol metadata, stored to disk, and a new
+   * outbound transaction is created in {@link EOutboundStatus#PENDING} state.
    *
    * @param sLogPrefix
    *        Log message prefix for traceability. May not be <code>null</code>.
    * @param aSbdIS
-   *        The input stream containing the complete pre-built SBD. May not be <code>null</code>.
+   *        The input stream containing the complete pre-built SBD. May not be
+   *        <code>null</code>.
    * @param sMlsTo
    *        Optional MLS "To" address. May be <code>null</code>.
-   * @return The created {@link IOutboundTransaction} or <code>null</code> if the SBD could not be
-   *         parsed.
+   * @return The created {@link IOutboundTransaction} or <code>null</code> if
+   *         the SBD could not be parsed.
    */
   @Nullable
   public static IOutboundTransaction submitPrebuiltSBD (@NonNull final String sLogPrefix,
@@ -266,8 +270,9 @@ public final class OutboundOrchestrator
 
     final IAPTimestampManager aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
     final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
+    final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
 
-    final File aStorageBasePath = new File (APBasicConfig.getStorageOutboundPath ());
+    final String sStorageBasePath = APBasicConfig.getStorageOutboundPath ();
     final OffsetDateTime aCreationDT = aTimestampMgr.getCurrentDateTimeUTC ();
     final Wrapper <String> aTempPathHolder = Wrapper.empty ();
 
@@ -282,9 +287,9 @@ public final class OutboundOrchestrator
     // 4. Parse the SBDH
     try (final CountingInputStream aCountingIS = new CountingInputStream (aSbdIS);
          final DigestInputStream aDigestIS = new DigestInputStream (aCountingIS, aMD);
-         final OutputStream aFileOS = DocumentStorageHelper.openTemporaryDocumentStream (aStorageBasePath,
-                                                                                         aCreationDT,
-                                                                                         aTempPathHolder::set);
+         final OutputStream aFileOS = aDocPayloadMgr.openTemporaryDocumentStreamForWrite (sStorageBasePath,
+                                                                                          aCreationDT,
+                                                                                          aTempPathHolder::set);
          final CopyingInputStream aCopyIS = new CopyingInputStream (aDigestIS, aFileOS))
     {
       aSbdData = new PeppolSBDHDataReader (aIF).extractData (aCopyIS);
@@ -299,7 +304,7 @@ public final class OutboundOrchestrator
 
       // No need to keep the temporary file
       if (aTempPathHolder.isSet ())
-        DocumentStorageHelper.deleteDocument (aTempPathHolder.get ());
+        aDocPayloadMgr.deleteDocument (aTempPathHolder.get ());
       return null;
     }
 
@@ -312,17 +317,22 @@ public final class OutboundOrchestrator
     final String sDocumentPath;
     {
       // Rename temp file to final name
-      final File aTempFile = new File (aTempPathHolder.get ());
-      final File aDstFile = DocumentStorageHelper.renameFile (aTempFile,
-                                                              aTempFile.getParentFile (),
-                                                              sSbdhInstanceID,
-                                                              ".sbd");
+      final String sTempFile = aTempPathHolder.get ();
+      final String sTargetDir = FilenameHelper.getPath (sTempFile);
+      final File aDstFile = aDocPayloadMgr.renameFile (sTempFile, sTargetDir, sSbdhInstanceID, ".sbd");
       sDocumentPath = aDstFile.getAbsolutePath ().toString ();
     }
 
     final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
 
     // Create in pending state
+
+    final String sInboundTxID = null;
+    final String sSbdhStandard = null;
+    final String sSbdhTypeVersion = null;
+    final String sSbdhType = null;
+    final String sPayloadMimeType = null;
+
     final String sTransactionID = aMgr.create (ETransactionType.BUSINESS_DOCUMENT,
                                                aSbdData.getSenderURIEncoded (),
                                                aSbdData.getReceiverURIEncoded (),
@@ -336,30 +346,32 @@ public final class OutboundOrchestrator
                                                aSbdData.getCountryC1 (),
                                                aCreationDT,
                                                sMlsTo,
-                                               (String) null,
-                                               (String) null,
-                                               (String) null,
-                                               (String) null,
-                                               (String) null);
+                                               sInboundTxID,
+                                               sSbdhStandard,
+                                               sSbdhTypeVersion,
+                                               sSbdhType,
+                                               sPayloadMimeType);
     return aMgr.getByID (sTransactionID);
   }
 
   /**
-   * Process a pending outbound transaction by performing SMP lookup and sending the document via
-   * AS4/Peppol. This method handles dynamic discovery (NAPTR + SMP), certificate validation,
-   * circuit breaker checks, and the actual AS4 transmission. On success, the transaction status is
-   * updated to {@link EOutboundStatus#SENT}. On failure, the transaction is either marked as
-   * {@link EOutboundStatus#FAILED} (with retry scheduling) or
-   * {@link EOutboundStatus#PERMANENTLY_FAILED} depending on the error type and attempt count.
+   * Process a pending outbound transaction by performing SMP lookup and sending
+   * the document via AS4/Peppol. This method handles dynamic discovery (NAPTR +
+   * SMP), certificate validation, circuit breaker checks, and the actual AS4
+   * transmission. On success, the transaction status is updated to
+   * {@link EOutboundStatus#SENT}. On failure, the transaction is either marked
+   * as {@link EOutboundStatus#FAILED} (with retry scheduling) or
+   * {@link EOutboundStatus#PERMANENTLY_FAILED} depending on the error type and
+   * attempt count.
    *
    * @param sLogPrefix
    *        Log message prefix for traceability. May not be <code>null</code>.
    * @param aTx
-   *        The outbound transaction to process. Must be in pending state. May not be
-   *        <code>null</code>.
-   * @return The {@link Phase4PeppolSendingReport} containing the full details of the sending
-   *         attempt including lookup results, AS4 message IDs, and timing information. Never
-   *         <code>null</code>.
+   *        The outbound transaction to process. Must be in pending state. May
+   *        not be <code>null</code>.
+   * @return The {@link Phase4PeppolSendingReport} containing the full details
+   *         of the sending attempt including lookup results, AS4 message IDs,
+   *         and timing information. Never <code>null</code>.
    */
   @NonNull
   public static Phase4PeppolSendingReport processPendingOutbound (@NonNull final String sLogPrefix,
@@ -369,6 +381,7 @@ public final class OutboundOrchestrator
     final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
     final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
     final IOutboundSendingAttemptManager aAttemptMgr = APJdbcMetaManager.getOutboundSendingAttemptMgr ();
+    final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
 
     final String sTxID = aTx.getID ();
     final EPeppolNetwork ePeppolStage = APCoreConfig.getPeppolStage ();
@@ -391,7 +404,14 @@ public final class OutboundOrchestrator
 
       // Callback on recoverable error
       final Consumer <String> onFailed = sErrMsg -> {
-        aAttemptMgr.create (sTxID, sAS4MessageID, aAS4Timestamp, null, null, EAttemptStatus.FAILED, sErrMsg);
+        aAttemptMgr.create (sTxID,
+                            sAS4MessageID,
+                            aAS4Timestamp,
+                            null,
+                            null,
+                            EAttemptStatus.FAILED,
+                            sErrMsg,
+                            aSendingReport.getAsJsonString ());
         final OffsetDateTime aNextRetry = BackoffCalculator.calculateNextRetry (nNewAttemptCount,
                                                                                 APCoreConfig.getRetrySendingInitialBackoffMs (),
                                                                                 APCoreConfig.getRetrySendingBackoffMultiplier (),
@@ -401,7 +421,14 @@ public final class OutboundOrchestrator
 
       // Callback on permanent failure
       final Consumer <String> onPermanentFailure = sErrMsg -> {
-        aAttemptMgr.create (sTxID, sAS4MessageID, aAS4Timestamp, null, null, EAttemptStatus.FAILED, sErrMsg);
+        aAttemptMgr.create (sTxID,
+                            sAS4MessageID,
+                            aAS4Timestamp,
+                            null,
+                            null,
+                            EAttemptStatus.FAILED,
+                            sErrMsg,
+                            aSendingReport.getAsJsonString ());
         aTxMgr.updateStatusAndRetry (sTxID, EOutboundStatus.PERMANENTLY_FAILED, nNewAttemptCount, null, sErrMsg);
 
         // Notify
@@ -598,7 +625,7 @@ public final class OutboundOrchestrator
               if (CMimeType.APPLICATION_PDF.getAsStringWithoutParameters ().equals (sPayloadMimeType))
               {
                 // Send PDF - must fit into a byte array due to XML constraints
-                final byte [] aPDFBytes = DocumentStorageHelper.readDocument (aTx.getDocumentPath ());
+                final byte [] aPDFBytes = aDocPayloadMgr.readDocument (aTx.getDocumentPath ());
                 aBuilder.payloadBinaryContent (aPDFBytes, CMimeType.APPLICATION_PDF, null);
               }
               else
@@ -616,7 +643,7 @@ public final class OutboundOrchestrator
                                "'");
 
                 // Provide as InputStream to be able to handle larger payloads
-                aBuilder.payload (HasInputStream.multiple ( () -> DocumentStorageHelper.openDocumentStream (aTx.getDocumentPath ())));
+                aBuilder.payload (HasInputStream.multiple ( () -> aDocPayloadMgr.openDocumentStreamForRead (aTx.getDocumentPath ())));
               }
 
               eResult = aBuilder.sendMessageAndCheckForReceipt (aCaughtSendingEx::set);
@@ -629,7 +656,7 @@ public final class OutboundOrchestrator
             {
               final PeppolSBDHData aSbdData;
               final MessageDigest aMD = HashHelper.createMessageDigest ();
-              try (final InputStream aFileIS = DocumentStorageHelper.openDocumentStream (aTx.getDocumentPath ());
+              try (final InputStream aFileIS = aDocPayloadMgr.openDocumentStreamForRead (aTx.getDocumentPath ());
                    final CountingInputStream aCountingIS = new CountingInputStream (aFileIS);
                    final DigestInputStream aDigestIS = new DigestInputStream (aCountingIS, aMD))
               {
@@ -714,6 +741,7 @@ public final class OutboundOrchestrator
             aSendingReport.setSendingSuccess (false);
             aSendingReport.setOverallSuccess (false);
 
+            // Call after any Sending Report modifications
             if (nNewAttemptCount >= APCoreConfig.getRetrySendingMaxAttempts ())
               onPermanentFailure.accept (ex.getMessage ());
             else
@@ -730,7 +758,11 @@ public final class OutboundOrchestrator
 
             // Store successful attempt
             final String sAS4ReceiptID = aSendingReport.getAS4ReceivedSignalMsg ().getMessageInfo ().getMessageId ();
-            aAttemptMgr.createSuccess (sTxID, sAS4MessageID, aAS4Timestamp, sAS4ReceiptID);
+            aAttemptMgr.createSuccess (sTxID,
+                                       sAS4MessageID,
+                                       aAS4Timestamp,
+                                       sAS4ReceiptID,
+                                       aSendingReport.getAsJsonString ());
 
             // Update in DB
             aTxMgr.updateStatusCompleted (sTxID, EOutboundStatus.SENT);
@@ -761,11 +793,6 @@ public final class OutboundOrchestrator
           // Unexpected exception - not a Phase4Exception
           LOGGER.error (sRealLogPrefix + "Outbound sending exception for transaction '" + sTxID + "'", ex);
 
-          for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
-            aHandler.onUnexpectedException ("OutboundOrchestrator.processPendingOutbound",
-                                            "Outbound sending exception for transaction '" + sTxID + "'",
-                                            ex);
-
           aSendingSW.stop ();
           aSendingReport.setAS4SendingError ("Failed to transmit outbound AS4 message to '" + sReceiverAPURL + "'");
           aSendingReport.setAS4SendingException (ex);
@@ -773,10 +800,16 @@ public final class OutboundOrchestrator
           aSendingReport.setSendingSuccess (false);
           aSendingReport.setOverallSuccess (false);
 
+          // Call after any Sending Report modifications
           if (nNewAttemptCount >= APCoreConfig.getRetrySendingMaxAttempts ())
             onPermanentFailure.accept (ex.getMessage ());
           else
             onFailed.accept (ex.getMessage ());
+
+          for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+            aHandler.onUnexpectedException ("OutboundOrchestrator.processPendingOutbound",
+                                            "Outbound sending exception for transaction '" + sTxID + "'",
+                                            ex);
         }
 
         // Update circuit breaker based on sending result only
@@ -794,6 +827,7 @@ public final class OutboundOrchestrator
         aSendingReport.setSendingSuccess (false);
         aSendingReport.setOverallSuccess (false);
 
+        // Call after any Sending Report modifications
         onFailed.accept ("AP access limited by Circuit Breaker '" + sCircuitBreakerKeyAP + "'");
       }
     }

@@ -16,18 +16,17 @@
  */
 package com.helger.phoss.ap.forwarding.http;
 
-import java.io.File;
 import java.io.IOException;
 
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.FileEntity;
+import org.apache.hc.core5.http.io.entity.InputStreamEntity;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.base.enforce.ValueEnforcer;
-import com.helger.base.exception.InitializationException;
+import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
 import com.helger.base.tostring.ToStringGenerator;
 import com.helger.base.url.URLHelper;
@@ -41,9 +40,11 @@ import com.helger.json.IJsonObject;
 import com.helger.json.serialize.JsonReader;
 import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
+import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
+import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
 import com.helger.phoss.ap.api.model.ForwardingResult;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
-import com.helger.phoss.ap.api.spi.IDocumentForwarder;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 
 /**
  * Implementation of {@link IDocumentForwarder} for using HTTP.
@@ -66,26 +67,35 @@ public class HttpDocumentForwarder implements IDocumentForwarder
     m_eMode = eMode;
   }
 
-  public void initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
+  @NonNull
+  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
   {
     m_sEndpointURL = aConfig.getAsString (APConfigurationProperties.FORWARDING_HTTP_ENDPOINT);
     if (StringHelper.isEmpty (m_sEndpointURL))
-      throw new InitializationException ("The forwarding HTTP endpoint is missing");
+    {
+      LOGGER.error ("The forwarding HTTP endpoint is missing");
+      return ESuccess.FAILURE;
+    }
     if (URLHelper.getAsURL (m_sEndpointURL) == null)
-      throw new InitializationException ("The provided forwarding HTTP endpoint '" +
-                                         m_sEndpointURL +
-                                         "' is not a valid URL");
+    {
+      LOGGER.error ("The provided forwarding HTTP endpoint '" + m_sEndpointURL + "' is not a valid URL");
+      return ESuccess.FAILURE;
+    }
 
     HttpClientSettingsConfig.assignConfigValues (m_aHCS, aConfig, "forwarding.");
+    return ESuccess.SUCCESS;
   }
 
   @NonNull
   public ForwardingResult forwardDocument (@NonNull final IInboundTransaction aTransaction)
   {
+    final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
+
     try (final HttpClientManager aHttpClientMgr = new HttpClientManager ())
     {
       final HttpPost aPost = new HttpPost (m_sEndpointURL);
-      aPost.setEntity (new FileEntity (new File (aTransaction.getDocumentPath ()), ContentType.APPLICATION_XML));
+      aPost.setEntity (new InputStreamEntity (aDocPayloadMgr.openDocumentStreamForRead (aTransaction.getDocumentPath ()),
+                                              ContentType.APPLICATION_XML));
 
       LOGGER.info ("Forwarding inbound transaction '" +
                    aTransaction.getID () +
@@ -98,8 +108,7 @@ public class HttpDocumentForwarder implements IDocumentForwarder
       final byte [] aResponse = aHttpClientMgr.execute (aPost, new ResponseHandlerByteArray ());
       return switch (m_eMode)
       {
-        case HTTP_POST_SYNC ->
-        {
+        case HTTP_POST_SYNC -> {
           final IJsonObject aJsonObject = JsonReader.builder ().source (aResponse).readAsObject ();
           if (aJsonObject == null)
             yield ForwardingResult.failure ("http_response_error", "Failed to parse response as JSON object");
@@ -108,13 +117,11 @@ public class HttpDocumentForwarder implements IDocumentForwarder
           LOGGER.info ("Received C4 Country Code is '" + sCountryCodeC4 + "'");
           yield ForwardingResult.success (sCountryCodeC4);
         }
-        case HTTP_POST_ASYNC ->
-        {
+        case HTTP_POST_ASYNC -> {
           LOGGER.info ("HTTP forwarding successful for transaction " + aTransaction.getID ());
           yield ForwardingResult.success ();
         }
-        default ->
-        {
+        default -> {
           LOGGER.error ("Unexpected forwarding mode " + m_eMode + " for HTTP forwarder");
           yield ForwardingResult.failure ("http_configuration_error", "Unexpected forwarding mode " + m_eMode);
         }

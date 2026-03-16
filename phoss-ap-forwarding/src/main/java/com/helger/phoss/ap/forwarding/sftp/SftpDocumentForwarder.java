@@ -24,7 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.base.enforce.ValueEnforcer;
-import com.helger.base.exception.InitializationException;
 import com.helger.base.io.iface.IHasInputStream;
 import com.helger.base.io.stream.HasInputStream;
 import com.helger.base.state.ESuccess;
@@ -34,10 +33,11 @@ import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.io.file.FilenameHelper;
 import com.helger.jsch.sftp.ChannelSftpHelper;
 import com.helger.network.WebExceptionHelper;
+import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
+import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
 import com.helger.phoss.ap.api.model.ForwardingResult;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
-import com.helger.phoss.ap.api.spi.IDocumentForwarder;
-import com.helger.phoss.ap.basic.storage.DocumentStorageHelper;
+import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.photon.connect.sftp.AbstractChannelSftpRunnable;
 import com.helger.photon.connect.sftp.ISftpSettings;
 import com.helger.photon.connect.sftp.SftpMaxParallelRunner;
@@ -55,16 +55,22 @@ public class SftpDocumentForwarder implements IDocumentForwarder
 
   private ISftpSettings m_aSftpSettings;
 
-  public void initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
+  @NonNull
+  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
   {
     m_aSftpSettings = SftpSettings.createFromConfig (aConfig, "forwarding.sftp");
     if (m_aSftpSettings == null)
-      throw new InitializationException ("Failed to initialize SFTP settings from configuration");
+    {
+      LOGGER.error ("Failed to initialize SFTP settings from configuration 'forwarding.sftp.*'");
+      return ESuccess.FAILURE;
+    }
+    return ESuccess.SUCCESS;
   }
 
   /**
-   * Upload a file to the server by first writing the content to a file with the extension ".tmp".
-   * Once all data is transfer, the file is renamed to the original destination filename.
+   * Upload a file to the server by first writing the content to a file with the
+   * extension ".tmp". Once all data is transfer, the file is renamed to the
+   * original destination filename.
    *
    * @param aUploadSettings
    *        The connection settings to use. May not be <code>null</code>.
@@ -73,8 +79,9 @@ public class SftpDocumentForwarder implements IDocumentForwarder
    * @param sTargetFilename
    *        The name of the uploaded file. May not be <code>null</code>.
    * @param aISP
-   *        The input stream to read from. The stream is automatically closed within this method -
-   *        no matter whether the upload was successful or not. May not be <code>null</code>.
+   *        The input stream to read from. The stream is automatically closed
+   *        within this method - no matter whether the upload was successful or
+   *        not. May not be <code>null</code>.
    * @return The {@link ForwardingResult} to return. Never <code>null</code>.
    */
   @NonNull
@@ -115,8 +122,9 @@ public class SftpDocumentForwarder implements IDocumentForwarder
           aChannel.cd (sRealTargetDirectory);
 
           /*
-           * First write to the server with a temporary filename, to avoid that unfinished documents
-           * are retrieved.The total length is unknown that's why we need to count.
+           * First write to the server with a temporary filename, to avoid that
+           * unfinished documents are retrieved.The total length is unknown
+           * that's why we need to count.
            */
           final String sTargetTempFilename = sTargetFilename + ".tmp";
 
@@ -183,6 +191,8 @@ public class SftpDocumentForwarder implements IDocumentForwarder
   {
     try
     {
+      final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
+
       // Layout: yyyyMMddHHmmss_(random value).xml
       final String sTargetFilename = DateTimeFormatter.ofPattern (SFTP_DATETIME_PATTERN)
                                                       .format (aTransaction.getReceivedDT ()) +
@@ -193,7 +203,7 @@ public class SftpDocumentForwarder implements IDocumentForwarder
       return writeUploadedFile (m_aSftpSettings,
                                 "",
                                 sTargetFilename,
-                                HasInputStream.create (DocumentStorageHelper.readDocument (aTransaction.getDocumentPath ())));
+                                HasInputStream.multiple ( () -> aDocPayloadMgr.openDocumentStreamForRead (aTransaction.getDocumentPath ())));
     }
     catch (final Exception ex)
     {

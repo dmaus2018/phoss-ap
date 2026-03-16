@@ -14,18 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.helger.phoss.ap.api.spi;
+package com.helger.phoss.ap.api.mgr;
 
 import org.jspecify.annotations.NonNull;
 
+import com.helger.base.state.ESuccess;
 import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.phoss.ap.api.model.ForwardingResult;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 
 /**
- * SPI interface for forwarding received inbound documents to the Receiver Backend (C4).
- * Implementations are loaded via {@link java.util.ServiceLoader}. Exactly one implementation must
- * be present on the classpath at runtime.
+ * SPI interface for forwarding received inbound documents to the Receiver
+ * Backend (C4). Implementations are loaded via {@link java.util.ServiceLoader}.
+ * Exactly one implementation must be present on the classpath at runtime.
  *
  * @author Philip Helger
  */
@@ -36,18 +37,21 @@ public interface IDocumentForwarder
    *
    * @param aConfig
    *        The configuration object to init from. Never <code>null</code>.
+   * @return {@link ESuccess}
    */
-  void initFromConfiguration (@NonNull IConfigWithFallback aConfig);
+  @NonNull
+  ESuccess initFromConfiguration (@NonNull IConfigWithFallback aConfig);
 
   /**
-   * Forward the given inbound transaction's document to the Receiver Backend. This method should
-   * never throw an exception.
+   * Forward the given inbound transaction's document to the Receiver Backend.
+   * This method should never throw an exception.
    *
    * @param aTransaction
-   *        The inbound transaction whose document bytes should be forwarded. Never
-   *        <code>null</code>.
+   *        The inbound transaction whose document bytes should be forwarded.
+   *        Never <code>null</code>.
    * @return {@link ForwardingResult#success()} if forwarding succeeded, or
-   *         {@link ForwardingResult#failure(String, String)} with error details otherwise.
+   *         {@link ForwardingResult#failure(String, String)} with error details
+   *         otherwise.
    */
   @NonNull
   ForwardingResult forwardDocument (@NonNull IInboundTransaction aTransaction);

@@ -16,8 +16,6 @@
  */
 package com.helger.phoss.ap.basic;
 
-import java.io.File;
-
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,14 +23,13 @@ import org.slf4j.LoggerFactory;
 import com.helger.annotation.style.UsedViaReflection;
 import com.helger.base.exception.InitializationException;
 import com.helger.base.lang.clazz.ClassHelper;
-import com.helger.base.string.StringHelper;
-import com.helger.io.file.FileOperationManager;
-import com.helger.io.file.IFileOperationManager;
 import com.helger.peppolid.factory.IIdentifierFactory;
 import com.helger.peppolid.factory.PeppolIdentifierFactory;
 import com.helger.peppolid.factory.PeppolLaxIdentifierFactory;
-import com.helger.phoss.ap.api.datetime.APTimestampManager;
 import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
+import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
+import com.helger.phoss.ap.basic.mgr.APTimestampManager;
+import com.helger.phoss.ap.basic.mgr.DocumentPayloadManagerFileSystem;
 import com.helger.scope.IScope;
 import com.helger.scope.singleton.AbstractGlobalSingleton;
 
@@ -45,6 +42,7 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (APBasicMetaManager.class);
 
+  private IDocumentPayloadManager m_aDocPayloadMgr;
   private IIdentifierFactory m_aIdentifierFactory;
   private IAPTimestampManager m_aTimestampMgr;
 
@@ -56,6 +54,10 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
   public APBasicMetaManager ()
   {}
 
+  /**
+   * @return The global singleton instance of this manager. Never
+   *         <code>null</code>.
+   */
   @NonNull
   public static APBasicMetaManager getInstance ()
   {
@@ -68,44 +70,17 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
     LOGGER.info ("Initializing " + ClassHelper.getClassLocalName (this));
     try
     {
-      final IFileOperationManager aFOM = FileOperationManager.INSTANCE;
-
-      {
-        final String sInboundPath = APBasicConfig.getStorageInboundPath ();
-        if (StringHelper.isEmpty (sInboundPath))
-          throw new InitializationException ("No Storage Inbound Path provided");
-        final File aInboundPath = new File (sInboundPath);
-        if (aFOM.createDirRecursiveIfNotExisting (aInboundPath).isFailure ())
-          throw new InitializationException ("Failed to create the Storage Inbound Path '" + sInboundPath + "'");
-        if (!aInboundPath.canWrite ())
-          throw new InitializationException ("The Storage Inbound Path '" +
-                                             sInboundPath +
-                                             "' is not writable by the application user");
-      }
-
-      {
-        final String sOutboundPath = APBasicConfig.getStorageOutboundPath ();
-        if (StringHelper.isEmpty (sOutboundPath))
-          throw new InitializationException ("No Storage Outbound Path provided");
-        final File aOutboundPath = new File (sOutboundPath);
-        if (aFOM.createDirRecursiveIfNotExisting (aOutboundPath).isFailure ())
-          throw new InitializationException ("Failed to create the Storage Outbound Path '" + sOutboundPath + "'");
-        if (!aOutboundPath.canWrite ())
-          throw new InitializationException ("The Storage Outbound Path '" +
-                                             sOutboundPath +
-                                             "' is not writable by the application user");
-      }
+      m_aDocPayloadMgr = new DocumentPayloadManagerFileSystem ();
+      m_aDocPayloadMgr.verifyConfiguration ();
 
       // Determine identifier factory from configuration
       m_aIdentifierFactory = switch (APBasicConfig.getPeppolIdentifierMode ())
       {
-        case STRICT ->
-        {
+        case STRICT -> {
           LOGGER.info ("Using strict Peppol Identifier Factory");
           yield PeppolIdentifierFactory.INSTANCE;
         }
-        case LAX ->
-        {
+        case LAX -> {
           LOGGER.info ("Using lax Peppol Identifier Factory");
           yield PeppolLaxIdentifierFactory.INSTANCE;
         }
@@ -121,12 +96,30 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
     }
   }
 
+  /**
+   * @return The document payload manager for storing and retrieving documents on
+   *         the filesystem. Never <code>null</code>.
+   */
+  @NonNull
+  public static IDocumentPayloadManager getDocPayloadMgr ()
+  {
+    return getInstance ().m_aDocPayloadMgr;
+  }
+
+  /**
+   * @return The timestamp manager used for generating UTC timestamps. Never
+   *         <code>null</code>.
+   */
   @NonNull
   public static IAPTimestampManager getTimestampMgr ()
   {
     return getInstance ().m_aTimestampMgr;
   }
 
+  /**
+   * @return The Peppol identifier factory (strict or lax) as configured. Never
+   *         <code>null</code>.
+   */
   @NonNull
   public static IIdentifierFactory getIdentifierFactory ()
   {

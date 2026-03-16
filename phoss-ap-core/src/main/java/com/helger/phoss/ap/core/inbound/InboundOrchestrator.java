@@ -22,18 +22,23 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.base.state.ESuccess;
+import com.helger.phoss.ap.api.CPhossAP;
 import com.helger.phoss.ap.api.IInboundForwardingAttemptManager;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EInboundStatus;
+import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.model.ForwardingResult;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
-import com.helger.phoss.ap.api.spi.IDocumentForwarder;
+import com.helger.phoss.ap.api.model.MlsOutcome;
+import com.helger.phoss.ap.api.model.MlsOutcomeIssue;
 import com.helger.phoss.ap.core.APCoreConfig;
 import com.helger.phoss.ap.core.APCoreMetaManager;
 import com.helger.phoss.ap.core.CircuitBreakerManager;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
+import com.helger.phoss.ap.core.mls.MlsHandler;
 import com.helger.phoss.ap.core.reporting.APPeppolReportingHelper;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
+import com.helger.photon.io.PhotonWorkerPool;
 
 /**
  * Internal orchestrator to handle messages received via the Peppol Network
@@ -48,6 +53,18 @@ public final class InboundOrchestrator
   private InboundOrchestrator ()
   {}
 
+  /**
+   * Forward a received inbound document to the configured C4 endpoint. Handles
+   * retry scheduling with exponential backoff and triggers MLS rejection
+   * responses when maximum retries are exhausted.
+   *
+   * @param sLogPrefix
+   *        Log message prefix for traceability. May not be <code>null</code>.
+   * @param aTx
+   *        The inbound transaction to forward. May not be <code>null</code>.
+   * @return {@link ESuccess#SUCCESS} if forwarding succeeded,
+   *         {@link ESuccess#FAILURE} otherwise.
+   */
   @NonNull
   public static ESuccess forwardDocument (@NonNull final String sLogPrefix, @NonNull final IInboundTransaction aTx)
   {
@@ -131,6 +148,18 @@ public final class InboundOrchestrator
                                            nMaxRetryAttempts +
                                            ") exhausted: " +
                                            aResult.getErrorDetails ());
+
+        // Don't send MLS as response to MLS
+        if (!CPhossAP.isMLS (aTx.getDocTypeID (), aTx.getProcessID ()))
+        {
+          // Send asynchronously
+          PhotonWorkerPool.getInstance ().run ("send-mls", () -> {
+            // Send negative MLS (RE) with FD reason back to C2
+            final MlsOutcome aOutcome = MlsOutcome.rejection ("Forwarding to C4 failed",
+                                                              MlsOutcomeIssue.failureOfDelivery ("Permanent inability to forward document to C4"));
+            MlsHandler.triggerSendingInboundResultMls (aTx, aOutcome);
+          });
+        }
 
         for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
           aHandler.onInboundPermanentForwardingFailure (aTx.getID (),

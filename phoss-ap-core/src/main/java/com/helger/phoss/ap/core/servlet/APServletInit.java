@@ -30,7 +30,6 @@ import com.helger.base.exception.InitializationException;
 import com.helger.base.state.ETriState;
 import com.helger.base.string.StringHelper;
 import com.helger.base.url.URLHelper;
-import com.helger.cache.regex.RegExHelper;
 import com.helger.httpclient.HttpDebugger;
 import com.helger.mime.CMimeType;
 import com.helger.peppol.reporting.api.PeppolReportingHelper;
@@ -38,7 +37,6 @@ import com.helger.peppol.reporting.api.backend.IPeppolReportingBackendSPI;
 import com.helger.peppol.reporting.api.backend.PeppolReportingBackend;
 import com.helger.peppol.security.PeppolTrustedCA;
 import com.helger.peppol.servicedomain.EPeppolNetwork;
-import com.helger.peppolid.peppol.PeppolIdentifierHelper;
 import com.helger.phase4.config.AS4Configuration;
 import com.helger.phase4.crypto.AS4CryptoFactoryConfiguration;
 import com.helger.phase4.crypto.AS4CryptoFactoryInMemoryKeyStore;
@@ -52,6 +50,7 @@ import com.helger.phase4.peppol.servlet.Phase4PeppolDefaultReceiverConfiguration
 import com.helger.phase4.profile.peppol.AS4PeppolProfileRegistarSPI;
 import com.helger.phase4.profile.peppol.PeppolCRLDownloader;
 import com.helger.phase4.profile.peppol.Phase4PeppolHttpClientSettings;
+import com.helger.phoss.ap.api.CPhossAP;
 import com.helger.phoss.ap.api.config.APConfigProvider;
 import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
@@ -73,6 +72,14 @@ import com.helger.xservlet.requesttrack.RequestTrackerSettings;
 import jakarta.activation.CommandMap;
 import jakarta.servlet.ServletContext;
 
+/**
+ * Central servlet initialization and shutdown handler for the phoss AP
+ * application. Configures global settings, AS4 and Peppol AS4, initializes all
+ * managers, and starts background schedulers on startup. Performs orderly
+ * shutdown of all components on application stop.
+ *
+ * @author Philip Helger
+ */
 public class APServletInit
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (APServletInit.class);
@@ -99,8 +106,8 @@ public class APServletInit
     HttpDebugger.setEnabled (false);
 
     // Sanity check
-    if (CommandMap.getDefaultCommandMap ()
-                  .createDataContentHandler (CMimeType.MULTIPART_RELATED.getAsString ()) == null)
+    if (CommandMap.getDefaultCommandMap ().createDataContentHandler (CMimeType.MULTIPART_RELATED.getAsString ()) ==
+        null)
     {
       throw new IllegalStateException ("No DataContentHandler for MIME Type '" +
                                        CMimeType.MULTIPART_RELATED.getAsString () +
@@ -130,11 +137,12 @@ public class APServletInit
 
     AS4ServerInitializer.initAS4Server ();
 
-    if (false)
+    final String sDumpPath = APCoreConfig.getPhase4DumpPath ();
+    if (StringHelper.isNotEmpty (sDumpPath))
     {
-      // dump all messages to a file
       AS4DumpManager.setIncomingDumper (new AS4IncomingDumperFileBased ());
       AS4DumpManager.setOutgoingDumper (new AS4OutgoingDumperFileBased ());
+      LOGGER.info ("AS4 message dumping enabled to '" + sDumpPath + "'");
     }
   }
 
@@ -197,7 +205,7 @@ public class APServletInit
 
     // Check Seat ID configuration
     final String sSeatID = APCoreConfig.getPeppolSeatID ();
-    if (!RegExHelper.stringMatchesPattern (PeppolIdentifierHelper.REGEX_SEAT_ID, sSeatID))
+    if (!CPhossAP.isPeppolSeatID (sSeatID))
     {
       throw new InitializationException ("The configured Peppol Seat ID '" +
                                          sSeatID +
@@ -215,7 +223,7 @@ public class APServletInit
 
     // Eventually enable the receiver check, so that for each incoming request
     // the validity is crosscheck against the owning SMP
-    final String sSMPURL = null; // TODO APCoreConfig.getMySmpUrl ();
+    final String sSMPURL = APCoreConfig.getPeppolSmpUrl ();
     final String sAPURL = AS4Configuration.getThisEndpointAddress ();
     if (StringHelper.isNotEmpty (sSMPURL) && StringHelper.isNotEmpty (sAPURL))
     {
@@ -240,6 +248,14 @@ public class APServletInit
       throw new InitializationException ("Failed to init Peppol Reporting Backend Service");
   }
 
+  /**
+   * Initialize the entire phoss AP application including global settings, AS4,
+   * Peppol configuration, all managers, startup recovery, and background
+   * schedulers.
+   *
+   * @param aSC
+   *        The servlet context. May not be <code>null</code>.
+   */
   public static void init (@NonNull final ServletContext aSC)
   {
     LOGGER.info ("Initializing phoss AP");
@@ -254,7 +270,8 @@ public class APServletInit
     APJdbcMetaManager.getInstance ();
     APCoreMetaManager.init ();
 
-    // This is e.g. the Identifier Factory that is used in the Peppol Receiving processing
+    // This is e.g. the Identifier Factory that is used in the Peppol Receiving
+    // processing
     Phase4PeppolDefaultReceiverConfiguration.setSBDHIdentifierFactory (APBasicMetaManager.getIdentifierFactory ());
 
     // Recover transactions that were in-flight during unclean shutdown
@@ -267,6 +284,11 @@ public class APServletInit
     LOGGER.info ("phoss AP initialized successfully");
   }
 
+  /**
+   * Shut down the phoss AP application by stopping schedulers, closing
+   * managers, shutting down the Peppol Reporting backend, and releasing all
+   * resources.
+   */
   public static void shutdown ()
   {
     LOGGER.info ("Shutting down phoss AP");

@@ -25,8 +25,9 @@ import com.helger.base.string.StringHelper;
 import com.helger.base.tostring.ToStringGenerator;
 
 /**
- * Immutable result of a document forwarding operation. Carries structured error information on
- * failure so that callers can record meaningful error codes and details.
+ * Immutable result of a document forwarding operation. Carries structured error
+ * information on failure so that callers can record meaningful error codes and
+ * details.
  *
  * @author Philip Helger
  */
@@ -57,26 +58,38 @@ public final class ForwardingResult implements ISuccessIndicator
   }
 
   /**
-   * @return <code>true</code> if the result contains the country code of C4. This can only happen
-   *         in the success case.
+   * @return <code>true</code> if the result contains the country code of C4.
+   *         This can only happen in the success case.
    */
   public boolean hasCountryCodeC4 ()
   {
     return StringHelper.isNotEmpty (m_sCountryCodeC4);
   }
 
+  /**
+   * @return The C4 country code from the forwarding response, or
+   *         <code>null</code> if not available.
+   */
   @Nullable
   public String getCountryCodeC4 ()
   {
     return m_sCountryCodeC4;
   }
 
+  /**
+   * @return The machine-readable error code classifying the failure, or
+   *         <code>null</code> on success.
+   */
   @Nullable
   public String getErrorCode ()
   {
     return m_sErrorCode;
   }
 
+  /**
+   * @return The human-readable error description, or <code>null</code> on
+   *         success.
+   */
   @Nullable
   public String getErrorDetails ()
   {
@@ -93,18 +106,38 @@ public final class ForwardingResult implements ISuccessIndicator
                                        .getToString ();
   }
 
+  /**
+   * @return A successful forwarding result without a C4 country code.
+   */
   @NonNull
   public static ForwardingResult success ()
   {
     return SUCCESS;
   }
 
+  /**
+   * Create a successful forwarding result with an optional C4 country code.
+   *
+   * @param sCountryCodeC4
+   *        The C4 country code from the forwarding response. May be
+   *        <code>null</code>.
+   * @return A new success result. Never <code>null</code>.
+   */
   @NonNull
   public static ForwardingResult success (@Nullable final String sCountryCodeC4)
   {
     return new ForwardingResult (true, sCountryCodeC4, null, null);
   }
 
+  /**
+   * Create a failure result with error details.
+   *
+   * @param sErrorCode
+   *        Machine-readable error code. May be <code>null</code>.
+   * @param sErrorDetails
+   *        Human-readable error description. May be <code>null</code>.
+   * @return A new failure result. Never <code>null</code>.
+   */
   @NonNull
   public static ForwardingResult failure (@Nullable final String sErrorCode, @Nullable final String sErrorDetails)
   {

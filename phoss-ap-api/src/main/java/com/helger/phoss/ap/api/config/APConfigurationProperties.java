@@ -19,9 +19,9 @@ package com.helger.phoss.ap.api.config;
 import com.helger.annotation.concurrent.Immutable;
 
 /**
- * Constants for all configuration property keys used throughout phoss-ap. These keys are resolved
- * from the ph-config configuration sources (properties files, environment variables, system
- * properties).
+ * Constants for all configuration property keys used throughout phoss-ap. These
+ * keys are resolved from the ph-config configuration sources (properties files,
+ * environment variables, system properties).
  *
  * @author Philip Helger
  */
@@ -37,6 +37,7 @@ public final class APConfigurationProperties
   public static final boolean PEPPOL_SENDING_ENABLED_DEFAULT = true;
   public static final String PEPPOL_RECEIVING_ENABLED = "peppol.receiving.enabled";
   public static final boolean PEPPOL_RECEIVING_ENABLED_DEFAULT = true;
+  public static final String PEPPOL_SMP_URL = "peppol.smp.url";
   public static final String PEPPOL_IDENTIFIER_MODE = "peppol.identifier.mode";
 
   // AS4 endpoint
