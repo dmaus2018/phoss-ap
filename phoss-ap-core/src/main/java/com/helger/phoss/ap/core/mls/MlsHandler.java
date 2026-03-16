@@ -30,6 +30,8 @@ import com.helger.peppol.mls.PeppolMLSBuilder;
 import com.helger.peppol.mls.PeppolMLSMarshaller;
 import com.helger.peppol.sbdh.EPeppolMLSType;
 import com.helger.peppol.sbdh.PeppolSBDHData;
+import com.helger.peppolid.CIdentifier;
+import com.helger.peppolid.peppol.PeppolIdentifierHelper;
 import com.helger.peppolid.peppol.doctype.EPredefinedDocumentTypeIdentifier;
 import com.helger.peppolid.peppol.process.EPredefinedProcessIdentifier;
 import com.helger.peppolid.peppol.spis.SPIDHelper;
@@ -52,9 +54,9 @@ import com.helger.phoss.ap.core.outbound.OutboundOrchestrator;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 
 /**
- * Handler for Peppol Message Level Status (MLS) responses. Responsible for
- * creating outbound MLS response transactions for inbound documents and for
- * correlating incoming MLS responses to previously sent outbound transactions.
+ * Handler for Peppol Message Level Status (MLS) responses. Responsible for creating outbound MLS
+ * response transactions for inbound documents and for correlating incoming MLS responses to
+ * previously sent outbound transactions.
  *
  * @author Philip Helger
  */
@@ -66,15 +68,14 @@ public final class MlsHandler
   {}
 
   /**
-   * Handle the outcome of an inbound document by creating an outbound MLS
-   * response transaction if required by the MLS strategy.
+   * Handle the outcome of an inbound document by creating an outbound MLS response transaction if
+   * required by the MLS strategy.
    *
    * @param aInboundTx
    *        The inbound transaction. Never <code>null</code>.
    * @param aOutcome
-   *        The MLS outcome carrying the response code, optional response text,
-   *        and optional issues for rejection responses. Never
-   *        <code>null</code>.
+   *        The MLS outcome carrying the response code, optional response text, and optional issues
+   *        for rejection responses. Never <code>null</code>.
    * @return {@link ESuccess}
    */
   @NonNull
@@ -107,16 +108,18 @@ public final class MlsHandler
                  "'");
 
     // Create MLS data structure from MlsOutcome
-    final String sEffectiveMlsTo = StringHelper.isNotEmpty (aInboundTx.getMlsTo ()) ? aInboundTx.getMlsTo ()
-                                                                                    : SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME +
-                                                                                      ":" +
-                                                                                      aInboundTx.getC2SeatID ()
-                                                                                                .substring (3);
+    final String sSenderPIDValue = SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME + ":" + APCoreConfig.getPeppolOwnerSPID ();
+    // If an MlsTo value is in the DB, it is previously checked and valid
+    final String sEffectiveMlsToPIDValue = StringHelper.isNotEmpty (aInboundTx.getMlsTo ()) ? aInboundTx.getMlsTo ()
+                                                                                            : SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME +
+                                                                                              ":" +
+                                                                                              aInboundTx.getC2SeatID ()
+                                                                                                        .substring (3);
     final PeppolMLSBuilder aBuilder = aOutcome.getAsMLSBuilder ();
     aBuilder.randomID ()
             .issueDateTimeNow ()
-            .senderParticipantID (SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME + ":" + APCoreConfig.getPeppolOwnerSPID ())
-            .receiverParticipantID (sEffectiveMlsTo)
+            .senderParticipantID (sSenderPIDValue)
+            .receiverParticipantID (sEffectiveMlsToPIDValue)
             .referenceId (aInboundTx.getSbdhInstanceID ());
     final var aMls = aBuilder.build ();
     if (aMls == null)
@@ -163,8 +166,10 @@ public final class MlsHandler
 
     // Create outbound transaction
     final String sMlsTxID = aOutboundMgr.create (ETransactionType.MLS_RESPONSE,
-                                                 aInboundTx.getReceiverID (),
-                                                 aInboundTx.getSenderID (),
+                                                 CIdentifier.getURIEncoded (PeppolIdentifierHelper.DEFAULT_PARTICIPANT_SCHEME,
+                                                                            sSenderPIDValue),
+                                                 CIdentifier.getURIEncoded (PeppolIdentifierHelper.DEFAULT_PARTICIPANT_SCHEME,
+                                                                            sEffectiveMlsToPIDValue),
                                                  EPredefinedDocumentTypeIdentifier.PEPPOL_MLS_1_0.getURIEncoded (),
                                                  EPredefinedProcessIdentifier.urn_peppol_edec_mls.getURIEncoded (),
                                                  sMlsSbdhInstanceID,
@@ -207,8 +212,7 @@ public final class MlsHandler
    * @param eResponseCode
    *        The MLS response code received. May not be <code>null</code>.
    * @param aMlsAS4ReceivedDT
-   *        The MLS AS4 receiving date time for the SLR. May not be
-   *        <code>null</code>.
+   *        The MLS AS4 receiving date time for the SLR. May not be <code>null</code>.
    * @param sMlsID
    *        The MLS document ID received. May not be <code>null</code>.
    * @return {@link ESuccess}

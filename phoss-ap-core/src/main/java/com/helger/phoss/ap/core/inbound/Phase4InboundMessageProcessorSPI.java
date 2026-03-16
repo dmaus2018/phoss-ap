@@ -217,7 +217,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
       }
 
       // Find MLS receiver
-      String sMlsTo = null;
+      String sValidMlsTo = null;
       {
         final String sScheme = aPeppolSBD.getMLSToScheme ();
         final String sValue = aPeppolSBD.getMLSToValue ();
@@ -230,11 +230,11 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
               RegExHelper.stringMatchesPattern (SPIDHelper.REGEX_COMPLETE, sValue.substring (5)))
           {
             // Value is valid as well - use it
-            sMlsTo = CIdentifier.getURIEncoded (sScheme, sValue);
+            sValidMlsTo = CIdentifier.getURIEncoded (sScheme, sValue);
           }
         }
 
-        if (sMlsTo == null && (sScheme != null || sValue != null))
+        if (sValidMlsTo == null && (sScheme != null || sValue != null))
         {
           LOGGER.warn (sLogPrefix +
                        "Some MLS_TO parts were provided ('" +
@@ -269,7 +269,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
                                                sC1CountryCode,
                                                bIsDuplicateAS4,
                                                bIsDuplicateSBDH,
-                                               sMlsTo,
+                                               sValidMlsTo,
                                                APCoreConfig.getMlsType ());
       final var aInboundTx = aInboundMgr.getByID (sTxID);
       if (aInboundTx == null)

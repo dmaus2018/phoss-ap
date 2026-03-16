@@ -21,7 +21,7 @@
     <!-- encoders are assigned the type
          ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
     <encoder>
-      <pattern>[%date{ISO8601}] [phoss AP] [%thread] %-5level %logger{35} -%kvp- %msg %n</pattern>
+      <pattern>[%date{ISO8601}] [phoss AP] [%thread] %-5level %logger{35} -%kvp- %msg%n</pattern>
     </encoder>
   </appender>
 
