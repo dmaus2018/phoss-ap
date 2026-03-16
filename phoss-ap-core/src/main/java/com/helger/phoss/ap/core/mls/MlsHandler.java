@@ -115,7 +115,7 @@ public final class MlsHandler
     final PeppolMLSBuilder aBuilder = aOutcome.getAsMLSBuilder ();
     aBuilder.randomID ()
             .issueDateTimeNow ()
-            .senderParticipantID (SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME + ":" + APCoreConfig.getPeppolSPID ())
+            .senderParticipantID (SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME + ":" + APCoreConfig.getPeppolOwnerSPID ())
             .receiverParticipantID (sEffectiveMlsTo)
             .referenceId (aInboundTx.getSbdhInstanceID ());
     final var aMls = aBuilder.build ();

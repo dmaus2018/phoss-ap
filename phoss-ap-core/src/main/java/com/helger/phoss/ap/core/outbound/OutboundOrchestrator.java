@@ -386,7 +386,7 @@ public final class OutboundOrchestrator
     final String sTxID = aTx.getID ();
     final EPeppolNetwork ePeppolStage = APCoreConfig.getPeppolStage ();
     final ISMLInfo aSMLInfo = ePeppolStage.getSMLInfo ();
-    final String sC2SeatID = APCoreConfig.getPeppolSeatID ();
+    final String sC2SeatID = APCoreConfig.getPeppolOwnerSeatID ();
     final StopWatch aOverallSW = StopWatch.createdStarted ();
 
     final Phase4PeppolSendingReport aSendingReport = new Phase4PeppolSendingReport (aSMLInfo);

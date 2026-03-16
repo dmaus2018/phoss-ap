@@ -73,9 +73,9 @@ public final class APCoreConfig
    *         not configured.
    */
   @Nullable
-  public static String getPeppolSeatID ()
+  public static String getPeppolOwnerSeatID ()
   {
-    return _getConfig ().getAsString (APConfigurationProperties.PEPPOL_SEATID);
+    return _getConfig ().getAsString (APConfigurationProperties.PEPPOL_OWNER_SEATID);
   }
 
   /**
@@ -83,9 +83,9 @@ public final class APCoreConfig
    *         prefix. May be <code>null</code> if the Seat ID is not configured or invalid.
    */
   @Nullable
-  public static String getPeppolSPID ()
+  public static String getPeppolOwnerSPID ()
   {
-    final String sSeatID = getPeppolSeatID ();
+    final String sSeatID = getPeppolOwnerSeatID ();
     return CPhossAP.isPeppolSeatID (sSeatID) ? sSeatID.substring (3) : null;
   }
 

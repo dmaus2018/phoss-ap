@@ -89,7 +89,7 @@ public class PeppolReportingController
         // Create report with the read transactions
         final TransactionStatisticsReportType aReport = TransactionStatisticsReport.builder ()
                                                                                    .monthOf (aYearMonth)
-                                                                                   .reportingServiceProviderID (APCoreConfig.getPeppolSeatID ())
+                                                                                   .reportingServiceProviderID (APCoreConfig.getPeppolOwnerSeatID ())
                                                                                    .reportingItemList (aReportingItems)
                                                                                    .build ();
         return ResponseEntity.ok (new TransactionStatisticsReport101Marshaller ().getAsString (aReport));
@@ -137,7 +137,7 @@ public class PeppolReportingController
         // Create report with the read transactions
         final EndUserStatisticsReportType aReport = EndUserStatisticsReport.builder ()
                                                                            .monthOf (aYearMonth)
-                                                                           .reportingServiceProviderID (APCoreConfig.getPeppolSeatID ())
+                                                                           .reportingServiceProviderID (APCoreConfig.getPeppolOwnerSeatID ())
                                                                            .reportingItemList (aReportingItems)
                                                                            .build ();
         return ResponseEntity.ok (new EndUserStatisticsReport110Marshaller ().getAsString (aReport));

@@ -114,7 +114,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
       final String sC2ID = CertificateHelper.getSubjectCN (aIncomingState.getSigningCertificate ());
       if (!CPhossAP.isPeppolSeatID (sC2ID))
         LOGGER.error ("Received C2 ID '" + sC2ID + "' does not seem to be a valid Peppol Seat ID");
-      final String sC3ID = APCoreConfig.getPeppolSeatID ();
+      final String sC3ID = APCoreConfig.getPeppolOwnerSeatID ();
 
       LOGGER.info (sLogPrefix +
                    "Received inbound SBD - SBDH ID '" +

@@ -226,7 +226,7 @@ public class APServletInit
     }
 
     // Check Seat ID configuration
-    final String sSeatID = APCoreConfig.getPeppolSeatID ();
+    final String sSeatID = APCoreConfig.getPeppolOwnerSeatID ();
     if (!CPhossAP.isPeppolSeatID (sSeatID))
     {
       throw new InitializationException ("The configured Peppol Seat ID '" +

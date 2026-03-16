@@ -99,7 +99,7 @@ public final class APPeppolReportHelper
       // Create report with the read transactions
       return TransactionStatisticsReport.builder ()
                                         .monthOf (aYearMonth)
-                                        .reportingServiceProviderID (APCoreConfig.getPeppolSeatID ())
+                                        .reportingServiceProviderID (APCoreConfig.getPeppolOwnerSeatID ())
                                         .reportingItemList (aReportingItems)
                                         .build ();
     }
@@ -122,7 +122,7 @@ public final class APPeppolReportHelper
       // Create report with the read transactions
       return EndUserStatisticsReport.builder ()
                                     .monthOf (aYearMonth)
-                                    .reportingServiceProviderID (APCoreConfig.getPeppolSeatID ())
+                                    .reportingServiceProviderID (APCoreConfig.getPeppolOwnerSeatID ())
                                     .reportingItemList (aReportingItems)
                                     .build ();
     }
@@ -153,7 +153,7 @@ public final class APPeppolReportHelper
       // Sender: your company participant ID
       final IParticipantIdentifier aSenderID = aIF.createParticipantIdentifierWithDefaultScheme (SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME +
                                                                                                  ":" +
-                                                                                                 APCoreConfig.getPeppolSPID ());
+                                                                                                 APCoreConfig.getPeppolOwnerSPID ());
 
       // Receiver: production OpenPeppol; test Helger
       // OpenPeppol doesn't offer this participant ID on test :-/
