@@ -64,6 +64,8 @@ import com.helger.phoss.ap.db.APJdbcMetaManager;
 import com.helger.photon.io.WebFileIO;
 import com.helger.security.certificate.ECertificateCheckResult;
 import com.helger.security.certificate.TrustedCAChecker;
+import com.helger.security.revocation.CertificateRevocationCheckerDefaults;
+import com.helger.security.revocation.ERevocationCheckMode;
 import com.helger.servlet.ServletHelper;
 import com.helger.smpclient.peppol.CachingSMPClientReadOnly;
 import com.helger.smpclient.peppol.SMPClientReadOnly;
@@ -125,6 +127,13 @@ public class APServletInit
       final boolean bFileAccessCheck = false;
       // Init the IO layer
       WebFileIO.initPaths (new File (sDataPath).getAbsoluteFile (), sServletContextPath, bFileAccessCheck);
+    }
+
+    if (APCoreConfig.isOfflineMode ())
+    {
+      LOGGER.warn ("Offline mode enabled - for development purposes only!");
+      // Special setup for offline mode
+      CertificateRevocationCheckerDefaults.setRevocationCheckMode (ERevocationCheckMode.NONE);
     }
   }
 

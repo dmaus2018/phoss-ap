@@ -51,6 +51,12 @@ public final class APCoreConfig
     return APConfigProvider.getConfig ();
   }
 
+  public static boolean isOfflineMode ()
+  {
+    // This property is not documented by purpose, as it is experimental
+    return _getConfig ().getAsBoolean ("phossap.offlinemode.enabled", false);
+  }
+
   /**
    * @return The configured Peppol network stage (production or test). May be <code>null</code> if
    *         not configured.
