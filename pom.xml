@@ -66,7 +66,7 @@
 
     <ph-commons.version>12.1.4</ph-commons.version>
     <ph-web.version>11.2.4-SNAPSHOT</ph-web.version>
-    <phive.version>12.0.1-SNAPSHOT</phive.version>
+    <phive.version>12.0.1</phive.version>
     <ph-oton.version>10.2.2</ph-oton.version>
     <peppol-ap-support.version>2.1.1</peppol-ap-support.version>
     <peppol-commons.version>12.3.12</peppol-commons.version>
