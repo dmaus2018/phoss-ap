@@ -48,9 +48,8 @@ public final class APFlywayMigrator
   {}
 
   /**
-   * Run Flyway database migration using the provided JDBC and Flyway
-   * configuration. If Flyway is disabled via configuration, this method returns
-   * immediately.
+   * Run Flyway database migration using the provided JDBC and Flyway configuration. If Flyway is
+   * disabled via configuration, this method returns immediately.
    *
    * @param aJdbcConfig
    *        The JDBC configuration to use. May not be <code>null</code>.
@@ -70,6 +69,15 @@ public final class APFlywayMigrator
 
     final Callback aCallbackLogging = new BaseCallback ()
     {
+      @Override
+      public boolean supports (@NonNull final Event aEvent, @Nullable final Context aContext)
+      {
+        // Deprecated by Flyway itself - just to avoid warnings
+        if (aEvent == Event.CREATE_SCHEMA)
+          return false;
+        return super.supports (aEvent, aContext);
+      }
+
       public void handle (@NonNull final Event aEvent, @Nullable final Context aContext)
       {
         if (LOGGER.isDebugEnabled ())
