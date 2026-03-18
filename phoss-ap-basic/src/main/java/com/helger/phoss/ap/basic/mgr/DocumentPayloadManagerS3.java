@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonempty;
+import com.helger.annotation.style.VisibleForTesting;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.exception.InitializationException;
 import com.helger.base.io.nonblocking.NonBlockingByteArrayOutputStream;
@@ -104,6 +105,21 @@ public class DocumentPayloadManagerS3 implements IDocumentPayloadManager
 
   private final S3Client m_aS3Client;
   private final String m_sBucket;
+
+  /**
+   * Package-private constructor for testing with an externally provided S3 client and bucket.
+   *
+   * @param aS3Client
+   *        The S3 client to use. May not be <code>null</code>.
+   * @param sBucket
+   *        The S3 bucket name. May not be <code>null</code>.
+   */
+  @VisibleForTesting
+  DocumentPayloadManagerS3 (@NonNull final S3Client aS3Client, @NonNull final String sBucket)
+  {
+    m_aS3Client = ValueEnforcer.notNull (aS3Client, "S3Client");
+    m_sBucket = ValueEnforcer.notNull (sBucket, "Bucket");
+  }
 
   /**
    * Default constructor. Reads S3 configuration from {@link APBasicConfig}.
