@@ -54,6 +54,7 @@
     <!-- External dependency versions -->
     <awssdk.version>2.42.13</awssdk.version>
     <commons-compression.version>1.28.0</commons-compression.version>
+    <commons-lang.version>3.20.0</commons-lang.version>
     <failsafe.version>3.3.2</failsafe.version>
     <flyway.version>12.1.0</flyway.version>
     <jackson.version>3.1.0</jackson.version>
@@ -172,6 +173,11 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-compress</artifactId>
         <version>${commons-compression.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>${commons-lang.version}</version>
       </dependency>
       <dependency>
         <groupId>com.sun.xml.bind</groupId>
