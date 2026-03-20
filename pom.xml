@@ -52,16 +52,16 @@
     <maven.compiler.release>21</maven.compiler.release>
 
     <!-- External dependency versions -->
-    <awssdk.version>2.42.13</awssdk.version>
+    <awssdk.version>2.42.17</awssdk.version>
     <commons-compression.version>1.28.0</commons-compression.version>
     <commons-lang.version>3.20.0</commons-lang.version>
     <failsafe.version>3.3.2</failsafe.version>
-    <flyway.version>12.1.0</flyway.version>
+    <flyway.version>12.1.1</flyway.version>
     <jackson.version>3.1.0</jackson.version>
-    <jaxb-impl.version>4.0.6</jaxb-impl.version>
+    <jaxb-impl.version>4.0.7</jaxb-impl.version>
     <log4j.version>2.25.3</log4j.version>
     <postgres.version>42.7.10</postgres.version>
-    <sentry.version>8.35.0</sentry.version>
+    <sentry.version>8.36.0</sentry.version>
     <spring-boot.version>4.0.4</spring-boot.version>
 
     <ph-commons.version>12.1.5</ph-commons.version>
