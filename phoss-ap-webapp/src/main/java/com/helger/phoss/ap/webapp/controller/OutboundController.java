@@ -47,8 +47,8 @@ import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.APCoreConfig;
 import com.helger.phoss.ap.core.outbound.OutboundOrchestrator;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
-import com.helger.phoss.ap.webapp.dto.OutboundS3SubmitRequest;
-import com.helger.phoss.ap.webapp.dto.OutboundTransactionResponse;
+import com.helger.phoss.ap.api.dto.OutboundS3SubmitRequest;
+import com.helger.phoss.ap.api.dto.OutboundTransactionResponse;
 
 import jakarta.servlet.http.HttpServletRequest;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;

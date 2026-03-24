@@ -72,7 +72,8 @@ public class MlsMetricsManagerJdbc extends AbstractAPJdbcManager
   }
 
   /**
-   * An individual MLS SLA measurement data point.
+   * An individual MLS SLA measurement data point. Must correlate with
+   * {@link com.helger.phoss.ap.api.dto.MlsSlaEntryResponse}.
    *
    * @param sbdhInstanceID
    *        SBDH Instance ID
@@ -93,7 +94,8 @@ public class MlsMetricsManagerJdbc extends AbstractAPJdbcManager
   {}
 
   /**
-   * Aggregated SLA report.
+   * Aggregated SLA report. Must correlate with
+   * {@link com.helger.phoss.ap.api.dto.MlsSlaReportResponse}
    *
    * @param entries
    *        All MLS relevant entries

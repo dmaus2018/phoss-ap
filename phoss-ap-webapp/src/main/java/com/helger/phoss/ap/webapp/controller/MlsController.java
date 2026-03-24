@@ -18,6 +18,7 @@ package com.helger.phoss.ap.webapp.controller;
 
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,10 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.helger.collection.commons.ICommonsList;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
+import com.helger.phoss.ap.api.dto.InboundTransactionResponse;
+import com.helger.phoss.ap.api.dto.MlsSlaEntryResponse;
+import com.helger.phoss.ap.api.dto.MlsSlaReportResponse;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 import com.helger.phoss.ap.db.MlsMetricsManagerJdbc;
-import com.helger.phoss.ap.webapp.dto.InboundTransactionResponse;
-import com.helger.phoss.ap.webapp.dto.MlsSlaReportResponse;
+import com.helger.phoss.ap.db.MlsMetricsManagerJdbc.MlsSlaReport;
 
 /**
  * REST controller for MLS (Message Level Status) related operations including querying transactions
@@ -56,6 +59,33 @@ public class MlsController
   }
 
   /**
+   * Create a response DTO from a domain model MLS SLA report. This factory method depends on
+   * {@code phoss-ap-db} types and therefore stays in the webapp module.
+   *
+   * @param aReport
+   *        The MLS SLA report. May not be <code>null</code>.
+   * @return A new response DTO. Never <code>null</code>.
+   */
+  @NonNull
+  private static MlsSlaReportResponse _fromDomain (@NonNull final MlsSlaReport aReport)
+  {
+    final MlsSlaReportResponse ret = new MlsSlaReportResponse ();
+    ret.setTotalCount (aReport.totalCount ());
+    ret.setWithinSlaCount (aReport.withinSlaCount ());
+    ret.setCompliancePercent (aReport.compliancePercent ());
+    ret.setTargetPercent (aReport.targetPercent ());
+    ret.setThresholdSeconds (aReport.thresholdSeconds ());
+    ret.setMeetingSla (aReport.isMeetingSla ());
+    ret.setEntries (aReport.entries ()
+                           .getAllMapped (e -> new MlsSlaEntryResponse (e.sbdhInstanceID (),
+                                                                        e.m1 ().toString (),
+                                                                        e.m2OrM3 ().toString (),
+                                                                        e.durationSeconds (),
+                                                                        e.withinSla ())));
+    return ret;
+  }
+
+  /**
    * Get MLS-1 SLA report (receiving side). Measures M2 - M1: time between receiving the original
    * business document (M1) and successfully sending back the MLS response (M2). SLR: 99.5% within
    * 20 minutes.
@@ -68,7 +98,7 @@ public class MlsController
     final MlsMetricsManagerJdbc aMetricsMgr = APJdbcMetaManager.getMlsMetricsMgr ();
 
     final var aReport = aMetricsMgr.getMls1Report ();
-    return ResponseEntity.ok (MlsSlaReportResponse.fromDomain (aReport));
+    return ResponseEntity.ok (_fromDomain (aReport));
   }
 
   /**
@@ -84,6 +114,6 @@ public class MlsController
     final MlsMetricsManagerJdbc aMetricsMgr = APJdbcMetaManager.getMlsMetricsMgr ();
 
     final var aReport = aMetricsMgr.getMls2Report ();
-    return ResponseEntity.ok (MlsSlaReportResponse.fromDomain (aReport));
+    return ResponseEntity.ok (_fromDomain (aReport));
   }
 }

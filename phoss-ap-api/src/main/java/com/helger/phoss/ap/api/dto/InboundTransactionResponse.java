@@ -14,65 +14,73 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.helger.phoss.ap.webapp.dto;
+package com.helger.phoss.ap.api.dto;
 
 import org.jspecify.annotations.NonNull;
 
-import com.helger.phoss.ap.api.model.IOutboundTransaction;
+import com.helger.phoss.ap.api.model.IInboundTransaction;
 
 /**
- * JSON response DTO representing an outbound transaction with all relevant fields for the REST API.
+ * JSON response DTO representing an inbound transaction with all relevant fields for the REST API.
+ * Usable both for server-side serialization and client-side deserialization.
  *
  * @author Philip Helger
  */
-public class OutboundTransactionResponse
+public class InboundTransactionResponse
 {
   private String id;
-  private String transactionType;
   private String senderID;
   private String receiverID;
   private String docTypeID;
   private String processID;
+  private String as4MessageID;
   private String sbdhInstanceID;
   private String status;
   private int attemptCount;
-  private String createdDT;
+  private String receivedDT;
   private String completedDT;
   private String reportingStatus;
   private String nextRetryDT;
   private String errorDetails;
-  private String mlsStatus;
+  private boolean isDuplicateAS4;
+  private boolean isDuplicateSBDH;
+  private String mlsResponseCode;
 
-  private OutboundTransactionResponse ()
+  /**
+   * Default constructor for JSON deserialization.
+   */
+  public InboundTransactionResponse ()
   {}
 
   /**
-   * Create a response DTO from a domain model outbound transaction.
+   * Create a response DTO from a domain model inbound transaction.
    *
    * @param aTx
-   *        The outbound transaction. May not be <code>null</code>.
+   *        The inbound transaction. May not be <code>null</code>.
    * @return A new response DTO. Never <code>null</code>.
    */
   @NonNull
-  public static OutboundTransactionResponse fromDomain (@NonNull final IOutboundTransaction aTx)
+  public static InboundTransactionResponse fromDomain (@NonNull final IInboundTransaction aTx)
   {
-    final OutboundTransactionResponse aResp = new OutboundTransactionResponse ();
-    aResp.id = aTx.getID ();
-    aResp.transactionType = aTx.getTransactionType ().getID ();
-    aResp.senderID = aTx.getSenderID ();
-    aResp.receiverID = aTx.getReceiverID ();
-    aResp.docTypeID = aTx.getDocTypeID ();
-    aResp.processID = aTx.getProcessID ();
-    aResp.sbdhInstanceID = aTx.getSbdhInstanceID ();
-    aResp.status = aTx.getStatus ().getID ();
-    aResp.attemptCount = aTx.getAttemptCount ();
-    aResp.createdDT = aTx.getCreatedDT () != null ? aTx.getCreatedDT ().toString () : null;
-    aResp.completedDT = aTx.getCompletedDT () != null ? aTx.getCompletedDT ().toString () : null;
-    aResp.reportingStatus = aTx.getReportingStatus ().getID ();
-    aResp.nextRetryDT = aTx.getNextRetryDT () != null ? aTx.getNextRetryDT ().toString () : null;
-    aResp.errorDetails = aTx.getErrorDetails ();
-    aResp.mlsStatus = aTx.getMlsStatus () != null ? aTx.getMlsStatus ().getID () : null;
-    return aResp;
+    final InboundTransactionResponse ret = new InboundTransactionResponse ();
+    ret.id = aTx.getID ();
+    ret.senderID = aTx.getSenderID ();
+    ret.receiverID = aTx.getReceiverID ();
+    ret.docTypeID = aTx.getDocTypeID ();
+    ret.processID = aTx.getProcessID ();
+    ret.as4MessageID = aTx.getAS4MessageID ();
+    ret.sbdhInstanceID = aTx.getSbdhInstanceID ();
+    ret.status = aTx.getStatus ().getID ();
+    ret.attemptCount = aTx.getAttemptCount ();
+    ret.receivedDT = aTx.getReceivedDT () != null ? aTx.getReceivedDT ().toString () : null;
+    ret.completedDT = aTx.getCompletedDT () != null ? aTx.getCompletedDT ().toString () : null;
+    ret.reportingStatus = aTx.getReportingStatus ().getID ();
+    ret.nextRetryDT = aTx.getNextRetryDT () != null ? aTx.getNextRetryDT ().toString () : null;
+    ret.errorDetails = aTx.getErrorDetails ();
+    ret.isDuplicateAS4 = aTx.isDuplicateAS4 ();
+    ret.isDuplicateSBDH = aTx.isDuplicateSBDH ();
+    ret.mlsResponseCode = aTx.getMlsResponseCode () != null ? aTx.getMlsResponseCode ().getID () : null;
+    return ret;
   }
 
   /** @return the transaction ID */
@@ -88,21 +96,6 @@ public class OutboundTransactionResponse
   public void setID (final String s)
   {
     id = s;
-  }
-
-  /** @return the transaction type */
-  public String getTransactionType ()
-  {
-    return transactionType;
-  }
-
-  /**
-   * @param s
-   *        The transaction type to set.
-   */
-  public void setTransactionType (final String s)
-  {
-    transactionType = s;
   }
 
   /** @return the sender participant ID */
@@ -165,6 +158,21 @@ public class OutboundTransactionResponse
     processID = s;
   }
 
+  /** @return the AS4 message ID */
+  public String getAS4MessageID ()
+  {
+    return as4MessageID;
+  }
+
+  /**
+   * @param s
+   *        The AS4 message ID to set.
+   */
+  public void setAS4MessageID (final String s)
+  {
+    as4MessageID = s;
+  }
+
   /** @return the SBDH instance ID */
   public String getSbdhInstanceID ()
   {
@@ -210,19 +218,19 @@ public class OutboundTransactionResponse
     attemptCount = n;
   }
 
-  /** @return the created date-time as a string */
-  public String getCreatedDT ()
+  /** @return the received date-time as a string */
+  public String getReceivedDT ()
   {
-    return createdDT;
+    return receivedDT;
   }
 
   /**
    * @param s
-   *        The created date-time to set.
+   *        The received date-time to set.
    */
-  public void setCreatedDT (final String s)
+  public void setReceivedDT (final String s)
   {
-    createdDT = s;
+    receivedDT = s;
   }
 
   /** @return the completed date-time as a string */
@@ -285,18 +293,48 @@ public class OutboundTransactionResponse
     errorDetails = s;
   }
 
-  /** @return the MLS status */
-  public String getMlsStatus ()
+  /** @return <code>true</code> if this is a duplicate AS4 message */
+  public boolean isDuplicateAS4 ()
   {
-    return mlsStatus;
+    return isDuplicateAS4;
+  }
+
+  /**
+   * @param b
+   *        <code>true</code> if this is a duplicate AS4 message.
+   */
+  public void setDuplicateAS4 (final boolean b)
+  {
+    isDuplicateAS4 = b;
+  }
+
+  /** @return <code>true</code> if this is a duplicate SBDH */
+  public boolean isDuplicateSBDH ()
+  {
+    return isDuplicateSBDH;
+  }
+
+  /**
+   * @param b
+   *        <code>true</code> if this is a duplicate SBDH.
+   */
+  public void setDuplicateSBDH (final boolean b)
+  {
+    isDuplicateSBDH = b;
+  }
+
+  /** @return the MLS response code */
+  public String getMlsResponseCode ()
+  {
+    return mlsResponseCode;
   }
 
   /**
    * @param s
-   *        The MLS status to set.
+   *        The MLS response code to set.
    */
-  public void setMlsStatus (final String s)
+  public void setMlsResponseCode (final String s)
   {
-    mlsStatus = s;
+    mlsResponseCode = s;
   }
 }

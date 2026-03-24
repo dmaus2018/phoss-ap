@@ -34,8 +34,8 @@ import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.core.reporting.APPeppolReportingHelper;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
-import com.helger.phoss.ap.webapp.dto.InboundTransactionResponse;
-import com.helger.phoss.ap.webapp.dto.ReportResponse;
+import com.helger.phoss.ap.api.dto.InboundTransactionResponse;
+import com.helger.phoss.ap.api.dto.ReportResponse;
 
 /**
  * REST controller for inbound transaction operations including reporting the C4 country code,

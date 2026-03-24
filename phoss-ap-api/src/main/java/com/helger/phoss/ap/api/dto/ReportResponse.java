@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.helger.phoss.ap.webapp.dto;
+package com.helger.phoss.ap.api.dto;
 
 /**
  * JSON response DTO for reporting API operations, carrying a transaction ID, status, and a
