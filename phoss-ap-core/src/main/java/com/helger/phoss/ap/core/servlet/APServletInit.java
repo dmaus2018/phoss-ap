@@ -193,7 +193,9 @@ public class APServletInit
 
     final KeyStore.PrivateKeyEntry aPKE = aCryptoFactory.getPrivateKeyEntry ();
     if (aPKE == null)
-      throw new InitializationException ("Failed to load configured AS4 private key - fix the configuration");
+      throw new InitializationException ("Failed to load configured AS4 private key with the alias '" +
+                                         aCryptoFactory.getKeyAlias () +
+                                         "' - fix the configuration");
     LOGGER.info ("Successfully loaded configured AS4 private key (alias '" +
                  aCryptoFactory.getKeyAlias () +
                  "') from the crypto factory");
