@@ -641,6 +641,7 @@ public final class OutboundOrchestrator
               }
 
               eResult = aBuilder.sendMessageAndCheckForReceipt (aCaughtSendingEx::set);
+              aSendingReport.setAS4SendingResult (eResult);
               LOGGER.info (sRealLogPrefix + "Peppol SBDH-building client send result: " + eResult);
 
               aReportingItem = aBuilder.createPeppolReportingItemAfterSending (aReceiverID.getURIEncoded ());
@@ -710,6 +711,7 @@ public final class OutboundOrchestrator
                                              aSendingReport.setAS4ReceivedSignalMsg (aSignalMsg);
                                            });
               eResult = aBuilder.sendMessageAndCheckForReceipt (aCaughtSendingEx::set);
+              aSendingReport.setAS4SendingResult (eResult);
               LOGGER.info (sRealLogPrefix + "Peppol Prebuilt-SBDH client send result: " + eResult);
 
               aReportingItem = aBuilder.createPeppolReportingItemAfterSending (aReceiverID.getURIEncoded ());
@@ -736,8 +738,7 @@ public final class OutboundOrchestrator
 
             aSendingReport.setAS4SendingError ("An error occurred during the phase4 transmission to '" +
                                                sReceiverAPURL +
-                                               "'. Result code is " +
-                                               eResult);
+                                               "'.");
             aSendingReport.setAS4SendingException (ex);
             aSendingReport.setSendingSuccess (false);
             aSendingReport.setOverallSuccess (false);
