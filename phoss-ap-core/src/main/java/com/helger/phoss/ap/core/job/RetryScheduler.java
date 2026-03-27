@@ -22,6 +22,8 @@ import java.util.TimerTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.annotation.Nonnegative;
+import com.helger.base.exception.InitializationException;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
@@ -39,20 +41,19 @@ import com.helger.phoss.ap.db.APJdbcMetaManager;
 public final class RetryScheduler
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (RetryScheduler.class);
-  private static final int BATCH_SIZE = 50;
 
   private static Timer s_aTimer;
 
   private RetryScheduler ()
   {}
 
-  private static void _retryOutbound ()
+  private static void _retryOutbound (@Nonnegative final int nBatchSize)
   {
     final var aOutboundMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
 
     try
     {
-      final ICommonsList <IOutboundTransaction> aTransactions = aOutboundMgr.getAllForRetry (BATCH_SIZE);
+      final ICommonsList <IOutboundTransaction> aTransactions = aOutboundMgr.getAllForRetry (nBatchSize);
 
       if (aTransactions.isNotEmpty ())
       {
@@ -91,13 +92,13 @@ public final class RetryScheduler
     }
   }
 
-  private static void _retryInbound ()
+  private static void _retryInbound (@Nonnegative final int nBatchSize)
   {
     final var aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
 
     try
     {
-      final ICommonsList <IInboundTransaction> aTransactions = aInboundMgr.getAllForRetry (BATCH_SIZE);
+      final ICommonsList <IInboundTransaction> aTransactions = aInboundMgr.getAllForRetry (nBatchSize);
 
       if (aTransactions.isNotEmpty ())
       {
@@ -135,8 +136,12 @@ public final class RetryScheduler
    */
   public static void start ()
   {
+    final int nBatchSize = APCoreConfig.getRetrySchedulerBatchSize ();
+    if (nBatchSize < 1)
+      throw new InitializationException ("The retry scheduler batch size must be >= 1, but is " + nBatchSize);
+
     final long nIntervalMs = APCoreConfig.getRetrySchedulerIntervalMs ();
-    LOGGER.info ("Starting phoss AP retry scheduler with interval " + nIntervalMs + " ms");
+    LOGGER.info ("Starting phoss AP retry scheduler with interval " + nIntervalMs + " ms and batch size " + nBatchSize);
 
     s_aTimer = new Timer ("phoss-ap-retry-scheduler", true);
     s_aTimer.scheduleAtFixedRate (new TimerTask ()
@@ -144,8 +149,8 @@ public final class RetryScheduler
       @Override
       public void run ()
       {
-        _retryOutbound ();
-        _retryInbound ();
+        _retryOutbound (nBatchSize);
+        _retryInbound (nBatchSize);
       }
     }, nIntervalMs, nIntervalMs);
   }

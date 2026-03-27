@@ -95,6 +95,8 @@ public final class APConfigurationProperties
   // Retry scheduler
   public static final String RETRY_SCHEDULER_INTERVAL_MS = "retry.scheduler.interval.ms";
   public static final long RETRY_SCHEDULER_INTERVAL_MS_DEFAULT = 60_000L;
+  public static final String RETRY_SCHEDULER_BATCH_SIZE = "retry.scheduler.batch-size";
+  public static final int RETRY_SCHEDULER_BATCH_SIZE_DEFAULT = 50;
 
   // Circuit breaker
   public static final String CIRCUIT_BREAKER_FAILURE_THRESHOLD = "circuit-breaker.failure-threshold";

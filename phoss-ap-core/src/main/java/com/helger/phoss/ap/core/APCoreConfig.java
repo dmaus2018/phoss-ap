@@ -250,6 +250,17 @@ public final class APCoreConfig
   }
 
   /**
+   * @return The number of transactions to retry per scheduler cycle. Default is {@code 50}.
+   * @since 0.1.2
+   */
+  @Nonnegative
+  public static int getRetrySchedulerBatchSize ()
+  {
+    return _getConfig ().getAsInt (APConfigurationProperties.RETRY_SCHEDULER_BATCH_SIZE,
+                                   APConfigurationProperties.RETRY_SCHEDULER_BATCH_SIZE_DEFAULT);
+  }
+
+  /**
    * @return The number of consecutive failures before the circuit breaker opens.
    */
   @Nonnegative
@@ -418,6 +429,7 @@ public final class APCoreConfig
 
   /**
    * @return The number of transactions to archive per scheduler cycle. Default is {@code 100}.
+   * @since 0.1.2
    */
   @Nonnegative
   public static int getArchivalSchedulerBatchSize ()
