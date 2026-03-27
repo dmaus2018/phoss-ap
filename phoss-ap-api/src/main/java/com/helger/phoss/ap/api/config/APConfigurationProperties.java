@@ -162,6 +162,10 @@ public final class APConfigurationProperties
   public static final String OUTBOUND_S3_ACCESS_KEY_ID = "outbound.s3.access-key-id";
   public static final String OUTBOUND_S3_SECRET_ACCESS_KEY = "outbound.s3.secret-access-key";
 
+  // Management
+  public static final String MANAGEMENT_STATUS_ENABLED = "management.status.enabled";
+  public static final boolean MANAGEMENT_STATUS_ENABLED_DEFAULT = true;
+
   // Shutdown / Startup
   public static final String SHUTDOWN_TIMEOUT_MS = "shutdown.timeout.ms";
   public static final long SHUTDOWN_TIMEOUT_MS_DEFAULT = 30_000L;

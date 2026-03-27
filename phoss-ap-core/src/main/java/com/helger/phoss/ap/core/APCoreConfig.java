@@ -439,6 +439,16 @@ public final class APCoreConfig
   }
 
   /**
+   * @return {@code true} if the management status endpoint is enabled. Defaults to {@code true}.
+   * @since 0.1.3
+   */
+  public static boolean isManagementStatusEnabled ()
+  {
+    return _getConfig ().getAsBoolean (APConfigurationProperties.MANAGEMENT_STATUS_ENABLED,
+                                       APConfigurationProperties.MANAGEMENT_STATUS_ENABLED_DEFAULT);
+  }
+
+  /**
    * @return {@code true} if startup recovery of in-flight transactions is enabled.
    */
   public static boolean isStartupRecoveryEnabled ()

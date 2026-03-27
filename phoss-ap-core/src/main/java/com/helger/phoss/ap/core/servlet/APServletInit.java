@@ -19,8 +19,10 @@ package com.helger.phoss.ap.core.servlet;
 import java.io.File;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
+import java.time.OffsetDateTime;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
@@ -86,9 +88,21 @@ import jakarta.servlet.ServletContext;
 public class APServletInit
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (APServletInit.class);
+  private static OffsetDateTime s_aStartupDT;
 
   private APServletInit ()
   {}
+
+  /**
+   * @return The date time when the application was initialized, or <code>null</code> if not yet
+   *         initialized.
+   * @since 0.1.3
+   */
+  @Nullable
+  public static OffsetDateTime getStartupDateTime ()
+  {
+    return s_aStartupDT;
+  }
 
   private static void _initGlobalSettings (@NonNull final ServletContext aSC)
   {
@@ -307,6 +321,7 @@ public class APServletInit
     RetryScheduler.start ();
     ArchivalScheduler.start ();
 
+    s_aStartupDT = OffsetDateTime.now ();
     LOGGER.info ("phoss AP initialized successfully");
   }
 
