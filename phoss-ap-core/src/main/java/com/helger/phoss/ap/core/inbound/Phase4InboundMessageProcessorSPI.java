@@ -50,6 +50,7 @@ import com.helger.phase4.logging.Phase4LogCustomizer;
 import com.helger.phase4.logging.Phase4LoggerFactory;
 import com.helger.phase4.model.error.EEbmsError;
 import com.helger.phase4.peppol.servlet.IPhase4PeppolIncomingSBDHandlerSPI;
+import com.helger.phase4.util.Phase4Exception;
 import com.helger.phoss.ap.api.CPhossAP;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EDuplicateDetectionMode;
@@ -93,6 +94,12 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
                                  @NonNull final IAS4IncomingMessageState aIncomingState,
                                  @NonNull final AS4ErrorList aProcessingErrorMessages) throws Exception
   {
+    if (!APCoreConfig.isReceivingEnabled ())
+    {
+      LOGGER.info ("Peppol AP receiving is disabled");
+      throw new Phase4Exception ("Peppol AP receiving is disabled");
+    }
+
     final String sLogPrefix = "[" + aMessageMetadata.getIncomingUniqueID () + "] ";
     Phase4LogCustomizer.setThreadLocalLogPrefix (sLogPrefix);
 
