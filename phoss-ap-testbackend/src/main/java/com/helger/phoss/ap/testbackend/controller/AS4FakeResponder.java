@@ -63,8 +63,8 @@ public class AS4FakeResponder
   @PostMapping (path = "/plaintext/{status}",
                 consumes = MediaType.MULTIPART_RELATED_VALUE,
                 produces = MediaType.TEXT_PLAIN_VALUE)
-  public ResponseEntity <String> plainTextResponse (@SuppressWarnings ("unused") final HttpServletRequest aServletRequest,
-                                                    @SuppressWarnings ("unused") @RequestHeader ("Content-Type") final String sContentType,
+  public ResponseEntity <String> plainTextResponse (final HttpServletRequest aServletRequest,
+                                                    @RequestHeader ("Content-Type") final String sContentType,
                                                     @PathVariable (value = "status") final int nStatus)
   {
     LOGGER.info ("In plaintext/" + nStatus);

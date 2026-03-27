@@ -40,7 +40,6 @@ public class AS4ServletRegistration
    * @param aProfileConfigIntegration
    *        Injected solely for bean ordering. Not used directly.
    */
-  @SuppressWarnings ("unused")
   public AS4ServletRegistration (final SpringProfileConfigIntegration aProfileConfigIntegration)
   {
     // Dependency injection ensures profile config is loaded first
@@ -88,10 +87,10 @@ public class AS4ServletRegistration
   }
 
   /**
-   * Create the {@link Destroyer} bean that triggers graceful shutdown of {@link APServletInit} when
-   * the Spring context is closed.
+   * Create the Destroyer bean that triggers graceful shutdown of {@link APServletInit} when the
+   * Spring context is closed.
    *
-   * @return A new {@link Destroyer} instance. Never <code>null</code>.
+   * @return A new Destroyer instance. Never <code>null</code>.
    */
   @Bean
   public Destroyer destroyer ()
