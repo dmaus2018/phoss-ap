@@ -28,6 +28,7 @@ import com.helger.peppol.servicedomain.EPeppolNetwork;
 import com.helger.phoss.ap.api.CPhossAP;
 import com.helger.phoss.ap.api.codelist.EAS4DumpMode;
 import com.helger.phoss.ap.api.codelist.EDuplicateDetectionMode;
+import com.helger.phoss.ap.api.codelist.EReceiverCheckMode;
 import com.helger.phoss.ap.api.config.APConfigProvider;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 
@@ -110,6 +111,17 @@ public final class APCoreConfig
   public static String getPeppolSmpUrl ()
   {
     return _getConfig ().getAsString (APConfigurationProperties.PEPPOL_SMP_URL);
+  }
+
+  /**
+   * @return The configured receiver check mode. Defaults to {@link EReceiverCheckMode#NONE}. Never
+   *         <code>null</code>.
+   */
+  @NonNull
+  public static EReceiverCheckMode getReceiverCheckMode ()
+  {
+    final String sVal = _getConfig ().getAsString (APConfigurationProperties.PEPPOL_RECEIVER_CHECK_MODE);
+    return EReceiverCheckMode.getFromIDOrDefault (sVal);
   }
 
   /**

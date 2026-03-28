@@ -38,6 +38,7 @@ public final class APConfigurationProperties
   public static final String PEPPOL_RECEIVING_ENABLED = "peppol.receiving.enabled";
   public static final boolean PEPPOL_RECEIVING_ENABLED_DEFAULT = true;
   public static final String PEPPOL_SMP_URL = "peppol.smp.url";
+  public static final String PEPPOL_RECEIVER_CHECK_MODE = "peppol.receiver-check.mode";
   public static final String PEPPOL_DNS_SERVERS = "peppol.dns.servers";
   public static final String PEPPOL_IDENTIFIER_MODE = "peppol.identifier.mode";
 

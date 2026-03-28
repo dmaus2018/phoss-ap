@@ -56,7 +56,9 @@ import com.helger.phase4.profile.peppol.AS4PeppolProfileRegistarSPI;
 import com.helger.phase4.profile.peppol.PeppolCRLDownloader;
 import com.helger.phase4.profile.peppol.Phase4PeppolHttpClientSettings;
 import com.helger.phoss.ap.api.CPhossAP;
+import com.helger.phoss.ap.api.codelist.EReceiverCheckMode;
 import com.helger.phoss.ap.api.config.APConfigProvider;
+import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.APCoreConfig;
@@ -287,26 +289,59 @@ public class APServletInit
 
     // Eventually enable the receiver check, so that for each incoming request
     // the validity is crosscheck against the owning SMP
-    final String sSMPURL = APCoreConfig.getPeppolSmpUrl ();
-    final String sAPURL = AS4Configuration.getThisEndpointAddress ();
-    if (StringHelper.isNotEmpty (sSMPURL) && StringHelper.isNotEmpty (sAPURL))
+    final EReceiverCheckMode eReceiverCheckMode = APCoreConfig.getReceiverCheckMode ();
+    switch (eReceiverCheckMode)
     {
-      // To process the message even though the receiver is not registered in
-      // our AP
-      Phase4PeppolDefaultReceiverConfiguration.setReceiverCheckEnabled (true);
+      case SMP:
+      {
+        final String sSMPURL = APCoreConfig.getPeppolSmpUrl ();
+        if (StringHelper.isEmpty (sSMPURL))
+          throw new InitializationException ("Receiver check mode 'smp' requires configuration property '" +
+                                             APConfigurationProperties.PEPPOL_SMP_URL +
+                                             "' to be set");
 
-      final SMPClientReadOnly aReceiverCheckSMPClient = new CachingSMPClientReadOnly (URLHelper.getAsURI (sSMPURL));
-      APBasicConfig.applyHttpProxySettings (aReceiverCheckSMPClient.httpClientSettings ());
-      Phase4PeppolDefaultReceiverConfiguration.setSMPClient (aReceiverCheckSMPClient);
+        final String sAPURL = AS4Configuration.getThisEndpointAddress ();
+        if (StringHelper.isEmpty (sAPURL))
+          throw new InitializationException ("Receiver check mode 'smp' requires configuration property '" +
+                                             APConfigurationProperties.PHASE4_ENDPOINT_ADDRESS +
+                                             "' to be set");
 
-      Phase4PeppolDefaultReceiverConfiguration.setAS4EndpointURL (sAPURL);
-      Phase4PeppolDefaultReceiverConfiguration.setAPCertificate (aAPCert);
-      LOGGER.info ("phase4 Peppol receiver checks are enabled");
-    }
-    else
-    {
-      Phase4PeppolDefaultReceiverConfiguration.setReceiverCheckEnabled (false);
-      LOGGER.warn ("phase4 Peppol receiver checks are disabled");
+        Phase4PeppolDefaultReceiverConfiguration.setReceiverCheckEnabled (true);
+
+        final SMPClientReadOnly aReceiverCheckSMPClient = new CachingSMPClientReadOnly (URLHelper.getAsURI (sSMPURL));
+        APBasicConfig.applyHttpProxySettings (aReceiverCheckSMPClient.httpClientSettings ());
+        Phase4PeppolDefaultReceiverConfiguration.setSMPClient (aReceiverCheckSMPClient);
+
+        Phase4PeppolDefaultReceiverConfiguration.setAS4EndpointURL (sAPURL);
+        Phase4PeppolDefaultReceiverConfiguration.setAPCertificate (aAPCert);
+        LOGGER.info ("phase4 Peppol receiver checks are enabled using fixed SMP URL '" + sSMPURL + "'");
+        break;
+      }
+      case SML:
+      {
+        final String sAPURL = AS4Configuration.getThisEndpointAddress ();
+        if (StringHelper.isEmpty (sAPURL))
+          throw new InitializationException ("Receiver check mode 'sml' requires configuration property '" +
+                                             APConfigurationProperties.PHASE4_ENDPOINT_ADDRESS +
+                                             "' to be set");
+
+        Phase4PeppolDefaultReceiverConfiguration.setReceiverCheckEnabled (true);
+        Phase4PeppolDefaultReceiverConfiguration.setSMLInfo (ePeppolStage.getSMLInfo ());
+        Phase4PeppolDefaultReceiverConfiguration.setAS4EndpointURL (sAPURL);
+        Phase4PeppolDefaultReceiverConfiguration.setAPCertificate (aAPCert);
+        LOGGER.info ("phase4 Peppol receiver checks are enabled using SML '" +
+                     ePeppolStage.getSMLInfo ().getDisplayName () +
+                     "'");
+        break;
+      }
+      case NONE:
+      {
+        Phase4PeppolDefaultReceiverConfiguration.setReceiverCheckEnabled (false);
+        LOGGER.warn ("phase4 Peppol receiver checks are disabled");
+        break;
+      }
+      default:
+        throw new InitializationException ("Unsupported receiver check mode: " + eReceiverCheckMode);
     }
 
     // Initialize the Reporting Backend only once
