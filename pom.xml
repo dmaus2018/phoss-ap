@@ -68,10 +68,10 @@
     <ph-web.version>11.2.5</ph-web.version>
     <phive.version>12.0.1</phive.version>
     <ph-oton.version>10.2.2</ph-oton.version>
-    <peppol-ap-support.version>2.1.1</peppol-ap-support.version>
+    <peppol-ap-support.version>2.1.2</peppol-ap-support.version>
     <peppol-commons.version>12.4.0</peppol-commons.version>
     <peppol-reporting.version>4.1.1</peppol-reporting.version>
-    <phase4.version>4.4.1</phase4.version>
+    <phase4.version>4.4.2</phase4.version>
     <ph-db.version>8.1.2</ph-db.version>
   </properties>
 
