@@ -15,30 +15,23 @@
 # limitations under the License.
 #
 
-# Multi-stage Dockerfile for phoss-ap
-# Builds the application from source inside Docker - no local build tools needed.
+# Dockerfile for phoss-ap
+# Downloads the pre-built JAR from a GitHub release - no build tools needed.
 
-# --- Stage 1: Build ---
-FROM eclipse-temurin:21-alpine AS builder
-
-RUN apk add --no-cache maven
-
-WORKDIR /build
-COPY . .
-RUN mvn clean package -DskipTests -q
-
-# --- Stage 2: Runtime ---
 FROM eclipse-temurin:21-alpine
+
+ARG VERSION
 
 LABEL maintainer="Philip Helger <philip@helger.com>"
 LABEL org.opencontainers.image.title="phoss-ap"
 LABEL org.opencontainers.image.description="Open-source Peppol Access Point based on phase4"
 LABEL org.opencontainers.image.url="https://github.com/phax/phoss-ap"
+LABEL org.opencontainers.image.version="${VERSION}"
 
 VOLUME /tmp
 VOLUME /var/phoss-ap/data
 
-COPY --from=builder /build/phoss-ap-webapp/target/*.jar /app.jar
+ADD https://github.com/phax/phoss-ap/releases/download/phoss-ap-parent-pom-${VERSION}/phoss-ap-webapp-${VERSION}.jar /app.jar
 
 EXPOSE 8080
 

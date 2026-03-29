@@ -26,5 +26,5 @@ docker buildx rm phoss-ap
 set -e
 docker buildx create --name phoss-ap --driver docker-container
 
-docker buildx build --platform=linux/amd64 --push --pull -t phelger/phoss-ap:$version -t phelger/phoss-ap:latest -f ../Dockerfile ..
-docker buildx build --platform=linux/arm64 --push --pull -t phelger/phoss-ap-arm64:$version -t phelger/phoss-ap-arm64:latest -f ../Dockerfile ..
+docker buildx build --platform=linux/amd64 --push --pull --build-arg VERSION=$version -t phelger/phoss-ap:$version -t phelger/phoss-ap:latest -f ../Dockerfile ..
+docker buildx build --platform=linux/arm64 --push --pull --build-arg VERSION=$version -t phelger/phoss-ap-arm64:$version -t phelger/phoss-ap-arm64:latest -f ../Dockerfile ..
