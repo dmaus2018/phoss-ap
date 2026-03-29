@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
 
 import com.helger.annotation.concurrent.Immutable;
+import com.helger.ddd.DDDVersion;
 import com.helger.ddd.DocumentDetails;
 import com.helger.ddd.DocumentDetailsDeterminator;
 import com.helger.ddd.model.DDDSyntaxList;
@@ -47,7 +48,7 @@ public final class DDDHelper
     s_aDDD = new DocumentDetailsDeterminator (DDDSyntaxList.getDefaultSyntaxList (),
                                               DDDValueProviderList.getDefaultValueProviderList ());
     s_aDDD.setIdentifierFactory (APBasicMetaManager.getIdentifierFactory ());
-    LOGGER.info ("DDD (Document Details Determinator) initialized");
+    LOGGER.info ("DDD (Document Details Determinator) " + DDDVersion.getVersionNumber () + "initialized");
   }
 
   private DDDHelper ()
