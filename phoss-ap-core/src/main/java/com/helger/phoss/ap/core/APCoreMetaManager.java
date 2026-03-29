@@ -19,6 +19,7 @@ package com.helger.phoss.ap.core;
 import java.util.ServiceLoader;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +27,10 @@ import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.exception.InitializationException;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
+import com.helger.collection.commons.ICommonsOrderedSet;
+import com.helger.peppol.apsupport.BusinessCardCache;
+import com.helger.peppol.servicedomain.EPeppolNetwork;
+import com.helger.phoss.ap.api.codelist.EC4CountryCodeMode;
 import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.config.APConfigProvider;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
@@ -34,10 +39,12 @@ import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
+import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.core.notification.NotificationHandlerManager;
 import com.helger.phoss.ap.forwarding.http.HttpDocumentForwarder;
 import com.helger.phoss.ap.forwarding.s3.S3DocumentForwarder;
 import com.helger.phoss.ap.forwarding.sftp.SftpDocumentForwarder;
+import com.helger.smpclient.httpclient.SMPHttpClientSettings;
 
 /**
  * Central manager for core AP components including the document forwarder, inbound/outbound
@@ -52,6 +59,7 @@ public final class APCoreMetaManager
 
   private static EForwardingMode s_eForwardingMode;
   private static IDocumentForwarder s_aForwarder;
+  private static BusinessCardCache s_aBusinessCardCache;
   private static final ICommonsList <IInboundDocumentVerifierSPI> s_aInboundVerifiers = new CommonsArrayList <> ();
   private static final ICommonsList <IOutboundDocumentVerifierSPI> s_aOutboundVerifiers = new CommonsArrayList <> ();
   private static final ICommonsList <IPeppolReceiverCheckSPI> s_aReceiverChecks = new CommonsArrayList <> ();
@@ -88,6 +96,24 @@ public final class APCoreMetaManager
       s_eForwardingMode = eForwardingMode;
       s_aForwarder = aForwarder;
       LOGGER.info ("Loaded document forwarder: " + aForwarder.toString ());
+    }
+
+    // Initialize Business Card Cache if configured
+    {
+      final ICommonsOrderedSet <EC4CountryCodeMode> aModes = APCoreConfig.getC4CountryCodeModes ();
+      if (aModes.contains (EC4CountryCodeMode.BUSINESS_CARD_CACHE))
+      {
+        final EPeppolNetwork ePeppolStage = APCoreConfig.getPeppolStage ();
+        if (ePeppolStage == null)
+          throw new InitializationException ("Peppol stage must be configured when using C4 country code mode 'business_card'");
+
+        final SMPHttpClientSettings aHCS = new SMPHttpClientSettings ();
+        APBasicConfig.applyHttpProxySettings (aHCS);
+        s_aBusinessCardCache = new BusinessCardCache (ePeppolStage.getSMLInfo (), aHCS);
+        LOGGER.info ("Initialized BusinessCardCache for C4 country code determination");
+      }
+      if (aModes.isNotEmpty ())
+        LOGGER.info ("C4 country code determination modes: " + aModes);
     }
 
     for (final IInboundDocumentVerifierSPI aVerifier : ServiceLoader.load (IInboundDocumentVerifierSPI.class))
@@ -137,6 +163,17 @@ public final class APCoreMetaManager
   public static IDocumentForwarder getForwarder ()
   {
     return s_aForwarder;
+  }
+
+  /**
+   * @return The Business Card Cache for C4 country code lookup, or <code>null</code> if not
+   *         configured.
+   * @since v0.1.3
+   */
+  @Nullable
+  public static BusinessCardCache getBusinessCardCache ()
+  {
+    return s_aBusinessCardCache;
   }
 
   /**

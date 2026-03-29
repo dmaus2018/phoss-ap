@@ -414,4 +414,27 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
         ret.add (new InboundTransactionRow (aRow));
     return ret;
   }
+
+  /** {@inheritDoc} */
+  @NonNull
+  public ICommonsList <IInboundTransaction> getAllWithoutC4CountryCode ()
+  {
+    // Forwarded transactions where the C4 country code has not yet been set and
+    // reporting is still pending
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM " +
+                                                                      m_sTableName +
+                                                                      " WHERE c4_country_code IS NULL" +
+                                                                      " AND status=?" +
+                                                                      " AND reporting_status=?" +
+                                                                      " ORDER BY received_dt",
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARDED.getID (),
+                                                                                                                 EReportingStatus.PENDING.getID ()));
+    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
+    if (aRows != null)
+      for (final DBResultRow aRow : aRows)
+        ret.add (new InboundTransactionRow (aRow));
+    return ret;
+  }
 }

@@ -115,10 +115,15 @@ public final class InboundOrchestrator
         aTxMgr.updateStatusCompleted (aTx.getID (), EInboundStatus.FORWARDED);
         LOGGER.info (sLogPrefix + "Forwarding successful for transaction '" + aTx.getID () + "'");
 
-        if (aResult.hasCountryCodeC4 ())
+        // Determine C4 country code: either from sync response or via configured resolution modes
+        String sC4CountryCode = aResult.getCountryCodeC4 ();
+        if (sC4CountryCode == null)
+          sC4CountryCode = C4CountryCodeResolver.resolve (aTx);
+
+        if (sC4CountryCode != null)
         {
           // We can store the reporting item immediately
-          aTxMgr.updateC4CountryCode (aTx.getID (), aResult.getCountryCodeC4 ());
+          aTxMgr.updateC4CountryCode (aTx.getID (), sC4CountryCode);
           if (APPeppolReportingHelper.createInboundPeppolReportingItem (aTx.getID ()).isFailure ())
             LOGGER.error (sLogPrefix +
                           "Forwarding successful, but failed to store Peppol Reporting entry for '" +

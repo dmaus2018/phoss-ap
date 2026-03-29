@@ -42,6 +42,7 @@ public class InboundTransactionResponse
   private String reportingStatus;
   private String nextRetryDT;
   private String errorDetails;
+  private String c4CountryCode;
   private boolean isDuplicateAS4;
   private boolean isDuplicateSBDH;
   private String mlsResponseCode;
@@ -77,6 +78,7 @@ public class InboundTransactionResponse
     ret.reportingStatus = aTx.getReportingStatus ().getID ();
     ret.nextRetryDT = aTx.getNextRetryDT () != null ? aTx.getNextRetryDT ().toString () : null;
     ret.errorDetails = aTx.getErrorDetails ();
+    ret.c4CountryCode = aTx.getC4CountryCode ();
     ret.isDuplicateAS4 = aTx.isDuplicateAS4 ();
     ret.isDuplicateSBDH = aTx.isDuplicateSBDH ();
     ret.mlsResponseCode = aTx.getMlsResponseCode () != null ? aTx.getMlsResponseCode ().getID () : null;
@@ -291,6 +293,25 @@ public class InboundTransactionResponse
   public void setErrorDetails (final String s)
   {
     errorDetails = s;
+  }
+
+  /**
+   * @return the C4 country code, or <code>null</code> if not yet reported
+   * @since v0.1.3
+   */
+  public String getC4CountryCode ()
+  {
+    return c4CountryCode;
+  }
+
+  /**
+   * @param s
+   *        The C4 country code to set.
+   * @since v0.1.3
+   */
+  public void setC4CountryCode (final String s)
+  {
+    c4CountryCode = s;
   }
 
   /** @return <code>true</code> if this is a duplicate AS4 message */

@@ -279,4 +279,15 @@ public interface IInboundTransactionManager
    */
   @NonNull
   ICommonsList <IInboundTransaction> getAllWithoutMlsResponse ();
+
+  /**
+   * Get all forwarded inbound transactions for which the C4 country code has not yet been
+   * determined (i.e. {@code c4_country_code IS NULL}). Only includes transactions in status
+   * {@code FORWARDED} where reporting is still {@code PENDING}.
+   *
+   * @return The list of transactions without a C4 country code. Never <code>null</code>.
+   * @since v0.1.3
+   */
+  @NonNull
+  ICommonsList <IInboundTransaction> getAllWithoutC4CountryCode ();
 }

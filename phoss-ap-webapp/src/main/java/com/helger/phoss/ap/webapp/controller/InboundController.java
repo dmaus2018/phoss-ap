@@ -126,4 +126,44 @@ public class InboundController
     final ICommonsList <InboundTransactionResponse> aResult = aTxs.getAllMapped (InboundTransactionResponse::fromDomain);
     return ResponseEntity.ok (aResult);
   }
+
+  /**
+   * Get all forwarded inbound transactions that are still missing a C4 country code.
+   *
+   * @return A list of inbound transactions without C4 country code.
+   * @since v0.1.3
+   */
+  @GetMapping ("/missing-c4-country-code")
+  public ResponseEntity <List <InboundTransactionResponse>> getMissingC4CountryCode ()
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final var aTxs = aTxMgr.getAllWithoutC4CountryCode ();
+
+    final ICommonsList <InboundTransactionResponse> aResult = aTxs.getAllMapped (InboundTransactionResponse::fromDomain);
+    return ResponseEntity.ok (aResult);
+  }
+
+  /**
+   * Check if a specific inbound transaction is still missing a C4 country code.
+   *
+   * @param sbdhInstanceID
+   *        The SBDH Instance ID to check.
+   * @return 200 with the transaction details if the C4 country code is still missing, 204 if the
+   *         transaction exists but the C4 country code is already set, or 404 if the transaction
+   *         does not exist.
+   * @since v0.1.3
+   */
+  @GetMapping ("/missing-c4-country-code/{sbdhInstanceID}")
+  public ResponseEntity <InboundTransactionResponse> getMissingC4CountryCodeForTransaction (@PathVariable final String sbdhInstanceID)
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final IInboundTransaction aTx = aTxMgr.getBySbdhInstanceID (sbdhInstanceID);
+    if (aTx == null)
+      return ResponseEntity.notFound ().build ();
+
+    if (StringHelper.isNotEmpty (aTx.getC4CountryCode ()))
+      return ResponseEntity.noContent ().build ();
+
+    return ResponseEntity.ok (InboundTransactionResponse.fromDomain (aTx));
+  }
 }

@@ -63,6 +63,9 @@ public final class APConfigurationProperties
   // Forwarding
   public static final String FORWARDING_MODE = "forwarding.mode";
 
+  // Forwarding - C4 country code determination
+  public static final String FORWARDING_C4_COUNTRYCODE_MODES = "forwarding.c4countrycode.modes";
+
   // Forwarding - HTTP
   public static final String FORWARDING_HTTP_MODE = "forwarding.http.mode";
   public static final String FORWARDING_HTTP_ENDPOINT = "forwarding.http.endpoint";

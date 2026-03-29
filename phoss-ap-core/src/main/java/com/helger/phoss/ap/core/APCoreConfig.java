@@ -22,11 +22,15 @@ import org.jspecify.annotations.Nullable;
 import com.helger.annotation.CheckForSigned;
 import com.helger.annotation.Nonnegative;
 import com.helger.annotation.concurrent.Immutable;
+import com.helger.base.string.StringHelper;
+import com.helger.collection.commons.CommonsLinkedHashSet;
+import com.helger.collection.commons.ICommonsOrderedSet;
 import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.peppol.sbdh.EPeppolMLSType;
 import com.helger.peppol.servicedomain.EPeppolNetwork;
 import com.helger.phoss.ap.api.CPhossAP;
 import com.helger.phoss.ap.api.codelist.EAS4DumpMode;
+import com.helger.phoss.ap.api.codelist.EC4CountryCodeMode;
 import com.helger.phoss.ap.api.codelist.EDuplicateDetectionMode;
 import com.helger.phoss.ap.api.codelist.EReceiverCheckMode;
 import com.helger.phoss.ap.api.config.APConfigProvider;
@@ -152,6 +156,29 @@ public final class APCoreConfig
   {
     return _getConfig ().getAsBoolean (APConfigurationProperties.PEPPOL_RECEIVING_ENABLED,
                                        APConfigurationProperties.PEPPOL_RECEIVING_ENABLED_DEFAULT);
+  }
+
+  /**
+   * @return The configured C4 country code determination modes as an ordered list. May be empty if
+   *         no automatic determination is configured (only async API reporting). Never
+   *         <code>null</code>.
+   * @since v0.1.3
+   */
+  @NonNull
+  public static ICommonsOrderedSet <EC4CountryCodeMode> getC4CountryCodeModes ()
+  {
+    final String sVal = _getConfig ().getAsString (APConfigurationProperties.FORWARDING_C4_COUNTRYCODE_MODES);
+    final ICommonsOrderedSet <EC4CountryCodeMode> ret = new CommonsLinkedHashSet <> ();
+    if (StringHelper.isNotEmpty (sVal))
+    {
+      for (final String sPart : StringHelper.getExploded (',', sVal))
+      {
+        final EC4CountryCodeMode eMode = EC4CountryCodeMode.getFromIDOrNull (sPart.trim ());
+        if (eMode != null)
+          ret.add (eMode);
+      }
+    }
+    return ret;
   }
 
   /**

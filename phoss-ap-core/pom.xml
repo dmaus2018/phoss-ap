@@ -66,6 +66,11 @@
       <version>${peppol-ap-support.version}</version>
     </dependency>
     <dependency>
+      <groupId>com.helger.peppol</groupId>
+      <artifactId>peppol-ap-support</artifactId>
+      <version>${peppol-ap-support.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.helger.phoss.ap</groupId>
       <artifactId>phoss-ap-api</artifactId>
     </dependency>
