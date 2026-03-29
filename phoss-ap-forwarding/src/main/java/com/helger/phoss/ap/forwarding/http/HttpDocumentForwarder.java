@@ -100,7 +100,7 @@ public class HttpDocumentForwarder implements IDocumentForwarder
   {
     final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
 
-    try (final HttpClientManager aHttpClientMgr = new HttpClientManager ())
+    try (final HttpClientManager aHttpClientMgr = HttpClientManager.create (m_aHCS))
     {
       final HttpPost aPost = new HttpPost (m_sEndpointURL);
       aPost.setEntity (new InputStreamEntity (aDocPayloadMgr.openDocumentStreamForRead (aTransaction.getDocumentPath ()),
