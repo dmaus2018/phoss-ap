@@ -27,6 +27,7 @@ import com.helger.annotation.concurrent.ThreadSafe;
 import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.string.StringHelper;
 import com.helger.base.system.SystemProperties;
+import com.helger.ddd.DDDVersion;
 import com.helger.json.IJsonObject;
 import com.helger.json.JsonObject;
 import com.helger.peppol.commons.CPeppolCommonsVersion;
@@ -82,6 +83,8 @@ public final class APStatusProvider
     // Library versions
     aStatusData.add ("version.peppol-commons", CPeppolCommonsVersion.BUILD_VERSION);
     aStatusData.add ("version.phase4", CAS4Version.BUILD_VERSION);
+    // Since 0.1.4
+    aStatusData.add ("version.ddd", DDDVersion.getVersionNumber ());
 
     // Peppol
     // Stage is checked for non-null on startup
