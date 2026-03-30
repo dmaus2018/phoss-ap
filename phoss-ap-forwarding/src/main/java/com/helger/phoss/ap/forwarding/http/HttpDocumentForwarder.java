@@ -56,6 +56,7 @@ import com.helger.phoss.ap.basic.APBasicMetaManager;
 public class HttpDocumentForwarder implements IDocumentForwarder
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (HttpDocumentForwarder.class);
+  private static final int MAX_CUSTOM_HEADERS = 100;
 
   private final EForwardingMode m_eMode;
   private String m_sEndpointURL;
@@ -102,9 +103,16 @@ public class HttpDocumentForwarder implements IDocumentForwarder
       final String sName = aConfig.getAsString (sHeaderPrefix + nIndex + ".name");
       if (StringHelper.isEmpty (sName))
         break;
+
       final String sValue = aConfig.getAsString (sHeaderPrefix + nIndex + ".value");
       m_aCustomHeaders.put (sName, sValue != null ? sValue : "");
       LOGGER.info ("Configured custom forwarding HTTP header '" + sName + "'");
+
+      if (nIndex >= MAX_CUSTOM_HEADERS)
+      {
+        LOGGER.warn ("A maximum of " + MAX_CUSTOM_HEADERS + " custom headers is allowed. Skipping all additional ones.");
+        break;
+      }
     }
 
     return ESuccess.SUCCESS;
