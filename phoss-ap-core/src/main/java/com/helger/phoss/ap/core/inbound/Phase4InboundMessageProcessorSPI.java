@@ -57,6 +57,7 @@ import com.helger.phoss.ap.api.codelist.EDuplicateDetectionMode;
 import com.helger.phoss.ap.api.codelist.EInboundStatus;
 import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
+import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.MlsOutcome;
 import com.helger.phoss.ap.api.model.MlsOutcomeIssue;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
@@ -285,7 +286,7 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
                                                bIsDuplicateSBDH,
                                                sValidMlsTo,
                                                APCoreConfig.getMlsType ());
-      final var aInboundTx = aInboundMgr.getByID (sTxID);
+      final IInboundTransaction aInboundTx = aInboundMgr.getByID (sTxID);
       if (aInboundTx == null)
         throw new IllegalStateException ("Failed to store incoming transaction");
 
