@@ -372,6 +372,8 @@ public class Phase4InboundMessageProcessorSPI implements IPhase4PeppolIncomingSB
       // Forward - Business Document and MLS
       if (InboundOrchestrator.forwardDocument (sLogPrefix, aInboundTx).isFailure ())
       {
+        // Forwarding failed
+
         for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
           aHandler.onInboundForwardingError (sTxID, false);
       }
