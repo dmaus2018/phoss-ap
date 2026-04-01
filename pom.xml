@@ -60,6 +60,7 @@
     <jackson.version>3.1.0</jackson.version>
     <jaxb-impl.version>4.0.7</jaxb-impl.version>
     <log4j.version>2.25.3</log4j.version>
+    <mysql.version>9.6.0</mysql.version>
     <postgres.version>42.7.10</postgres.version>
     <sentry.version>8.37.1</sentry.version>
     <spring-boot.version>4.0.5</spring-boot.version>
@@ -223,9 +224,19 @@
         <version>${flyway.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.flywaydb</groupId>
+        <artifactId>flyway-mysql</artifactId>
+        <version>${flyway.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
         <version>${postgres.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.mysql</groupId>
+        <artifactId>mysql-connector-j</artifactId>
+        <version>${mysql.version}</version>
       </dependency>
       <dependency>
         <groupId>dev.failsafe</groupId>

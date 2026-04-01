@@ -51,7 +51,8 @@ import com.helger.scope.singleton.AbstractGlobalSingleton;
 public final class APJdbcMetaManager extends AbstractGlobalSingleton
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (APJdbcMetaManager.class);
-  private static final EnumSet <EDatabaseSystemType> ALLOWED_DB_TYPES = EnumSet.of (EDatabaseSystemType.POSTGRESQL);
+  private static final EnumSet <EDatabaseSystemType> ALLOWED_DB_TYPES = EnumSet.of (EDatabaseSystemType.POSTGRESQL,
+                                                                                    EDatabaseSystemType.MYSQL);
 
   private APJdbcConfiguration m_aJdbcConfig;
   private APDataSourceProvider m_aDSP;
