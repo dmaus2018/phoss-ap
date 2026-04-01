@@ -26,6 +26,8 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonempty;
 import com.helger.annotation.misc.DevelopersNote;
@@ -47,6 +49,7 @@ import com.helger.phoss.ap.basic.APBasicConfig;
  */
 public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
 {
+  private static final Logger LOGGER = LoggerFactory.getLogger (DocumentPayloadManagerFileSystem.class);
   private static final int MAX_UNIQUENESS_TRIES = 1_000;
 
   /**
@@ -133,6 +136,9 @@ public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
     {
       Files.createDirectories (aEffectiveBaseDir.toPath ());
       final Path aFilePath = aEffectiveBaseDir.toPath ().resolve (sFilename);
+
+      LOGGER.info ("Storing document with " + aBytes.length + " bytes to '" + aFilePath.toString () + "'");
+
       Files.write (aFilePath, aBytes);
       return aFilePath.toAbsolutePath ().toString ();
     }
@@ -217,6 +223,8 @@ public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
 
       // Get the absolute path
       final File aFilePath = _ensureUniqueFile (aEffectiveBaseDir, sFilename, sFileExt);
+
+      LOGGER.info ("Storing document to '" + aFilePath.toString () + "'");
 
       aPathConsumer.accept (aFilePath.getAbsolutePath ());
       return FileHelper.getBufferedOutputStream (aFilePath);
@@ -342,7 +350,12 @@ public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
 
     try
     {
-      return Files.deleteIfExists (Path.of (sAbsolutePath));
+      final Path aPath = Path.of (sAbsolutePath);
+      if (!Files.deleteIfExists (aPath))
+        return false;
+
+      LOGGER.info ("Deleted document at '" + aPath + "'");
+      return true;
     }
     catch (final Exception ex)
     {
