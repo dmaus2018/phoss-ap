@@ -60,12 +60,13 @@ public final class InboundOrchestrator
    *
    * @param sLogPrefix
    *        Log message prefix for traceability. May not be <code>null</code>.
-   * @param aTx
+   * @param aInboundTx
    *        The inbound transaction to forward. May not be <code>null</code>.
    * @return {@link ESuccess#SUCCESS} if forwarding succeeded, {@link ESuccess#FAILURE} otherwise.
    */
   @NonNull
-  public static ESuccess forwardDocument (@NonNull final String sLogPrefix, @NonNull final IInboundTransaction aTx)
+  public static ESuccess forwardDocument (@NonNull final String sLogPrefix,
+                                          @NonNull final IInboundTransaction aInboundTx)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final IInboundForwardingAttemptManager aAttemptMgr = APJdbcMetaManager.getInboundForwardingAttemptMgr ();
@@ -77,18 +78,18 @@ public final class InboundOrchestrator
       if (aForwarder == null)
       {
         LOGGER.error (sLogPrefix + "Internal error - No document forwarder configured");
-        aTxMgr.updateStatus (aTx.getID (), EInboundStatus.PERMANENTLY_FAILED);
+        aTxMgr.updateStatus (aInboundTx.getID (), EInboundStatus.PERMANENTLY_FAILED);
         return ESuccess.FAILURE;
       }
 
       // Set status
-      aTxMgr.updateStatus (aTx.getID (), EInboundStatus.FORWARDING);
+      aTxMgr.updateStatus (aInboundTx.getID (), EInboundStatus.FORWARDING);
 
       // Actual forwarding
       ForwardingResult aResult;
       try
       {
-        aResult = aForwarder.forwardDocument (aTx);
+        aResult = aForwarder.forwardDocument (aInboundTx);
       }
       catch (final Exception ex)
       {
@@ -101,34 +102,40 @@ public final class InboundOrchestrator
                                                                  ")");
 
         for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        {
           aHandler.onUnexpectedException ("InboundOrchestrator.forwardDocument",
-                                          "Internal error forwarding document for transaction '" + aTx.getID () + "'",
+                                          "Internal error forwarding document for transaction '" +
+                                                                                 aInboundTx.getID () +
+                                                                                 "'",
                                           ex);
+        }
       }
 
       if (aResult.isSuccess ())
       {
         // Forwarding worked
         CircuitBreakerManager.recordSuccess (sCircuitBreakerID);
-        aAttemptMgr.createSuccess (aTx.getID ());
+        aAttemptMgr.createSuccess (aInboundTx.getID ());
 
-        aTxMgr.updateStatusCompleted (aTx.getID (), EInboundStatus.FORWARDED);
-        LOGGER.info (sLogPrefix + "Forwarding successful for transaction '" + aTx.getID () + "'");
+        aTxMgr.updateStatusCompleted (aInboundTx.getID (), EInboundStatus.FORWARDED);
+        LOGGER.info (sLogPrefix + "Forwarding successful for transaction '" + aInboundTx.getID () + "'");
 
         // Determine C4 country code: either from sync response or via configured resolution modes
         String sC4CountryCode = aResult.getCountryCodeC4 ();
         if (sC4CountryCode == null)
-          sC4CountryCode = C4CountryCodeResolver.resolve (aTx);
+          sC4CountryCode = C4CountryCodeResolver.resolve (aInboundTx);
 
         if (sC4CountryCode != null)
         {
           // We can store the reporting item immediately
-          aTxMgr.updateC4CountryCode (aTx.getID (), sC4CountryCode);
-          if (APPeppolReportingHelper.createInboundPeppolReportingItem (aTx.getID ()).isFailure ())
+          aTxMgr.updateC4CountryCode (aInboundTx.getID (), sC4CountryCode);
+          if (APPeppolReportingHelper.createInboundPeppolReportingItem (aInboundTx.getID ()).isFailure ())
+          {
             LOGGER.error (sLogPrefix +
                           "Forwarding successful, but failed to store Peppol Reporting entry for '" +
-                          aTx.getID () +
+                          aInboundTx.getID () +
                           "'");
+          }
         }
 
         return ESuccess.SUCCESS;
@@ -136,9 +143,9 @@ public final class InboundOrchestrator
 
       // Forwarding failed
       CircuitBreakerManager.recordFailure (sCircuitBreakerID);
-      aAttemptMgr.createFailure (aTx.getID (), aResult.getErrorCode (), aResult.getErrorDetails ());
+      aAttemptMgr.createFailure (aInboundTx.getID (), aResult.getErrorCode (), aResult.getErrorDetails ());
 
-      final int nNewAttemptCount = aTx.getAttemptCount () + 1;
+      final int nNewAttemptCount = aInboundTx.getAttemptCount () + 1;
       final int nMaxRetryAttempts = APCoreConfig.getRetryForwardingMaxAttempts ();
       if (!aResult.isRetryAllowed () || nNewAttemptCount >= nMaxRetryAttempts)
       {
@@ -150,29 +157,31 @@ public final class InboundOrchestrator
                                                                   aResult.getErrorDetails ()
                                                                 : "Retry disallowed by receiver: " +
                                                                   aResult.getErrorDetails ();
-        aTxMgr.updateStatusAndRetry (aTx.getID (),
+        aTxMgr.updateStatusAndRetry (aInboundTx.getID (),
                                      EInboundStatus.PERMANENTLY_FAILED,
                                      nNewAttemptCount,
                                      null,
                                      sFailureReason);
 
         // Don't send MLS as response to MLS
-        if (!CPhossAP.isMLS (aTx.getDocTypeID (), aTx.getProcessID ()))
+        if (!CPhossAP.isMLS (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()))
         {
           // Send asynchronously
           PhotonWorkerPool.getInstance ().run ("send-mls", () -> {
             // Send negative MLS (RE) with FD reason back to C2
             final MlsOutcome aOutcome = MlsOutcome.rejection ("Forwarding to C4 failed",
                                                               MlsOutcomeIssue.failureOfDelivery ("Permanent inability to forward document to C4"));
-            MlsHandler.triggerSendingInboundResultMls (aTx, aOutcome);
+            MlsHandler.triggerSendingInboundResultMls (aInboundTx, aOutcome);
           });
         }
 
         for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
-          aHandler.onInboundPermanentForwardingFailure (aTx.getID (),
-                                                        aTx.getSbdhInstanceID (),
+        {
+          aHandler.onInboundPermanentForwardingFailure (aInboundTx.getID (),
+                                                        aInboundTx.getSbdhInstanceID (),
                                                         aResult.isRetryAllowed () ? "Max retries exhausted"
                                                                                   : "Retry disallowed by receiver");
+        }
       }
       else
       {
@@ -181,7 +190,7 @@ public final class InboundOrchestrator
                                                                      APCoreConfig.getRetryForwardingInitialBackoffMs (),
                                                                      APCoreConfig.getRetryForwardingBackoffMultiplier (),
                                                                      APCoreConfig.getRetryForwardingMaxBackoffMs ());
-        aTxMgr.updateStatusAndRetry (aTx.getID (),
+        aTxMgr.updateStatusAndRetry (aInboundTx.getID (),
                                      EInboundStatus.FORWARD_FAILED,
                                      nNewAttemptCount,
                                      aNextRetry,
