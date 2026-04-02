@@ -40,7 +40,7 @@ mvn clean verify
 
 ## Quick Start
 
-1. Set up a PostgreSQL database (see `docker-compose.yml` for an example)
+1. Set up a PostgreSQL or MySQL database (see `docker-compose.yml` for an example)
 2. Copy `phoss-ap-webapp/src/main/resources/application.properties` and adjust for your environment
 3. Run the application:
 
@@ -58,7 +58,7 @@ See the [Running phoss AP](https://github.com/phax/phoss-ap/wiki/Running-phoss-A
 
 ## Infrastructure
 
-As the backend system a PostgreSQL DB is required.
+As the backend system a PostgreSQL or MySQL DB is required.
 The system can be deployed both locally as well as in a Cloud environment.
 Docker images are available publicly.
 
