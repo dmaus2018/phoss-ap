@@ -399,6 +399,7 @@ public final class APCoreConfig
   /**
    * @return The optional custom S3 endpoint URL for the outbound sender bucket. May be
    *         <code>null</code> for standard AWS S3.
+   * @since 0.2.2
    */
   @Nullable
   public static String getOutboundS3Endpoint ()
@@ -409,6 +410,7 @@ public final class APCoreConfig
   /**
    * @return <code>true</code> if S3 path-style access should be used for the outbound sender
    *         bucket.
+   * @since 0.2.2
    */
   public static boolean isOutboundS3PathStyleAccess ()
   {

@@ -129,8 +129,9 @@ public final class APBasicConfig
   }
 
   /**
-   * @return The optional custom S3 endpoint URL for S3-compatible providers (e.g. MinIO,
-   *         Garage). May be <code>null</code> for standard AWS S3.
+   * @return The optional custom S3 endpoint URL for S3-compatible providers (e.g. MinIO, Garage).
+   *         May be <code>null</code> for standard AWS S3.
+   * @since 0.2.2
    */
   @Nullable
   public static String getStorageS3Endpoint ()
@@ -141,6 +142,7 @@ public final class APBasicConfig
   /**
    * @return <code>true</code> if S3 path-style access should be used instead of virtual-hosted
    *         style. Required by most S3-compatible providers.
+   * @since 0.2.2
    */
   public static boolean isStorageS3PathStyleAccess ()
   {

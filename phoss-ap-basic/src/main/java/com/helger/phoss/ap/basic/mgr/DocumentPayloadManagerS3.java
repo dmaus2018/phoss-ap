@@ -155,7 +155,11 @@ public class DocumentPayloadManagerS3 implements IDocumentPayloadManager
     }
 
     m_aS3Client = aBuilder.build ();
-    LOGGER.info ("S3 DocumentPayloadManager initialized with region '" + sRegion + "' and bucket '" + m_sBucket + "'" +
+    LOGGER.info ("S3 DocumentPayloadManager initialized with region '" +
+                 sRegion +
+                 "' and bucket '" +
+                 m_sBucket +
+                 "'" +
                  (sEndpoint != null ? " (endpoint: " + sEndpoint + ")" : ""));
   }
 
