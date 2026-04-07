@@ -21,7 +21,6 @@ import org.jspecify.annotations.NonNull;
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.db.api.config.JdbcConfigurationConfig;
-import com.helger.phoss.ap.api.config.APConfigurationProperties;
 
 /**
  * phoss AP JDBC configuration with lazy initialization.
@@ -36,8 +35,6 @@ public class APJdbcConfiguration extends JdbcConfigurationConfig
    */
   public static final String CONFIG_PREFIX = "phossap.jdbc.";
 
-  private final IConfigWithFallback m_aConfig;
-
   /**
    * Constructor
    *
@@ -47,41 +44,5 @@ public class APJdbcConfiguration extends JdbcConfigurationConfig
   public APJdbcConfiguration (@NonNull final IConfigWithFallback aConfig)
   {
     super (aConfig, CONFIG_PREFIX);
-    m_aConfig = aConfig;
-  }
-
-  /** @return the maximum number of pooling connections */
-  public int getJdbcPoolingMaxConnections ()
-  {
-    return m_aConfig.getAsInt (CONFIG_PREFIX + APConfigurationProperties.JDBC_POOLING_MAX_CONNECTIONS,
-                               APConfigurationProperties.JDBC_POOLING_MAX_CONNECTIONS_DEFAULT);
-  }
-
-  /** @return the maximum wait time in milliseconds for a pooled connection */
-  public long getJdbcPoolingMaxWaitMillis ()
-  {
-    return m_aConfig.getAsLong (CONFIG_PREFIX + APConfigurationProperties.JDBC_POOLING_MAX_WAIT_MILLIS,
-                                APConfigurationProperties.JDBC_POOLING_MAX_WAIT_MILLIS_DEFAULT);
-  }
-
-  /** @return the time in milliseconds between eviction runs */
-  public long getJdbcPoolingBetweenEvictionRunsMillis ()
-  {
-    return m_aConfig.getAsLong (CONFIG_PREFIX + APConfigurationProperties.JDBC_POOLING_BETWEEN_EVICTIONS_RUNS_MILLIS,
-                                APConfigurationProperties.JDBC_POOLING_BETWEEN_EVICTIONS_RUNS_MILLIS_DEFAULT);
-  }
-
-  /** @return the minimum idle time in milliseconds before a connection is eligible for eviction */
-  public long getJdbcPoolingMinEvictableIdleMillis ()
-  {
-    return m_aConfig.getAsLong (CONFIG_PREFIX + APConfigurationProperties.JDBC_POOLING_MIN_EVICTABLE_IDLE_MILLIS,
-                                APConfigurationProperties.JDBC_POOLING_MIN_EVICTABLE_IDLE_MILLIS_DEFAULT);
-  }
-
-  /** @return the timeout in milliseconds for removing abandoned connections */
-  public long getJdbcPoolingRemoveAbandonedTimeoutMillis ()
-  {
-    return m_aConfig.getAsLong (CONFIG_PREFIX + APConfigurationProperties.JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS,
-                                APConfigurationProperties.JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS_DEFAULT);
   }
 }

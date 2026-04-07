@@ -26,8 +26,8 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.db.api.config.IJdbcConfiguration;
 import com.helger.db.jdbc.IHasDataSource;
-import com.helger.phoss.ap.db.config.APJdbcConfiguration;
 
 final class APDataSourceProvider implements IHasDataSource, Closeable
 {
@@ -41,7 +41,7 @@ final class APDataSourceProvider implements IHasDataSource, Closeable
    * @param aJdbcConfig
    *        The JDBC configuration to use. May not be <code>null</code>.
    */
-  public APDataSourceProvider (@NonNull final APJdbcConfiguration aJdbcConfig)
+  public APDataSourceProvider (@NonNull final IJdbcConfiguration aJdbcConfig)
   {
     m_aDS = new BasicDataSource ();
     m_aDS.setDriverClassName (aJdbcConfig.getJdbcDriver ());
@@ -64,9 +64,13 @@ final class APDataSourceProvider implements IHasDataSource, Closeable
       m_aDS.setDurationBetweenEvictionRuns (Duration.ofMillis (nBetweenEvictionRunsMillis));
       m_aDS.setTestWhileIdle (true);
     }
-    m_aDS.setMinEvictableIdle (Duration.ofMillis (aJdbcConfig.getJdbcPoolingMinEvictableIdleMillis ()));
-    m_aDS.setRemoveAbandonedOnBorrow (true);
-    m_aDS.setRemoveAbandonedTimeout (Duration.ofMillis (aJdbcConfig.getJdbcPoolingRemoveAbandonedTimeoutMillis ()));
+    if (aJdbcConfig.getJdbcPoolingMinEvictableIdleMillis () > 0)
+      m_aDS.setMinEvictableIdle (Duration.ofMillis (aJdbcConfig.getJdbcPoolingMinEvictableIdleMillis ()));
+    if (aJdbcConfig.getJdbcPoolingRemoveAbandonedTimeoutMillis () > 0)
+    {
+      m_aDS.setRemoveAbandonedOnBorrow (true);
+      m_aDS.setRemoveAbandonedTimeout (Duration.ofMillis (aJdbcConfig.getJdbcPoolingRemoveAbandonedTimeoutMillis ()));
+    }
 
     LOGGER.info ("AP DataSource created with max " + nMaxConnections + " connections to " + aJdbcConfig.getJdbcUrl ());
   }
