@@ -30,6 +30,7 @@ import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.db.api.EDatabaseSystemType;
 import com.helger.db.api.flyway.FlywayConfiguration;
 import com.helger.db.api.helper.DBSystemHelper;
+import com.helger.db.jdbc.DataSourceProviderFromJdbcConfiguration;
 import com.helger.phoss.ap.api.IArchivalManager;
 import com.helger.phoss.ap.api.IInboundForwardingAttemptManager;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
@@ -56,7 +57,7 @@ public final class APJdbcMetaManager extends AbstractGlobalSingleton
                                                                                     EDatabaseSystemType.H2);
 
   private APJdbcConfiguration m_aJdbcConfig;
-  private APDataSourceProvider m_aDSP;
+  private DataSourceProviderFromJdbcConfiguration m_aDSP;
   private OutboundTransactionManagerJdbc m_aOutboundTxMgr;
   private OutboundSendingAttemptManagerJdbc m_aOutboundAttemptMgr;
   private InboundTransactionManagerJdbc m_aInboundTxMgr;
@@ -108,7 +109,7 @@ public final class APJdbcMetaManager extends AbstractGlobalSingleton
       APFlywayMigrator.runFlyway (m_aJdbcConfig, aFlywayConfig);
 
       // Create DataSource and DBExecutor
-      m_aDSP = new APDataSourceProvider (m_aJdbcConfig);
+      m_aDSP = new DataSourceProviderFromJdbcConfiguration (m_aJdbcConfig);
       APDBExecutor.setDataSourceProvider (m_aDSP);
 
       // Create managers

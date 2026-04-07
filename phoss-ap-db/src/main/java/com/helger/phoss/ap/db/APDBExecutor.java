@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.base.enforce.ValueEnforcer;
+import com.helger.db.jdbc.DataSourceProviderFromJdbcConfiguration;
 import com.helger.db.jdbc.executor.DBExecutor;
 
 /**
@@ -34,12 +35,12 @@ final class APDBExecutor extends DBExecutor
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (APDBExecutor.class);
 
-  private static APDataSourceProvider s_aDSP;
+  private static DataSourceProviderFromJdbcConfiguration s_aDSP;
 
   @NonNull
-  private static APDataSourceProvider _getDSPNotNull ()
+  private static DataSourceProviderFromJdbcConfiguration _getDSPNotNull ()
   {
-    final APDataSourceProvider ret = s_aDSP;
+    final DataSourceProviderFromJdbcConfiguration ret = s_aDSP;
     if (ret == null)
       throw new IllegalStateException ("The DataSourceProvider was never initialized");
     return ret;
@@ -53,7 +54,7 @@ final class APDBExecutor extends DBExecutor
    * @throws IllegalStateException
    *         if a data source provider was already set
    */
-  public static void setDataSourceProvider (@NonNull final APDataSourceProvider aDSP)
+  public static void setDataSourceProvider (@NonNull final DataSourceProviderFromJdbcConfiguration aDSP)
   {
     ValueEnforcer.notNull (aDSP, "DataSourceProvider");
     if (s_aDSP != null)
