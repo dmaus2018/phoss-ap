@@ -216,12 +216,13 @@ public final class OutboundOrchestrator
       for (final IOutboundDocumentVerifierSPI aVerifier : APCoreMetaManager.getAllOutboundVerifiers ())
         if (aVerifier.verifyOutboundDocument (sDocumentPath, aDocTypeID, aProcessID).isFailure ())
         {
-          LOGGER.warn (sLogPrefix + "Outbound document verification failed for SBDH '" + sSbdhInstanceID + "'");
+          LOGGER.warn (sLogPrefix + "Outbound document verification failed for SBDH ID‚ '" + sSbdhInstanceID + "'");
           return null;
         }
     }
 
     // Create in pending state
+    final String sMlsInboundTransactionID = null;
     final String sTransactionID = aOutboundMgr.create (ETransactionType.BUSINESS_DOCUMENT,
                                                        aSenderID.getURIEncoded (),
                                                        aReceiverID.getURIEncoded (),
@@ -235,7 +236,7 @@ public final class OutboundOrchestrator
                                                        sC1CountryCode,
                                                        aCreationDT,
                                                        sMlsTo,
-                                                       (String) null,
+                                                       sMlsInboundTransactionID,
                                                        sSbdhStandard,
                                                        sSbdhTypeVersion,
                                                        sSbdhType,
@@ -613,6 +614,16 @@ public final class OutboundOrchestrator
                 aBuilder.sbdhTypeVersion (aTx.getSbdhTypeVersion ());
               if (StringHelper.isNotEmpty (aTx.getSbdhType ()))
                 aBuilder.sbdhType (aTx.getSbdhType ());
+
+              // MLS params
+              if (StringHelper.isNotEmpty (aTx.getMlsTo ()))
+              {
+                IParticipantIdentifier aMlsTo = aIF.parseParticipantIdentifier (aTx.getMlsTo ());
+                if (aMlsTo == null)
+                  aMlsTo = aIF.createParticipantIdentifierWithDefaultScheme (aTx.getMlsTo ());
+                aBuilder.mlsTo (aMlsTo);
+              }
+              aBuilder.mlsType (APCoreConfig.getMlsType ());
 
               // Set the main payload
               final String sPayloadMimeType = aTx.getPayloadMimeType ();

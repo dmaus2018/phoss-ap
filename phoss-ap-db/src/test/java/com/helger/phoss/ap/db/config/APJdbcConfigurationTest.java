@@ -27,7 +27,6 @@ import org.junit.Test;
 import com.helger.db.api.EDatabaseSystemType;
 import com.helger.db.api.config.JdbcConfiguration;
 import com.helger.phoss.ap.api.config.APConfigProvider;
-import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.scope.mock.ScopeTestRule;
 
 /**
@@ -45,13 +44,14 @@ public final class APJdbcConfigurationTest
   {
     final APJdbcConfiguration aJdbcConfig = new APJdbcConfiguration (APConfigProvider.getConfig ());
 
-    // Values from test application.properties
-    assertSame (EDatabaseSystemType.POSTGRESQL, aJdbcConfig.getJdbcDatabaseSystemType ());
-    assertEquals ("org.postgresql.Driver", aJdbcConfig.getJdbcDriver ());
-    assertEquals ("jdbc:postgresql://localhost:5432/phoss-ap", aJdbcConfig.getJdbcUrl ());
-    assertEquals ("peppol", aJdbcConfig.getJdbcUser ());
-    assertEquals ("peppol", aJdbcConfig.getJdbcPassword ());
-    assertEquals ("ap-test", aJdbcConfig.getJdbcSchema ());
+    // Values from test application.properties (in-memory H2)
+    assertSame (EDatabaseSystemType.H2, aJdbcConfig.getJdbcDatabaseSystemType ());
+    assertEquals ("org.h2.Driver", aJdbcConfig.getJdbcDriver ());
+    assertEquals ("jdbc:h2:mem:phoss_ap_test;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
+                  aJdbcConfig.getJdbcUrl ());
+    assertEquals ("sa", aJdbcConfig.getJdbcUser ());
+    assertEquals ("", aJdbcConfig.getJdbcPassword ());
+    assertEquals ("ap_test", aJdbcConfig.getJdbcSchema ());
 
     // Boolean / numeric properties return their defined defaults (not set in
     // test properties)
@@ -64,25 +64,25 @@ public final class APJdbcConfigurationTest
     assertFalse (aJdbcConfig.isJdbcDebugSQL ());
 
     // Pooling defaults
-    assertEquals (APConfigurationProperties.JDBC_POOLING_MAX_CONNECTIONS_DEFAULT,
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_MAX_CONNECTIONS,
                   aJdbcConfig.getJdbcPoolingMaxConnections ());
-    assertEquals (APConfigurationProperties.JDBC_POOLING_MAX_WAIT_MILLIS_DEFAULT,
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_MAX_WAIT_MILLIS,
                   aJdbcConfig.getJdbcPoolingMaxWaitMillis ());
-    assertEquals (APConfigurationProperties.JDBC_POOLING_BETWEEN_EVICTIONS_RUNS_MILLIS_DEFAULT,
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_BETWEEN_EVICTION_RUNS_MILLIS,
                   aJdbcConfig.getJdbcPoolingBetweenEvictionRunsMillis ());
-    assertEquals (APConfigurationProperties.JDBC_POOLING_MIN_EVICTABLE_IDLE_MILLIS_DEFAULT,
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_MIN_EVICTABLE_IDLE_MILLIS,
                   aJdbcConfig.getJdbcPoolingMinEvictableIdleMillis ());
-    assertEquals (APConfigurationProperties.JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS_DEFAULT,
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS,
                   aJdbcConfig.getJdbcPoolingRemoveAbandonedTimeoutMillis ());
   }
 
   @Test
   public void testDefaultConstantsValues ()
   {
-    assertEquals (8, APConfigurationProperties.JDBC_POOLING_MAX_CONNECTIONS_DEFAULT);
-    assertEquals (10_000L, APConfigurationProperties.JDBC_POOLING_MAX_WAIT_MILLIS_DEFAULT);
-    assertEquals (300_000L, APConfigurationProperties.JDBC_POOLING_BETWEEN_EVICTIONS_RUNS_MILLIS_DEFAULT);
-    assertEquals (1_800_000L, APConfigurationProperties.JDBC_POOLING_MIN_EVICTABLE_IDLE_MILLIS_DEFAULT);
-    assertEquals (300_000L, APConfigurationProperties.JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS_DEFAULT);
+    assertEquals (8, JdbcConfiguration.DEFAULT_POOLING_MAX_CONNECTIONS);
+    assertEquals (10_000L, JdbcConfiguration.DEFAULT_POOLING_MAX_WAIT_MILLIS);
+    assertEquals (300_000L, JdbcConfiguration.DEFAULT_POOLING_BETWEEN_EVICTION_RUNS_MILLIS);
+    assertEquals (1_800_000L, JdbcConfiguration.DEFAULT_POOLING_MIN_EVICTABLE_IDLE_MILLIS);
+    assertEquals (300_000L, JdbcConfiguration.DEFAULT_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS);
   }
 }

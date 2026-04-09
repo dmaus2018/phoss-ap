@@ -105,13 +105,13 @@ public final class RetryScheduler
         LOGGER.info ("Retrying " + aTransactions.size () + " inbound forwarding transactions");
         final String sLogPrefix = "[RetryInbound] ";
 
-        for (final IInboundTransaction aTx : aTransactions)
+        for (final IInboundTransaction aInboundTx : aTransactions)
         {
           // Re-forward using the original InboundOrchestrator logic
-          if (InboundOrchestrator.forwardDocument (sLogPrefix, aTx).isFailure ())
+          if (InboundOrchestrator.forwardDocument (sLogPrefix, aInboundTx).isFailure ())
           {
             for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
-              aHandler.onInboundForwardingError (aTx.getID (), true);
+              aHandler.onInboundForwardingError (aInboundTx.getID (), true);
           }
         }
       }

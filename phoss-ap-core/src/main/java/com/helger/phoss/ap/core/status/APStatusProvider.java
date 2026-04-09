@@ -38,6 +38,7 @@ import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.core.APCoreConfig;
 import com.helger.phoss.ap.core.APCoreMetaManager;
 import com.helger.phoss.ap.core.servlet.APServletInit;
+import com.helger.phoss.ap.db.APJdbcMetaManager;
 
 /**
  * Provides the status data for the management status endpoint. The returned JSON object contains
@@ -85,6 +86,9 @@ public final class APStatusProvider
     aStatusData.add ("version.phase4", CAS4Version.BUILD_VERSION);
     // Since 0.2.0
     aStatusData.add ("version.ddd", DDDVersion.getVersionNumber ());
+
+    // Since 0.2.1
+    aStatusData.add ("database.type", APJdbcMetaManager.getJdbcConfig ().getJdbcDatabaseType ());
 
     // Peppol
     // Stage is checked for non-null on startup

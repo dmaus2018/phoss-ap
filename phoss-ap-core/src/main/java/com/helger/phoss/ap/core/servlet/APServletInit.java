@@ -74,6 +74,7 @@ import com.helger.security.certificate.TrustedCAChecker;
 import com.helger.security.revocation.CertificateRevocationCheckerDefaults;
 import com.helger.security.revocation.ERevocationCheckMode;
 import com.helger.servlet.ServletHelper;
+import com.helger.smpclient.config.SMPClientConfiguration;
 import com.helger.smpclient.peppol.CachingSMPClientReadOnly;
 import com.helger.smpclient.peppol.SMPClientReadOnly;
 import com.helger.smpclient.url.PeppolNaptrURLProvider;
@@ -159,6 +160,10 @@ public class APServletInit
 
   private static void _initAS4 ()
   {
+    // Explicitly set the configuration so that the Spring stuff gets propagated
+    AS4Configuration.setConfig (APConfigProvider.getConfig ());
+    SMPClientConfiguration.setConfig (APConfigProvider.getConfig ());
+
     // Enforce Peppol profile usage
     // This is the programmatic way to enforce exactly this one profile
     // In a multi-profile environment, that will not work

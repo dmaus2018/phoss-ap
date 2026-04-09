@@ -30,8 +30,8 @@ import com.helger.peppol.mls.PeppolMLSBuilder;
 import com.helger.peppol.mls.PeppolMLSMarshaller;
 import com.helger.peppol.sbdh.EPeppolMLSType;
 import com.helger.peppol.sbdh.PeppolSBDHData;
-import com.helger.peppolid.CIdentifier;
-import com.helger.peppolid.peppol.PeppolIdentifierHelper;
+import com.helger.peppolid.IParticipantIdentifier;
+import com.helger.peppolid.factory.IIdentifierFactory;
 import com.helger.peppolid.peppol.doctype.EPredefinedDocumentTypeIdentifier;
 import com.helger.peppolid.peppol.process.EPredefinedProcessIdentifier;
 import com.helger.peppolid.peppol.spis.SPIDHelper;
@@ -90,6 +90,7 @@ public final class MlsHandler
     }
 
     final IAPTimestampManager aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
+    final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
     final IInboundTransactionManager aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final IOutboundTransactionManager aOutboundMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
     final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
@@ -117,17 +118,44 @@ public final class MlsHandler
 
     // Create MLS data structure from MlsOutcome
     final String sSenderPIDValue = SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME + ":" + APCoreConfig.getPeppolOwnerSPID ();
+    final IParticipantIdentifier aMLSSenderPID = aIF.createParticipantIdentifierWithDefaultScheme (sSenderPIDValue);
+    if (aMLSSenderPID == null)
+    {
+      // Failed to build PID
+      LOGGER.error ("Failed to create MLS sender participant ID with value '" + sSenderPIDValue + "'");
+      return ESuccess.FAILURE;
+    }
+
     // If an MlsTo value is in the DB, it is previously checked and valid
-    final String sEffectiveMlsToPIDValue = StringHelper.isNotEmpty (aInboundTx.getMlsTo ()) ? aInboundTx.getMlsTo ()
-                                                                                            : SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME +
-                                                                                              ":" +
-                                                                                              aInboundTx.getC2SeatID ()
-                                                                                                        .substring (3);
+    final IParticipantIdentifier aMLSReceiverPID;
+    if (StringHelper.isNotEmpty (aInboundTx.getMlsTo ()))
+    {
+      // DB value contains meta-scheme, scheme and value
+      aMLSReceiverPID = aIF.parseParticipantIdentifier (aInboundTx.getMlsTo ());
+      if (aMLSReceiverPID == null)
+      {
+        // Failed to build PID
+        LOGGER.error ("Failed to parse MLS receiver participant ID '" + aInboundTx.getMlsTo () + "'");
+        return ESuccess.FAILURE;
+      }
+    }
+    else
+    {
+      final String sValue = SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME + ":" + aInboundTx.getC2SeatID ().substring (3);
+      aMLSReceiverPID = aIF.createParticipantIdentifierWithDefaultScheme (sValue);
+      if (aMLSReceiverPID == null)
+      {
+        // Failed to build PID
+        LOGGER.error ("Failed to create MLS receiver participant ID with value '" + sValue + "'");
+        return ESuccess.FAILURE;
+      }
+    }
+
     final PeppolMLSBuilder aBuilder = aOutcome.getAsMLSBuilder ();
     aBuilder.randomID ()
             .issueDateTimeNow ()
-            .senderParticipantID (sSenderPIDValue)
-            .receiverParticipantID (sEffectiveMlsToPIDValue)
+            .senderParticipantID (aMLSSenderPID)
+            .receiverParticipantID (aMLSReceiverPID)
             .referenceId (aInboundTx.getSbdhInstanceID ());
     final var aMls = aBuilder.build ();
     if (aMls == null)
@@ -174,10 +202,8 @@ public final class MlsHandler
 
     // Create outbound transaction
     final String sMlsTxID = aOutboundMgr.create (ETransactionType.MLS_RESPONSE,
-                                                 CIdentifier.getURIEncoded (PeppolIdentifierHelper.DEFAULT_PARTICIPANT_SCHEME,
-                                                                            sSenderPIDValue),
-                                                 CIdentifier.getURIEncoded (PeppolIdentifierHelper.DEFAULT_PARTICIPANT_SCHEME,
-                                                                            sEffectiveMlsToPIDValue),
+                                                 aMLSSenderPID.getURIEncoded (),
+                                                 aMLSReceiverPID.getURIEncoded (),
                                                  EPredefinedDocumentTypeIdentifier.PEPPOL_MLS_1_0.getURIEncoded (),
                                                  EPredefinedProcessIdentifier.urn_peppol_edec_mls.getURIEncoded (),
                                                  sMlsSbdhInstanceID,
