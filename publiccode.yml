@@ -1,0 +1,69 @@
+publiccodeYmlVersion: "0"
+
+name: phoss-ap
+url: https://github.com/phax/phoss-ap
+landingURL: https://github.com/phax/phoss-ap
+
+softwareVersion: "0.2.2"
+releaseDate: "2026-04-12"
+
+platforms:
+  - web
+
+developmentStatus: stable
+softwareType: standalone/web
+
+categories:
+  - billing-and-invoicing
+  - communications
+  - erp
+  - it-security
+
+description:
+  en:
+    shortDescription: >-
+      Open-source Peppol Access Point based on phase4 and Spring Boot.
+    longDescription: >-
+      phoss AP is a complete open-source Peppol Access Point built on
+      phase4 and Spring Boot. It handles all relevant Peppol specifications
+      including AS4 messaging, SMP lookup, Network Reporting and MLS
+      (Message Level Status). Features include inbound document reception
+      with configurable forwarding (HTTP, S3, SFTP), outbound document
+      sending with automatic SMP lookup and SBDH creation, retry with
+      exponential backoff and circuit breaker, optional document validation,
+      duplicate detection on AS4 Message ID and SBDH Instance Identifier,
+      MLS support with SLA monitoring, Peppol Reporting with scheduled
+      submission, archival of completed transactions, and Sentry integration
+      for error tracking.
+    features:
+      - Inbound document reception with configurable forwarding (HTTP, S3, SFTP)
+      - Outbound document sending with automatic SMP lookup and SBDH creation
+      - Retry with exponential backoff and circuit breaker
+      - Optional document validation via external verification service
+      - Duplicate detection on AS4 Message ID and SBDH Instance Identifier
+      - MLS (Message Level Status) support with SLA monitoring
+      - Peppol Reporting with scheduled submission
+      - Archival of completed transactions
+      - Sentry integration for error tracking
+    documentation: https://github.com/phax/phoss-ap
+
+legal:
+  license: Apache-2.0
+  mainCopyrightOwner: Philip Helger
+
+maintenance:
+  type: community
+  contacts:
+    - name: Philip Helger
+      email: philip@helger.com
+      affiliation: helger.com
+
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
+
+dependsOn:
+  open:
+    - name: Java
+      versionMin: "21"
