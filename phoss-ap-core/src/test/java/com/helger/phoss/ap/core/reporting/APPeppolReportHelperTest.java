@@ -21,7 +21,10 @@ import static org.junit.Assert.assertNotNull;
 
 import java.time.YearMonth;
 
+import org.junit.Rule;
 import org.junit.Test;
+
+import com.helger.scope.mock.ScopeTestRule;
 
 /**
  * Test class for {@link APPeppolReportHelper}.
@@ -30,6 +33,9 @@ import org.junit.Test;
  */
 public final class APPeppolReportHelperTest
 {
+  @Rule
+  public final ScopeTestRule m_aRule = new ScopeTestRule ();
+
   @Test
   public void testGetValidYearMonthInAPIPastDate ()
   {

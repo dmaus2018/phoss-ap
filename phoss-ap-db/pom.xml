@@ -22,7 +22,7 @@
   <parent>
     <groupId>com.helger.phoss.ap</groupId>
     <artifactId>phoss-ap-parent-pom</artifactId>
-    <version>0.2.2-SNAPSHOT</version>
+    <version>0.2.3-SNAPSHOT</version>
   </parent>
   <artifactId>phoss-ap-db</artifactId>
   <packaging>jar</packaging>
@@ -47,6 +47,10 @@
     <dependency>
       <groupId>com.helger.db</groupId>
       <artifactId>ph-db-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.helger.db</groupId>
+      <artifactId>ph-db-flyway</artifactId>
     </dependency>
     <dependency>
       <groupId>com.helger.phoss.ap</groupId>
