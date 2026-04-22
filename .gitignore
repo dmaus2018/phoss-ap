@@ -10,3 +10,5 @@ zz
 
 *.p12
 .idea/
+sync_and_push_to_gitlab.sh
+.gitignore
