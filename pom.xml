@@ -54,7 +54,7 @@
     <maven.compiler.release>21</maven.compiler.release>
 
     <!-- External dependency versions -->
-    <awssdk.version>2.42.35</awssdk.version>
+    <awssdk.version>2.42.37</awssdk.version>
     <commons-compression.version>1.28.0</commons-compression.version>
     <commons-lang.version>3.20.0</commons-lang.version>
     <failsafe.version>3.3.2</failsafe.version>
@@ -66,12 +66,12 @@
     <log4j.version>2.25.4</log4j.version>
     <mysql.version>9.6.0</mysql.version>
     <postgres.version>42.7.10</postgres.version>
-    <sentry.version>8.38.0</sentry.version>
+    <sentry.version>8.39.0</sentry.version>
     <spring-boot.version>4.0.5</spring-boot.version>
 
-    <ph-commons.version>12.2.0</ph-commons.version>
+    <ph-commons.version>12.2.1</ph-commons.version>
     <ph-db.version>8.2.1</ph-db.version>
-    <ph-web.version>11.2.6</ph-web.version>
+    <ph-web.version>11.3.0</ph-web.version>
     <ph-oton.version>10.2.2</ph-oton.version>
     <peppol-commons.version>12.4.1</peppol-commons.version>
     <phive.version>12.0.3</phive.version>

@@ -604,8 +604,7 @@ public final class OutboundOrchestrator
                                            .rawResponseConsumer (aSendingReport::setRawHttpResponse)
                                            .signalMsgConsumer ( (aSignalMsg, aMessageMetadata, aState) -> {
                                              aSendingReport.setAS4ReceivedSignalMsg (aSignalMsg);
-                                           })
-                                           .disableValidation ();
+                                           });
 
               // Add the optional SBDH parameters required for e.g. PDF sending
               if (StringHelper.isNotEmpty (aTx.getSbdhStandard ()))
