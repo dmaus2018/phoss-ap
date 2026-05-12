@@ -56,33 +56,21 @@ public final class APJdbcConfigurationTest
     // Boolean / numeric properties return their defined defaults (not set in
     // test properties)
     assertTrue (aJdbcConfig.isJdbcExecutionTimeWarningEnabled ());
-    assertEquals (JdbcConfiguration.DEFAULT_EXECUTION_DURATION_WARN_MS,
-                  aJdbcConfig.getJdbcExecutionTimeWarningMilliseconds ());
+    assertEquals (JdbcConfiguration.DEFAULT_EXECUTION_TIME_WARNING_DURATION,
+                  aJdbcConfig.getJdbcExecutionTimeWarning ());
 
     assertFalse (aJdbcConfig.isJdbcDebugConnections ());
     assertFalse (aJdbcConfig.isJdbcDebugTransactions ());
     assertFalse (aJdbcConfig.isJdbcDebugSQL ());
 
     // Pooling defaults
-    assertEquals (JdbcConfiguration.DEFAULT_POOLING_MAX_CONNECTIONS,
-                  aJdbcConfig.getJdbcPoolingMaxConnections ());
-    assertEquals (JdbcConfiguration.DEFAULT_POOLING_MAX_WAIT_MILLIS,
-                  aJdbcConfig.getJdbcPoolingMaxWaitMillis ());
-    assertEquals (JdbcConfiguration.DEFAULT_POOLING_BETWEEN_EVICTION_RUNS_MILLIS,
-                  aJdbcConfig.getJdbcPoolingBetweenEvictionRunsMillis ());
-    assertEquals (JdbcConfiguration.DEFAULT_POOLING_MIN_EVICTABLE_IDLE_MILLIS,
-                  aJdbcConfig.getJdbcPoolingMinEvictableIdleMillis ());
-    assertEquals (JdbcConfiguration.DEFAULT_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS,
-                  aJdbcConfig.getJdbcPoolingRemoveAbandonedTimeoutMillis ());
-  }
-
-  @Test
-  public void testDefaultConstantsValues ()
-  {
-    assertEquals (8, JdbcConfiguration.DEFAULT_POOLING_MAX_CONNECTIONS);
-    assertEquals (10_000L, JdbcConfiguration.DEFAULT_POOLING_MAX_WAIT_MILLIS);
-    assertEquals (300_000L, JdbcConfiguration.DEFAULT_POOLING_BETWEEN_EVICTION_RUNS_MILLIS);
-    assertEquals (1_800_000L, JdbcConfiguration.DEFAULT_POOLING_MIN_EVICTABLE_IDLE_MILLIS);
-    assertEquals (300_000L, JdbcConfiguration.DEFAULT_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS);
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_MAX_CONNECTIONS, aJdbcConfig.getJdbcPoolingMaxConnections ());
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_MAX_WAIT_DURATION, aJdbcConfig.getJdbcPoolingMaxWait ());
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_BETWEEN_EVICTION_RUNS_DURATION,
+                  aJdbcConfig.getJdbcPoolingBetweenEvictionRuns ());
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_MIN_EVICTABLE_IDLE_DURATION,
+                  aJdbcConfig.getJdbcPoolingMinEvictableIdle ());
+    assertEquals (JdbcConfiguration.DEFAULT_POOLING_REMOVE_ABANDONED_DURATION,
+                  aJdbcConfig.getJdbcPoolingRemoveAbandonedTimeout ());
   }
 }

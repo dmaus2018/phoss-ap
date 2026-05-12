@@ -16,6 +16,7 @@
  */
 package com.helger.phoss.ap.db;
 
+import java.time.Duration;
 import java.util.function.Supplier;
 
 import org.jspecify.annotations.NonNull;
@@ -73,16 +74,16 @@ final class APDBExecutor extends DBExecutor
 
     if (aJdbcConfig.isJdbcExecutionTimeWarningEnabled ())
     {
-      final long nMillis = aJdbcConfig.getJdbcExecutionTimeWarningMilliseconds ();
-      if (nMillis > 0)
-        setExecutionDurationWarnMS (nMillis);
+      final Duration aWarnDuration = aJdbcConfig.getJdbcExecutionTimeWarning ();
+      if (aWarnDuration.isPositive ())
+        setExecutionWarnDuration (aWarnDuration);
       else
         if (LOGGER.isDebugEnabled ())
           LOGGER.debug ("Ignoring execution time warning setting because it is invalid.");
     }
     else
     {
-      setExecutionDurationWarnMS (0);
+      setExecutionWarnDuration (Duration.ZERO);
     }
   }
 
