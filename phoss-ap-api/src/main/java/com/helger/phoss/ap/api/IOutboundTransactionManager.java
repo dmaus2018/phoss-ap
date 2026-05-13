@@ -125,7 +125,8 @@ public interface IOutboundTransactionManager
   boolean containsTransactionWithID (@NonNull String sID);
 
   /**
-   * Look up a transaction by its SBDH Instance Identifier.
+   * Look up a transaction by its SBDH Instance Identifier. Searches the active
+   * {@code outbound_transaction} table only.
    *
    * @param sSbdhInstanceID
    *        The SBDH Instance Identifier. Never <code>null</code>.
@@ -133,6 +134,20 @@ public interface IOutboundTransactionManager
    */
   @Nullable
   IOutboundTransaction getBySbdhInstanceID (@NonNull String sSbdhInstanceID);
+
+  /**
+   * Look up a transaction by its SBDH Instance Identifier, searching both the active
+   * {@code outbound_transaction} table and the {@code outbound_transaction_archive} table. The
+   * active table is queried first; the archive table is only consulted if no match is found there.
+   *
+   * @param sSbdhInstanceID
+   *        The SBDH Instance Identifier. Never <code>null</code>.
+   * @return The transaction (from the active table if present, otherwise from the archive), or
+   *         <code>null</code> if not found in either.
+   * @since 0.9.0
+   */
+  @Nullable
+  IOutboundTransaction getBySbdhInstanceIDIncludingArchive (@NonNull String sSbdhInstanceID);
 
   /**
    * Update the status of a transaction.

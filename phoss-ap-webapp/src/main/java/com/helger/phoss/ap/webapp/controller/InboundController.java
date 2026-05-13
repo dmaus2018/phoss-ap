@@ -98,13 +98,19 @@ public class InboundController
    *
    * @param sbdhInstanceID
    *        The SBDH Instance ID to look up.
+   * @param bIncludeArchive
+   *        When <code>true</code>, the archive table is searched if the transaction is no longer
+   *        present in the active table. Default is <code>false</code> (active table only). Added in
+   *        0.9.0.
    * @return The transaction details, or 404 if not found.
    */
   @GetMapping ("/status/{sbdhInstanceID}")
-  public ResponseEntity <InboundTransactionResponse> getStatus (@PathVariable final String sbdhInstanceID)
+  public ResponseEntity <InboundTransactionResponse> getStatus (@PathVariable final String sbdhInstanceID,
+                                                                @RequestParam (name = "includeArchive", defaultValue = "false") final boolean bIncludeArchive)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
-    final IInboundTransaction aTx = aTxMgr.getBySbdhInstanceID (sbdhInstanceID);
+    final IInboundTransaction aTx = bIncludeArchive ? aTxMgr.getBySbdhInstanceIDIncludingArchive (sbdhInstanceID)
+                                                    : aTxMgr.getBySbdhInstanceID (sbdhInstanceID);
     if (aTx == null)
       return ResponseEntity.notFound ().build ();
 

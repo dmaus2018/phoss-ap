@@ -192,6 +192,37 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
   }
 
   /** {@inheritDoc} */
+  @Nullable
+  public IOutboundTransaction getBySbdhInstanceIDIncludingArchive (@NonNull final String sSbdhInstanceID)
+  {
+    // Active table first
+    final IOutboundTransaction aActive = getBySbdhInstanceID (sSbdhInstanceID);
+    if (aActive != null)
+      return aActive;
+
+    // Fall back to archive table
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM " +
+                                                                      m_sTableName +
+                                                                      "_archive" +
+                                                                      " WHERE sbdh_instance_id=?",
+                                                                      new ConstantPreparedStatementDataProvider (sSbdhInstanceID));
+    if (aRows != null)
+    {
+      if (aRows.size () == 1)
+        return new OutboundTransactionRow (aRows.getFirstOrNull ());
+      if (aRows.size () > 1)
+        LOGGER.warn ("Found " +
+                     aRows.size () +
+                     " archived transactions that all match the SBDH Instance Identifier '" +
+                     sSbdhInstanceID +
+                     "'");
+    }
+    return null;
+  }
+
+  /** {@inheritDoc} */
   @NonNull
   public ESuccess updateStatus (@NonNull final String sID, @NonNull final EOutboundStatus eStatus)
   {

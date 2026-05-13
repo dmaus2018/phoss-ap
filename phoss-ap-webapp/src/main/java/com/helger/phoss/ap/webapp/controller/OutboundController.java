@@ -610,15 +610,24 @@ public class OutboundController
    *
    * @param sSbdhInstanceID
    *        The SBDH Instance ID to look up.
+   * @param bIncludeArchive
+   *        When <code>true</code>, the archive table is searched if the transaction is no longer
+   *        present in the active table. Default is <code>false</code> (active table only). Added in
+   *        0.9.0.
    * @return The transaction details, or 404 if not found.
    */
   @GetMapping ("/status/{sbdhInstanceID}")
-  public ResponseEntity <OutboundTransactionResponse> getStatus (@PathVariable ("sbdhInstanceID") final String sSbdhInstanceID)
+  public ResponseEntity <OutboundTransactionResponse> getStatus (@PathVariable ("sbdhInstanceID") final String sSbdhInstanceID,
+                                                                 @RequestParam (name = "includeArchive", defaultValue = "false") final boolean bIncludeArchive)
   {
-    LOGGER.info ("Checking for status of transmission with ID '" + sSbdhInstanceID + "'");
+    LOGGER.info ("Checking for status of transmission with ID '" +
+                 sSbdhInstanceID +
+                 "'" +
+                 (bIncludeArchive ? " (including archive)" : ""));
 
     final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
-    final IOutboundTransaction aTx = aTxMgr.getBySbdhInstanceID (sSbdhInstanceID);
+    final IOutboundTransaction aTx = bIncludeArchive ? aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhInstanceID)
+                                                     : aTxMgr.getBySbdhInstanceID (sSbdhInstanceID);
     if (aTx == null)
     {
       LOGGER.info ("No such transaction");

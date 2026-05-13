@@ -150,7 +150,8 @@ public interface IInboundTransactionManager
   boolean containsBySbdhInstanceID (@NonNull String sSbdhInstanceID);
 
   /**
-   * Look up a transaction by its SBDH Instance Identifier.
+   * Look up a transaction by its SBDH Instance Identifier. Searches the active
+   * {@code inbound_transaction} table only.
    *
    * @param sSbdhInstanceID
    *        The SBDH Instance Identifier. Never <code>null</code>.
@@ -158,6 +159,20 @@ public interface IInboundTransactionManager
    */
   @Nullable
   IInboundTransaction getBySbdhInstanceID (@NonNull String sSbdhInstanceID);
+
+  /**
+   * Look up a transaction by its SBDH Instance Identifier, searching both the active
+   * {@code inbound_transaction} table and the {@code inbound_transaction_archive} table. The
+   * active table is queried first; the archive table is only consulted if no match is found there.
+   *
+   * @param sSbdhInstanceID
+   *        The SBDH Instance Identifier. Never <code>null</code>.
+   * @return The transaction (from the active table if present, otherwise from the archive), or
+   *         <code>null</code> if not found in either.
+   * @since 0.9.0
+   */
+  @Nullable
+  IInboundTransaction getBySbdhInstanceIDIncludingArchive (@NonNull String sSbdhInstanceID);
 
   /**
    * Update the status of a transaction.

@@ -1049,6 +1049,113 @@ public final class JdbcManagerIntegrationTest
     assertTrue (aAttemptMgr.getByTransactionID (sTxID).isEmpty ());
   }
 
+  @Test
+  public void testOutboundGetBySbdhInstanceIDIncludingArchive ()
+  {
+    final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
+    final String sSbdhID = _uniqueID ();
+    final String sTxID = aTxMgr.create (ETransactionType.BUSINESS_DOCUMENT,
+                                        "iso6523-actorid-upis::9915:sender",
+                                        "iso6523-actorid-upis::9915:receiver",
+                                        "busdox-docid-qns::urn:test:invoice",
+                                        "cenbii-procid-ubl::urn:test:process",
+                                        sSbdhID,
+                                        ESourceType.PAYLOAD_ONLY,
+                                        "/tmp/test-archive-lookup.sbd",
+                                        128L,
+                                        "hashArchiveLookup",
+                                        "AT",
+                                        _now (),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null);
+    assertNotNull (sTxID);
+
+    // Active table only: both methods find the transaction
+    assertNotNull (aTxMgr.getBySbdhInstanceID (sSbdhID));
+    final IOutboundTransaction aTxActive = aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhID);
+    assertNotNull (aTxActive);
+    assertEquals (sTxID, aTxActive.getID ());
+
+    // Archive the transaction
+    aTxMgr.updateStatusCompleted (sTxID, EOutboundStatus.SENT);
+    assertTrue (aArchivalMgr.archiveOutboundTransaction (sTxID).isSuccess ());
+
+    // Active-only lookup returns null; including-archive returns the archived row
+    assertNull (aTxMgr.getBySbdhInstanceID (sSbdhID));
+    final IOutboundTransaction aTxArchived = aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhID);
+    assertNotNull (aTxArchived);
+    assertEquals (sTxID, aTxArchived.getID ());
+    assertEquals (sSbdhID, aTxArchived.getSbdhInstanceID ());
+  }
+
+  @Test
+  public void testOutboundGetBySbdhInstanceIDIncludingArchiveNotFound ()
+  {
+    assertNull (APJdbcMetaManager.getOutboundTransactionMgr ()
+                                 .getBySbdhInstanceIDIncludingArchive ("non-existent-sbdh-archive"));
+  }
+
+  @Test
+  public void testInboundGetBySbdhInstanceIDIncludingArchive ()
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final IInboundForwardingAttemptManager aAttemptMgr = APJdbcMetaManager.getInboundForwardingAttemptMgr ();
+    final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
+    final String sSbdhID = _uniqueID ();
+    final String sTxID = aTxMgr.create (_uniqueID (),
+                                        "POP000001",
+                                        "POP000002",
+                                        "CN=TestCert",
+                                        "iso6523-actorid-upis::9915:sender",
+                                        "iso6523-actorid-upis::9915:receiver",
+                                        "busdox-docid-qns::urn:test:invoice",
+                                        "cenbii-procid-ubl::urn:test:process",
+                                        "/tmp/test-archive-lookup-in.sbd",
+                                        256L,
+                                        "hashInArchiveLookup",
+                                        _uniqueID (),
+                                        _now (),
+                                        sSbdhID,
+                                        "DE",
+                                        false,
+                                        false,
+                                        null,
+                                        EPeppolMLSType.ALWAYS_SEND);
+    assertNotNull (sTxID);
+
+    // Active table only: both methods find the transaction
+    assertNotNull (aTxMgr.getBySbdhInstanceID (sSbdhID));
+    final IInboundTransaction aTxActive = aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhID);
+    assertNotNull (aTxActive);
+    assertEquals (sTxID, aTxActive.getID ());
+
+    // Archive the transaction
+    aAttemptMgr.createSuccess (sTxID);
+    aTxMgr.updateStatusCompleted (sTxID, EInboundStatus.FORWARDED);
+    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID).isSuccess ());
+
+    // Active-only lookup returns null; including-archive returns the archived row
+    assertNull (aTxMgr.getBySbdhInstanceID (sSbdhID));
+    final IInboundTransaction aTxArchived = aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhID);
+    assertNotNull (aTxArchived);
+    assertEquals (sTxID, aTxArchived.getID ());
+    assertEquals (sSbdhID, aTxArchived.getSbdhInstanceID ());
+  }
+
+  @Test
+  public void testInboundGetBySbdhInstanceIDIncludingArchiveNotFound ()
+  {
+    assertNull (APJdbcMetaManager.getInboundTransactionMgr ()
+                                 .getBySbdhInstanceIDIncludingArchive ("non-existent-sbdh-archive-in"));
+  }
+
   // --- AS4DuplicateManagerJdbc ---
 
   @Test
