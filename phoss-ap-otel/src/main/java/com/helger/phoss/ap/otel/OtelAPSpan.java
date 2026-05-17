@@ -28,7 +28,7 @@ import io.opentelemetry.context.Scope;
 /**
  * {@link IAPSpan} backed by an OpenTelemetry {@link Span} that has been made the current span on
  * the calling thread via {@link Span#makeCurrent()}. The returned {@link Scope} is kept inside this
- * wrapper and closed together with the span on {@link #close()}.
+ * wrapper and closed together with the span on <code>close()</code>.
  *
  * @author Philip Helger
  * @since 0.9.0

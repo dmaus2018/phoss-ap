@@ -25,22 +25,52 @@ import com.helger.phoss.ap.api.model.IInboundTransaction;
 
 /**
  * SPI interface for forwarding received inbound documents to the Receiver Backend (C4).
- * Implementations are loaded via {@link java.util.ServiceLoader}. Exactly one implementation must
- * be present on the classpath at runtime.
+ * Implementations are loaded via {@link java.util.ServiceLoader}. Exactly one primary
+ * implementation must be present on the classpath at runtime; additional secondary forwarders may
+ * be configured using indexed configuration keys (see <code>forwarding.secondary.{n}.*</code>).
  *
  * @author Philip Helger
  */
 public interface IDocumentForwarder
 {
   /**
-   * Initialize the forwarded from the provided configuration.
+   * The default configuration key prefix used for the primary forwarder.
+   *
+   * @since 0.9.0
+   */
+  String DEFAULT_CONFIG_KEY_PREFIX = "forwarding.";
+
+  /**
+   * Initialize the forwarder from the provided configuration using the default
+   * "forwarding." key prefix.
    *
    * @param aConfig
    *        The configuration object to init from. Never <code>null</code>.
    * @return {@link ESuccess}
    */
   @NonNull
-  ESuccess initFromConfiguration (@NonNull IConfigWithFallback aConfig);
+  default ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
+  {
+    return initFromConfiguration (aConfig, DEFAULT_CONFIG_KEY_PREFIX);
+  }
+
+  /**
+   * Initialize the forwarder from the provided configuration using the given configuration key
+   * prefix. This allows the same implementation to be used for both the primary forwarder (with
+   * prefix <code>"forwarding."</code>) and secondary forwarders (with prefix
+   * <code>"forwarding.secondary.{n}."</code>).
+   *
+   * @param aConfig
+   *        The configuration object to init from. Never <code>null</code>.
+   * @param sKeyPrefix
+   *        The configuration key prefix to use, including the trailing dot (e.g.
+   *        <code>"forwarding."</code> or <code>"forwarding.secondary.1."</code>). Never
+   *        <code>null</code>.
+   * @return {@link ESuccess}
+   * @since 0.9.0
+   */
+  @NonNull
+  ESuccess initFromConfiguration (@NonNull IConfigWithFallback aConfig, @NonNull String sKeyPrefix);
 
   /**
    * Forward the given inbound transaction's document to the Receiver Backend. This method should

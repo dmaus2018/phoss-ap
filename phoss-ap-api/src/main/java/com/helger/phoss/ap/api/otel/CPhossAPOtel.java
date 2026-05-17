@@ -19,8 +19,8 @@ package com.helger.phoss.ap.api.otel;
 import com.helger.annotation.concurrent.Immutable;
 
 /**
- * Constants for the phoss AP OpenTelemetry integration: instrumentation scope, metric names,
- * span names and attribute keys. Metric / span / attribute names follow OpenTelemetry semantic
+ * Constants for the phoss AP OpenTelemetry integration: instrumentation scope, metric names, span
+ * names and attribute keys. Metric / span / attribute names follow OpenTelemetry semantic
  * conventions (lowercase dotted namespace) and use the <code>phoss.ap.*</code> prefix for
  * AP-specific signals.
  * <p>
@@ -30,6 +30,7 @@ import com.helger.annotation.concurrent.Immutable;
  * {@code AttributesBuilder.put(String, ...)} accept those directly.
  *
  * @author Philip Helger
+ * @since 0.9.0
  */
 @Immutable
 public final class CPhossAPOtel
@@ -72,6 +73,7 @@ public final class CPhossAPOtel
   public static final String SPAN_INBOUND_RECEIVE = "phoss.ap.inbound.receive";
   public static final String SPAN_INBOUND_DUPLICATE_CHECK = "phoss.ap.inbound.duplicate_check";
   public static final String SPAN_INBOUND_FORWARD = "phoss.ap.inbound.forward";
+  public static final String SPAN_INBOUND_FORWARD_SECONDARY = "phoss.ap.inbound.forward.secondary";
   public static final String SPAN_INBOUND_C4_RESOLVE = "phoss.ap.inbound.c4_resolve";
   public static final String SPAN_OUTBOUND_SEND = "phoss.ap.outbound.send";
   public static final String SPAN_OUTBOUND_AS4_SEND = "phoss.ap.outbound.as4_send";
@@ -106,6 +108,8 @@ public final class CPhossAPOtel
   public static final String ATTR_SCHEDULER_NAME = "phoss.ap.scheduler.name";
   public static final String ATTR_SCHEDULER_ITEMS = "phoss.ap.scheduler.items";
   public static final String ATTR_FORWARDER_TYPE = "phoss.ap.forwarder.type";
+  /** @since 0.9.0 */
+  public static final String ATTR_FORWARDER_INDEX = "phoss.ap.forwarder.index";
   public static final String ATTR_SMP_URL = "phoss.ap.smp.url";
   public static final String ATTR_EXCEPTION_CONTEXT = "phoss.ap.exception.context";
   public static final String ATTR_EXCEPTION_CLASS = "phoss.ap.exception.class";

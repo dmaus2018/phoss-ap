@@ -60,7 +60,9 @@ public final class APConfigurationProperties
   public static final String JDBC_POOLING_MAX_WAIT = "pooling.max-wait";
   /** @since 0.9.0 */
   public static final Duration JDBC_POOLING_MAX_WAIT_DEFAULT = Duration.ofSeconds (10);
-  /** @deprecated Since 0.9.0; use {@link #JDBC_POOLING_MAX_WAIT} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #JDBC_POOLING_MAX_WAIT} with the duration grammar instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String JDBC_POOLING_MAX_WAIT_MILLIS = "pooling.max-wait.millis";
   /** @deprecated Since 0.9.0; use {@link #JDBC_POOLING_MAX_WAIT_DEFAULT} instead. */
@@ -70,7 +72,10 @@ public final class APConfigurationProperties
   public static final String JDBC_POOLING_BETWEEN_EVICTIONS_RUNS = "pooling.between-evictions-runs";
   /** @since 0.9.0 */
   public static final Duration JDBC_POOLING_BETWEEN_EVICTIONS_RUNS_DEFAULT = Duration.ofMinutes (5);
-  /** @deprecated Since 0.9.0; use {@link #JDBC_POOLING_BETWEEN_EVICTIONS_RUNS} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #JDBC_POOLING_BETWEEN_EVICTIONS_RUNS} with the duration
+   *             grammar instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String JDBC_POOLING_BETWEEN_EVICTIONS_RUNS_MILLIS = "pooling.between-evictions-runs.millis";
   /** @deprecated Since 0.9.0; use {@link #JDBC_POOLING_BETWEEN_EVICTIONS_RUNS_DEFAULT} instead. */
@@ -80,7 +85,10 @@ public final class APConfigurationProperties
   public static final String JDBC_POOLING_MIN_EVICTABLE_IDLE = "pooling.min-evictable-idle";
   /** @since 0.9.0 */
   public static final Duration JDBC_POOLING_MIN_EVICTABLE_IDLE_DEFAULT = Duration.ofMinutes (30);
-  /** @deprecated Since 0.9.0; use {@link #JDBC_POOLING_MIN_EVICTABLE_IDLE} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #JDBC_POOLING_MIN_EVICTABLE_IDLE} with the duration grammar
+   *             instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String JDBC_POOLING_MIN_EVICTABLE_IDLE_MILLIS = "pooling.min-evictable-idle.millis";
   /** @deprecated Since 0.9.0; use {@link #JDBC_POOLING_MIN_EVICTABLE_IDLE_DEFAULT} instead. */
@@ -90,36 +98,71 @@ public final class APConfigurationProperties
   public static final String JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT = "pooling.remove-abandoned-timeout";
   /** @since 0.9.0 */
   public static final Duration JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT_DEFAULT = Duration.ofMinutes (5);
-  /** @deprecated Since 0.9.0; use {@link #JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT} with the duration
+   *             grammar instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS = "pooling.remove-abandoned-timeout.millis";
-  /** @deprecated Since 0.9.0; use {@link #JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT_DEFAULT} instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT_DEFAULT} instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final long JDBC_POOLING_REMOVE_ABANDONED_TIMEOUT_MILLIS_DEFAULT = 300_000L;
 
   // Forwarding
   public static final String FORWARDING_MODE = "forwarding.mode";
 
+  // Forwarding - Secondary forwarders (since 0.9.0)
+  /**
+   * Indexed prefix for secondary forwarders. The mode of secondary <code>n</code> is read from
+   * <code>forwarding.secondary.{n}.mode</code> and all forwarder-specific properties use the same
+   * <code>forwarding.secondary.{n}.</code> base prefix (e.g.
+   * <code>forwarding.secondary.1.http.endpoint</code>). Iteration starts at index 1 and stops at
+   * the first index where no <code>.mode</code> is set.
+   *
+   * @since 0.9.0
+   */
+  public static final String FORWARDING_SECONDARY_PREFIX = "forwarding.secondary.";
+  /**
+   * Suffix appended to the secondary base prefix to read the forwarding mode.
+   *
+   * @since 0.9.0
+   */
+  public static final String FORWARDING_SECONDARY_MODE_SUFFIX = "mode";
+
   // Forwarding - C4 country code determination
   public static final String FORWARDING_C4_COUNTRYCODE_MODES = "forwarding.c4countrycode.modes";
 
   // Forwarding - HTTP
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_HTTP_MODE = "forwarding.http.mode";
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_HTTP_ENDPOINT = "forwarding.http.endpoint";
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_HTTP_HEADERS_PREFIX = "forwarding.http.headers.";
 
   // Forwarding - S3
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_S3_BUCKET = "forwarding.s3.bucket";
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_S3_REGION = "forwarding.s3.region";
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_S3_ACCESS_KEY_ID = "forwarding.s3.access-key-id";
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_S3_SECRET_ACCESS_KEY = "forwarding.s3.secret-access-key";
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_S3_KEY_PREFIX = "forwarding.s3.key-prefix";
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_S3_ENDPOINT = "forwarding.s3.endpoint";
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_S3_PATH_STYLE_ACCESS = "forwarding.s3.path-style-access";
   public static final boolean FORWARDING_S3_PATH_STYLE_ACCESS_DEFAULT = false;
 
   // Forwarding - Filesystem (since 0.2.0)
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_FILESYSTEM_DIRECTORY = "forwarding.filesystem.directory";
+  @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_FILESYSTEM_LAYOUT = "forwarding.filesystem.layout";
   public static final String FORWARDING_FILESYSTEM_LAYOUT_DEFAULT = "flat";
 
@@ -130,7 +173,10 @@ public final class APConfigurationProperties
   public static final String RETRY_SENDING_INITIAL_BACKOFF = "retry.sending.initial-backoff";
   /** @since 0.9.0 */
   public static final Duration RETRY_SENDING_INITIAL_BACKOFF_DEFAULT = Duration.ofMinutes (3);
-  /** @deprecated Since 0.9.0; use {@link #RETRY_SENDING_INITIAL_BACKOFF} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #RETRY_SENDING_INITIAL_BACKOFF} with the duration grammar
+   *             instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String RETRY_SENDING_INITIAL_BACKOFF_MS = "retry.sending.initial-backoff.ms";
   /** @deprecated Since 0.9.0; use {@link #RETRY_SENDING_INITIAL_BACKOFF_DEFAULT} instead. */
@@ -142,7 +188,10 @@ public final class APConfigurationProperties
   public static final String RETRY_SENDING_MAX_BACKOFF = "retry.sending.max-backoff";
   /** @since 0.9.0 */
   public static final Duration RETRY_SENDING_MAX_BACKOFF_DEFAULT = Duration.ofHours (1);
-  /** @deprecated Since 0.9.0; use {@link #RETRY_SENDING_MAX_BACKOFF} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #RETRY_SENDING_MAX_BACKOFF} with the duration grammar
+   *             instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String RETRY_SENDING_MAX_BACKOFF_MS = "retry.sending.max-backoff.ms";
   /** @deprecated Since 0.9.0; use {@link #RETRY_SENDING_MAX_BACKOFF_DEFAULT} instead. */
@@ -156,7 +205,10 @@ public final class APConfigurationProperties
   public static final String RETRY_FORWARDING_INITIAL_BACKOFF = "retry.forwarding.initial-backoff";
   /** @since 0.9.0 */
   public static final Duration RETRY_FORWARDING_INITIAL_BACKOFF_DEFAULT = Duration.ofMinutes (1);
-  /** @deprecated Since 0.9.0; use {@link #RETRY_FORWARDING_INITIAL_BACKOFF} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #RETRY_FORWARDING_INITIAL_BACKOFF} with the duration
+   *             grammar instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String RETRY_FORWARDING_INITIAL_BACKOFF_MS = "retry.forwarding.initial-backoff.ms";
   /** @deprecated Since 0.9.0; use {@link #RETRY_FORWARDING_INITIAL_BACKOFF_DEFAULT} instead. */
@@ -168,7 +220,10 @@ public final class APConfigurationProperties
   public static final String RETRY_FORWARDING_MAX_BACKOFF = "retry.forwarding.max-backoff";
   /** @since 0.9.0 */
   public static final Duration RETRY_FORWARDING_MAX_BACKOFF_DEFAULT = Duration.ofHours (1);
-  /** @deprecated Since 0.9.0; use {@link #RETRY_FORWARDING_MAX_BACKOFF} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #RETRY_FORWARDING_MAX_BACKOFF} with the duration grammar
+   *             instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String RETRY_FORWARDING_MAX_BACKOFF_MS = "retry.forwarding.max-backoff.ms";
   /** @deprecated Since 0.9.0; use {@link #RETRY_FORWARDING_MAX_BACKOFF_DEFAULT} instead. */
@@ -180,7 +235,10 @@ public final class APConfigurationProperties
   public static final String RETRY_SCHEDULER_INTERVAL = "retry.scheduler.interval";
   /** @since 0.9.0 */
   public static final Duration RETRY_SCHEDULER_INTERVAL_DEFAULT = Duration.ofMinutes (1);
-  /** @deprecated Since 0.9.0; use {@link #RETRY_SCHEDULER_INTERVAL} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #RETRY_SCHEDULER_INTERVAL} with the duration grammar
+   *             instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String RETRY_SCHEDULER_INTERVAL_MS = "retry.scheduler.interval.ms";
   /** @deprecated Since 0.9.0; use {@link #RETRY_SCHEDULER_INTERVAL_DEFAULT} instead. */
@@ -196,7 +254,10 @@ public final class APConfigurationProperties
   public static final String CIRCUIT_BREAKER_OPEN_DURATION = "circuit-breaker.open-duration";
   /** @since 0.9.0 */
   public static final Duration CIRCUIT_BREAKER_OPEN_DURATION_DEFAULT = Duration.ofMinutes (1);
-  /** @deprecated Since 0.9.0; use {@link #CIRCUIT_BREAKER_OPEN_DURATION} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #CIRCUIT_BREAKER_OPEN_DURATION} with the duration grammar
+   *             instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String CIRCUIT_BREAKER_OPEN_DURATION_MS = "circuit-breaker.open-duration.ms";
   /** @deprecated Since 0.9.0; use {@link #CIRCUIT_BREAKER_OPEN_DURATION_DEFAULT} instead. */
@@ -239,7 +300,10 @@ public final class APConfigurationProperties
   public static final String ARCHIVAL_SCHEDULER_INTERVAL = "archival.scheduler.interval";
   /** @since 0.9.0 */
   public static final Duration ARCHIVAL_SCHEDULER_INTERVAL_DEFAULT = Duration.ofHours (1);
-  /** @deprecated Since 0.9.0; use {@link #ARCHIVAL_SCHEDULER_INTERVAL} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #ARCHIVAL_SCHEDULER_INTERVAL} with the duration grammar
+   *             instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String ARCHIVAL_SCHEDULER_INTERVAL_MS = "archival.scheduler.interval.ms";
   /** @deprecated Since 0.9.0; use {@link #ARCHIVAL_SCHEDULER_INTERVAL_DEFAULT} instead. */
@@ -294,7 +358,10 @@ public final class APConfigurationProperties
   public static final String DIRSENDER_SCAN_INTERVAL = "dirsender.scan-interval";
   /** @since 0.9.0 */
   public static final Duration DIRSENDER_SCAN_INTERVAL_DEFAULT = Duration.ofSeconds (30);
-  /** @deprecated Since 0.9.0; use {@link #DIRSENDER_SCAN_INTERVAL} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #DIRSENDER_SCAN_INTERVAL} with the duration grammar
+   *             instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String DIRSENDER_SCAN_INTERVAL_MS = "dirsender.scan-interval.ms";
   /** @deprecated Since 0.9.0; use {@link #DIRSENDER_SCAN_INTERVAL_DEFAULT} instead. */
@@ -304,7 +371,10 @@ public final class APConfigurationProperties
   public static final String DIRSENDER_INITIAL_DELAY = "dirsender.initial-delay";
   /** @since 0.9.0 */
   public static final Duration DIRSENDER_INITIAL_DELAY_DEFAULT = Duration.ofSeconds (30);
-  /** @deprecated Since 0.9.0; use {@link #DIRSENDER_INITIAL_DELAY} with the duration grammar instead. */
+  /**
+   * @deprecated Since 0.9.0; use {@link #DIRSENDER_INITIAL_DELAY} with the duration grammar
+   *             instead.
+   */
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String DIRSENDER_INITIAL_DELAY_MS = "dirsender.initial-delay.ms";
   /** @deprecated Since 0.9.0; use {@link #DIRSENDER_INITIAL_DELAY_DEFAULT} instead. */

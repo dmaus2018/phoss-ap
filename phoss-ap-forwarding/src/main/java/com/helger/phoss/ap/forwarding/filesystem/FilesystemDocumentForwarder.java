@@ -26,6 +26,7 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
@@ -61,18 +62,25 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (FilesystemDocumentForwarder.class);
   private static final int MAX_UNIQUENESS_TRIES = 1_000;
+  // Configuration key suffixes (relative to the configured base prefix)
+  private static final String SUFFIX_FILESYSTEM_DIRECTORY = "filesystem.directory";
+  private static final String SUFFIX_FILESYSTEM_LAYOUT = "filesystem.layout";
 
   private File m_aBaseDirectory;
   private EForwardingFilesystemLayout m_eLayout;
 
   /** {@inheritDoc} */
   @NonNull
-  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
+  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig,
+                                         @NonNull final String sKeyPrefix)
   {
-    final String sDirectory = aConfig.getAsString (APConfigurationProperties.FORWARDING_FILESYSTEM_DIRECTORY);
+    ValueEnforcer.notNull (sKeyPrefix, "KeyPrefix");
+
+    final String sDirectoryKey = sKeyPrefix + SUFFIX_FILESYSTEM_DIRECTORY;
+    final String sDirectory = aConfig.getAsString (sDirectoryKey);
     if (StringHelper.isEmpty (sDirectory))
     {
-      LOGGER.error ("The forwarding filesystem directory is missing");
+      LOGGER.error ("The forwarding filesystem directory at '" + sDirectoryKey + "' is missing");
       return ESuccess.FAILURE;
     }
 
@@ -84,7 +92,7 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
       return ESuccess.FAILURE;
     }
 
-    final String sLayout = aConfig.getAsString (APConfigurationProperties.FORWARDING_FILESYSTEM_LAYOUT,
+    final String sLayout = aConfig.getAsString (sKeyPrefix + SUFFIX_FILESYSTEM_LAYOUT,
                                                 APConfigurationProperties.FORWARDING_FILESYSTEM_LAYOUT_DEFAULT);
     m_eLayout = EForwardingFilesystemLayout.getFromIDOrDefault (sLayout);
 

@@ -22,6 +22,7 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
 import com.helger.base.tostring.ToStringGenerator;
@@ -53,6 +54,14 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 public class S3DocumentForwarder implements IDocumentForwarder
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (S3DocumentForwarder.class);
+  // Configuration key suffixes (relative to the configured base prefix)
+  private static final String SUFFIX_S3_REGION = "s3.region";
+  private static final String SUFFIX_S3_BUCKET = "s3.bucket";
+  private static final String SUFFIX_S3_ACCESS_KEY_ID = "s3.access-key-id";
+  private static final String SUFFIX_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
+  private static final String SUFFIX_S3_ENDPOINT = "s3.endpoint";
+  private static final String SUFFIX_S3_PATH_STYLE_ACCESS = "s3.path-style-access";
+  private static final String SUFFIX_S3_KEY_PREFIX = "s3.key-prefix";
 
   private Region m_aRegion;
   private String m_sBucket;
@@ -64,9 +73,12 @@ public class S3DocumentForwarder implements IDocumentForwarder
 
   /** {@inheritDoc} */
   @NonNull
-  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
+  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig,
+                                         @NonNull final String sKeyPrefix)
   {
-    final String sRegion = aConfig.getAsString (APConfigurationProperties.FORWARDING_S3_REGION);
+    ValueEnforcer.notNull (sKeyPrefix, "KeyPrefix");
+
+    final String sRegion = aConfig.getAsString (sKeyPrefix + SUFFIX_S3_REGION);
     m_aRegion = Region.of (sRegion);
     if (m_aRegion == null)
     {
@@ -74,20 +86,21 @@ public class S3DocumentForwarder implements IDocumentForwarder
       return ESuccess.FAILURE;
     }
 
-    m_sBucket = aConfig.getAsString (APConfigurationProperties.FORWARDING_S3_BUCKET);
+    final String sBucketKey = sKeyPrefix + SUFFIX_S3_BUCKET;
+    m_sBucket = aConfig.getAsString (sBucketKey);
     if (StringHelper.isEmpty (m_sBucket))
     {
-      LOGGER.error ("S3 bucket is not configured");
+      LOGGER.error ("S3 bucket at '" + sBucketKey + "' is not configured");
       return ESuccess.FAILURE;
     }
 
-    m_sAccessKeyId = aConfig.getAsString (APConfigurationProperties.FORWARDING_S3_ACCESS_KEY_ID);
-    m_sSecretAccessKey = aConfig.getAsString (APConfigurationProperties.FORWARDING_S3_SECRET_ACCESS_KEY);
-    m_sEndpoint = aConfig.getAsString (APConfigurationProperties.FORWARDING_S3_ENDPOINT);
-    m_bPathStyleAccess = aConfig.getAsBoolean (APConfigurationProperties.FORWARDING_S3_PATH_STYLE_ACCESS,
+    m_sAccessKeyId = aConfig.getAsString (sKeyPrefix + SUFFIX_S3_ACCESS_KEY_ID);
+    m_sSecretAccessKey = aConfig.getAsString (sKeyPrefix + SUFFIX_S3_SECRET_ACCESS_KEY);
+    m_sEndpoint = aConfig.getAsString (sKeyPrefix + SUFFIX_S3_ENDPOINT);
+    m_bPathStyleAccess = aConfig.getAsBoolean (sKeyPrefix + SUFFIX_S3_PATH_STYLE_ACCESS,
                                                 APConfigurationProperties.FORWARDING_S3_PATH_STYLE_ACCESS_DEFAULT);
 
-    m_sKeyPrefix = aConfig.getAsString (APConfigurationProperties.FORWARDING_S3_KEY_PREFIX);
+    m_sKeyPrefix = aConfig.getAsString (sKeyPrefix + SUFFIX_S3_KEY_PREFIX);
     if (StringHelper.isNotEmpty (m_sKeyPrefix))
     {
       if (!m_sKeyPrefix.endsWith ("/"))

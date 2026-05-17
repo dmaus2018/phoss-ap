@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.base.state.ESuccess;
+import com.helger.collection.commons.ICommonsList;
 import com.helger.phoss.ap.api.CPhossAP;
 import com.helger.phoss.ap.api.IInboundForwardingAttemptManager;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
@@ -181,6 +182,67 @@ public final class InboundOrchestrator
                               aInboundTx.getID () +
                               "'");
               }
+            }
+
+            // Fire-and-forget dispatch to all configured secondary forwarders. Failures are logged
+            // only - no retry, no SLA, no effect on the inbound transaction status.
+            final ICommonsList <IDocumentForwarder> aSecondaryForwarders = APCoreMetaManager.getAllSecondaryForwarders ();
+            if (aSecondaryForwarders.isNotEmpty ())
+            {
+              PhotonWorkerPool.getInstance ().run ("forward-secondary", () -> {
+                int nIndex = 0;
+                for (final IDocumentForwarder aSecondary : aSecondaryForwarders)
+                {
+                  nIndex++;
+                  try (final IAPSpan aSecSpan = APTrace.startSpan (CPhossAPOtel.SPAN_INBOUND_FORWARD_SECONDARY,
+                                                                   EAPSpanKind.PRODUCER)
+                                                       .setAttribute (CPhossAPOtel.ATTR_TRANSACTION_ID,
+                                                                      aInboundTx.getID ())
+                                                       .setAttribute (CPhossAPOtel.ATTR_SBDH_INSTANCE_ID,
+                                                                      aInboundTx.getSbdhInstanceID ())
+                                                       .setAttribute (CPhossAPOtel.ATTR_FORWARDER_INDEX, nIndex))
+                  {
+                    try
+                    {
+                      final ForwardingResult aSecResult = aSecondary.forwardDocument (aInboundTx);
+                      if (aSecResult.isSuccess ())
+                      {
+                        LOGGER.info (sLogPrefix +
+                                     "Secondary forwarding #" +
+                                     nIndex +
+                                     " successful for transaction '" +
+                                     aInboundTx.getID () +
+                                     "'");
+                        aSecSpan.setStatusOk ();
+                      }
+                      else
+                      {
+                        LOGGER.warn (sLogPrefix +
+                                     "Secondary forwarding #" +
+                                     nIndex +
+                                     " failed (ignored) for transaction '" +
+                                     aInboundTx.getID () +
+                                     "': " +
+                                     aSecResult.getErrorDetails ());
+                        aSecSpan.setStatusError (aSecResult.getErrorDetails ());
+                      }
+                    }
+                    catch (final Exception ex)
+                    {
+                      // Catch everything so a failing secondary does not prevent the others from
+                      // running.
+                      LOGGER.error (sLogPrefix +
+                                    "Secondary forwarding #" +
+                                    nIndex +
+                                    " threw exception (ignored) for transaction '" +
+                                    aInboundTx.getID () +
+                                    "'",
+                                    ex);
+                      aSecSpan.recordException (ex).setStatusError (ex.getMessage ());
+                    }
+                  }
+                }
+              });
             }
 
             return ESuccess.SUCCESS;

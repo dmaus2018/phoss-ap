@@ -60,17 +60,24 @@ public class SftpDocumentForwarder implements IDocumentForwarder
   private static final Logger LOGGER = LoggerFactory.getLogger (SftpDocumentForwarder.class);
   private static final String SFTP_DATETIME_PATTERN = "yyyyMMddHHmmss";
   private static final AtomicInteger WRITE_FILE_COUNT = new AtomicInteger (0);
+  // Configuration key suffix (relative to the configured base prefix) - no trailing dot, used as
+  // the base path for SftpSettings.createFromConfig
+  private static final String SUFFIX_SFTP_BASE = "sftp";
 
   private ISftpSettings m_aSftpSettings;
 
   /** {@inheritDoc} */
   @NonNull
-  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
+  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig,
+                                         @NonNull final String sKeyPrefix)
   {
-    m_aSftpSettings = SftpSettings.createFromConfig (aConfig, "forwarding.sftp");
+    ValueEnforcer.notNull (sKeyPrefix, "KeyPrefix");
+
+    final String sSftpPrefix = sKeyPrefix + SUFFIX_SFTP_BASE;
+    m_aSftpSettings = SftpSettings.createFromConfig (aConfig, sSftpPrefix);
     if (m_aSftpSettings == null)
     {
-      LOGGER.error ("Failed to initialize SFTP settings from configuration 'forwarding.sftp.*'");
+      LOGGER.error ("Failed to initialize SFTP settings from configuration '" + sSftpPrefix + ".*'");
       return ESuccess.FAILURE;
     }
     return ESuccess.SUCCESS;

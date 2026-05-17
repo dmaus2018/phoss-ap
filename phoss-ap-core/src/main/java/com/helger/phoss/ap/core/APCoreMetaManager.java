@@ -28,6 +28,7 @@ import com.helger.base.exception.InitializationException;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.collection.commons.ICommonsOrderedSet;
+import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.peppol.apsupport.BusinessCardCache;
 import com.helger.peppol.servicedomain.EPeppolNetwork;
 import com.helger.phoss.ap.api.codelist.EC4CountryCodeMode;
@@ -62,6 +63,7 @@ public final class APCoreMetaManager
 
   private static EForwardingMode s_eForwardingMode;
   private static IDocumentForwarder s_aForwarder;
+  private static final ICommonsList <IDocumentForwarder> s_aSecondaryForwarders = new CommonsArrayList <> ();
   private static BusinessCardCache s_aBusinessCardCache;
   private static final ICommonsList <IInboundDocumentVerifierSPI> s_aInboundVerifiers = new CommonsArrayList <> ();
   private static final ICommonsList <IOutboundDocumentVerifierSPI> s_aOutboundVerifiers = new CommonsArrayList <> ();
@@ -71,6 +73,25 @@ public final class APCoreMetaManager
   {}
 
   /**
+   * Create a new forwarder instance for the given mode. Does not initialize it from configuration.
+   *
+   * @param eMode
+   *        The forwarding mode. May not be <code>null</code>.
+   * @return A new forwarder instance. Never <code>null</code>.
+   */
+  @NonNull
+  private static IDocumentForwarder _createForwarder (@NonNull final EForwardingMode eMode)
+  {
+    return switch (eMode)
+    {
+      case HTTP_POST_SYNC, HTTP_POST_ASYNC -> new HttpDocumentForwarder (eMode);
+      case S3_LINK -> new S3DocumentForwarder ();
+      case SFTP -> new SftpDocumentForwarder ();
+      case FILESYSTEM -> new FilesystemDocumentForwarder ();
+    };
+  }
+
+  /**
    * Initialize the core meta manager by creating the document forwarder from configuration and
    * loading all SPI-based verifiers, receiver checks, and notification handlers.
    */
@@ -78,28 +99,58 @@ public final class APCoreMetaManager
   {
     LOGGER.info ("Initializing APMetaManager");
 
-    final var aConfig = APConfigProvider.getConfig ();
+    final IConfigWithFallback aConfig = APConfigProvider.getConfig ();
 
-    // Create forwarder based on configuration
+    // Create primary forwarder based on configuration
     {
       final String sForwardingMode = aConfig.getAsString (APConfigurationProperties.FORWARDING_MODE);
       final EForwardingMode eForwardingMode = EForwardingMode.getFromIDOrNull (sForwardingMode);
       if (eForwardingMode == null)
         throw new InitializationException ("The configured Forwarding Mode '" + sForwardingMode + "' is invalid");
 
-      final IDocumentForwarder aForwarder = switch (eForwardingMode)
-      {
-        case HTTP_POST_SYNC, HTTP_POST_ASYNC -> new HttpDocumentForwarder (eForwardingMode);
-        case S3_LINK -> new S3DocumentForwarder ();
-        case SFTP -> new SftpDocumentForwarder ();
-        case FILESYSTEM -> new FilesystemDocumentForwarder ();
-      };
-      if (aForwarder.initFromConfiguration (aConfig).isFailure ())
+      final IDocumentForwarder aForwarder = _createForwarder (eForwardingMode);
+      if (aForwarder.initFromConfiguration (aConfig, IDocumentForwarder.DEFAULT_CONFIG_KEY_PREFIX).isFailure ())
         throw new InitializationException ("Failed to init forwarder configuration - see logs for details");
 
       s_eForwardingMode = eForwardingMode;
       s_aForwarder = aForwarder;
       LOGGER.info ("Loaded document forwarder: " + aForwarder.toString ());
+    }
+
+    // Create secondary forwarders (fire-and-forget, no retry, no SLA) based on configuration
+    {
+      for (int nIndex = 1;; nIndex++)
+      {
+        final String sSecondaryPrefix = APConfigurationProperties.FORWARDING_SECONDARY_PREFIX + nIndex + ".";
+        final String sSecondaryMode = aConfig.getAsString (sSecondaryPrefix +
+                                                           APConfigurationProperties.FORWARDING_SECONDARY_MODE_SUFFIX);
+        if (sSecondaryMode == null)
+          break;
+
+        final EForwardingMode eSecondaryMode = EForwardingMode.getFromIDOrNull (sSecondaryMode);
+        if (eSecondaryMode == null)
+          throw new InitializationException ("The configured Forwarding Mode for secondary forwarder at index " +
+                                             nIndex +
+                                             " ('" +
+                                             sSecondaryMode +
+                                             "') is invalid");
+
+        if (nIndex > 10)
+          throw new InitializationException ("No more than 10 secondary Forwarders are allowed.");
+
+        final IDocumentForwarder aSecondary = _createForwarder (eSecondaryMode);
+        if (aSecondary.initFromConfiguration (aConfig, sSecondaryPrefix).isFailure ())
+          throw new InitializationException ("Failed to init secondary forwarder #" +
+                                             nIndex +
+                                             " configuration - see logs for details");
+
+        s_aSecondaryForwarders.add (aSecondary);
+        LOGGER.info ("Loaded secondary document forwarder #" + nIndex + ": " + aSecondary.toString ());
+      }
+      if (s_aSecondaryForwarders.isEmpty ())
+        LOGGER.info ("No secondary document forwarders configured");
+      else
+        LOGGER.info ("Loaded " + s_aSecondaryForwarders.size () + " secondary document forwarder(s)");
     }
 
     // Initialize Business Card Cache if configured
@@ -168,6 +219,20 @@ public final class APCoreMetaManager
   public static IDocumentForwarder getForwarder ()
   {
     return s_aForwarder;
+  }
+
+  /**
+   * @return A mutable copy of all configured secondary document forwarders. Never <code>null</code>
+   *         but may be empty. Secondary forwarders are dispatched on a fire-and-forget basis after
+   *         the primary forwarder succeeded; they have no retries and their failure does not affect
+   *         the inbound transaction status.
+   * @since 0.9.0
+   */
+  @NonNull
+  @ReturnsMutableCopy
+  public static ICommonsList <IDocumentForwarder> getAllSecondaryForwarders ()
+  {
+    return s_aSecondaryForwarders.getClone ();
   }
 
   /**

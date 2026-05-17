@@ -41,7 +41,6 @@ import com.helger.httpclient.response.ResponseHandlerByteArray;
 import com.helger.json.IJsonObject;
 import com.helger.json.serialize.JsonReader;
 import com.helger.phoss.ap.api.codelist.EForwardingMode;
-import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
 import com.helger.phoss.ap.api.model.ForwardingResult;
@@ -60,6 +59,11 @@ public class HttpDocumentForwarder implements IDocumentForwarder
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (HttpDocumentForwarder.class);
   private static final int MAX_CUSTOM_HEADERS = 100;
+  // Configuration key suffixes (relative to the configured base prefix)
+  private static final String SUFFIX_HTTP_ENDPOINT = "http.endpoint";
+  private static final String SUFFIX_HTTP_HEADERS_PREFIX = "http.headers.";
+  private static final String SUFFIX_HTTP_HEADER_NAME = ".name";
+  private static final String SUFFIX_HTTP_HEADER_VALUE = ".value";
 
   private final EForwardingMode m_eMode;
   private String m_sEndpointURL;
@@ -83,12 +87,16 @@ public class HttpDocumentForwarder implements IDocumentForwarder
 
   /** {@inheritDoc} */
   @NonNull
-  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig)
+  public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig,
+                                         @NonNull final String sKeyPrefix)
   {
-    m_sEndpointURL = aConfig.getAsString (APConfigurationProperties.FORWARDING_HTTP_ENDPOINT);
+    ValueEnforcer.notNull (sKeyPrefix, "KeyPrefix");
+
+    final String sEndpointKey = sKeyPrefix + SUFFIX_HTTP_ENDPOINT;
+    m_sEndpointURL = aConfig.getAsString (sEndpointKey);
     if (StringHelper.isEmpty (m_sEndpointURL))
     {
-      LOGGER.error ("The forwarding HTTP endpoint is missing");
+      LOGGER.error ("The forwarding HTTP endpoint at '" + sEndpointKey + "' is missing");
       return ESuccess.FAILURE;
     }
     if (URLHelper.getAsURL (m_sEndpointURL) == null)
@@ -97,17 +105,17 @@ public class HttpDocumentForwarder implements IDocumentForwarder
       return ESuccess.FAILURE;
     }
 
-    HttpClientSettingsConfig.assignConfigValues (m_aHCS, aConfig, "forwarding.");
+    HttpClientSettingsConfig.assignConfigValues (m_aHCS, aConfig, sKeyPrefix);
 
-    // Load custom HTTP headers (indexed: forwarding.http.headers.1.name / .value)
-    final String sHeaderPrefix = APConfigurationProperties.FORWARDING_HTTP_HEADERS_PREFIX;
+    // Load custom HTTP headers (indexed: <prefix>http.headers.1.name / .value)
+    final String sHeadersPrefix = sKeyPrefix + SUFFIX_HTTP_HEADERS_PREFIX;
     for (int nIndex = 1;; nIndex++)
     {
-      final String sName = aConfig.getAsString (sHeaderPrefix + nIndex + ".name");
+      final String sName = aConfig.getAsString (sHeadersPrefix + nIndex + SUFFIX_HTTP_HEADER_NAME);
       if (StringHelper.isEmpty (sName))
         break;
 
-      final String sValue = aConfig.getAsString (sHeaderPrefix + nIndex + ".value");
+      final String sValue = aConfig.getAsString (sHeadersPrefix + nIndex + SUFFIX_HTTP_HEADER_VALUE);
       m_aCustomHeaders.put (sName, sValue != null ? sValue : "");
       LOGGER.info ("Configured custom forwarding HTTP header '" + sName + "'");
 
