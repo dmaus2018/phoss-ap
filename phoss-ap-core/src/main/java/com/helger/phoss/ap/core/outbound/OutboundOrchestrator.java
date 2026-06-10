@@ -72,9 +72,6 @@ import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
-import com.helger.telemetry.Telemetry;
-import com.helger.telemetry.ETelemetrySpanKind;
-import com.helger.telemetry.ITelemetrySpan;
 import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.APCoreConfig;
@@ -90,6 +87,9 @@ import com.helger.smpclient.peppol.CachingSMPClientReadOnly;
 import com.helger.smpclient.peppol.SMPClientReadOnly;
 import com.helger.smpclient.url.PeppolNaptrURLProvider;
 import com.helger.smpclient.url.SMPDNSResolutionException;
+import com.helger.telemetry.ETelemetrySpanKind;
+import com.helger.telemetry.ITelemetrySpan;
+import com.helger.telemetry.Telemetry;
 
 /**
  * Main class to handle outbound transactions.
@@ -499,6 +499,11 @@ public final class OutboundOrchestrator
             aHandler.onOutboundPermanentSendingFailure (sTxID, aTx.getSbdhInstanceID (), sErrMsg);
         };
 
+        // Add all information from the transaction into the sending report as soon as possible so
+        // that users can leverage it
+        aSendingReport.setSBDHInstanceIdentifier (aTx.getSbdhInstanceID ());
+        aSendingReport.setCountryC1 (aTx.getC1CountryCode ());
+
         // Convert all identifiers to structured data - that should have been
         // verified before
         final IParticipantIdentifier aSenderID = aIF.parseParticipantIdentifier (aTx.getSenderID ());
@@ -582,6 +587,7 @@ public final class OutboundOrchestrator
               onFailed.accept ("SMP access limited by Circuit Breaker '" + sCircuitBreakerKeySMP + "'");
               return aSendingReport;
             }
+
             final AS4EndpointDetailProviderPeppol aEndpointDetails = AS4EndpointDetailProviderPeppol.create (aSMPClient);
             try
             {
@@ -654,8 +660,6 @@ public final class OutboundOrchestrator
           // Only add it here to the sending report, otherwise the interpretation
           // of the report gets
           // more difficult
-          aSendingReport.setSBDHInstanceIdentifier (aTx.getSbdhInstanceID ());
-          aSendingReport.setCountryC1 (aTx.getC1CountryCode ());
           aSendingReport.setSenderPartyID (sC2SeatID);
           aSendingReport.setAS4MessageID (sAS4MessageID);
           aSendingReport.setAS4SendingDT (aAS4Timestamp);
@@ -822,34 +826,37 @@ public final class OutboundOrchestrator
                   }
                 }
 
-                // Start the main builder
-                final PeppolUserMessageSBDHBuilder aBuilder;
-                aBuilder = Phase4PeppolSender.sbdhBuilder ()
-                                             .httpClientFactory (aHCS)
-                                             // AS4 input
-                                             .messageID (sAS4MessageID)
-                                             .conversationID (sAS4ConversationID)
-                                             .sendingDateTime (aAS4Timestamp)
-                                             // SBD
-                                             .payloadAndMetadata (aSbdData)
-                                             // Remaining IDs
-                                             .senderPartyID (sC2SeatID)
-                                             // Certificate stuff
-                                             .peppolAP_CAChecker (aAPCAChecker)
-                                             .endpointDetailProvider (new AS4EndpointDetailProviderConstant (aReceiverCert,
-                                                                                                             sReceiverAPURL,
-                                                                                                             sReceiverTechnicalContact))
-                                             .certificateConsumer ( (aAPCertificate, aCheckDT, eCertCheckResult) -> {
-                                               // Determined by SMP
-                                               // lookup
-                                               aSendingReport.setC3CertCheckDT (aCheckDT);
-                                               aSendingReport.setC3CertCheckResult (eCertCheckResult);
-                                             })
-                                             // Response stuff
-                                             .rawResponseConsumer (aSendingReport::setRawHttpResponse)
-                                             .signalMsgConsumer ( (aSignalMsg, aMessageMetadata, aState) -> {
-                                               aSendingReport.setAS4ReceivedSignalMsg (aSignalMsg);
-                                             });
+                final PeppolUserMessageSBDHBuilder aBuilder = Phase4PeppolSender.sbdhBuilder ()
+                                                                                .httpClientFactory (aHCS)
+                                                                                // AS4 input
+                                                                                .messageID (sAS4MessageID)
+                                                                                .conversationID (sAS4ConversationID)
+                                                                                .sendingDateTime (aAS4Timestamp)
+                                                                                // SBD
+                                                                                .payloadAndMetadata (aSbdData)
+                                                                                // Remaining IDs
+                                                                                .senderPartyID (sC2SeatID)
+                                                                                // Certificate stuff
+                                                                                .peppolAP_CAChecker (aAPCAChecker)
+                                                                                .endpointDetailProvider (new AS4EndpointDetailProviderConstant (aReceiverCert,
+                                                                                                                                                sReceiverAPURL,
+                                                                                                                                                sReceiverTechnicalContact))
+                                                                                .certificateConsumer ( (aAPCertificate,
+                                                                                                        aCheckDT,
+                                                                                                        eCertCheckResult) -> {
+                                                                                  // Determined by
+                                                                                  // SMP
+                                                                                  // lookup
+                                                                                  aSendingReport.setC3CertCheckDT (aCheckDT);
+                                                                                  aSendingReport.setC3CertCheckResult (eCertCheckResult);
+                                                                                })
+                                                                                // Response stuff
+                                                                                .rawResponseConsumer (aSendingReport::setRawHttpResponse)
+                                                                                .signalMsgConsumer ( (aSignalMsg,
+                                                                                                      aMessageMetadata,
+                                                                                                      aState) -> {
+                                                                                  aSendingReport.setAS4ReceivedSignalMsg (aSignalMsg);
+                                                                                });
                 eResult = Telemetry.withSpan (CPhossAPOtel.SPAN_OUTBOUND_AS4_SEND,
                                               ETelemetrySpanKind.CLIENT,
                                               aSendSpan -> {
@@ -890,8 +897,8 @@ public final class OutboundOrchestrator
               aSendingReport.setOverallSuccess (false);
 
               // Call after any Sending Report modifications
-              final String sErrorMsg = ex != null ? ex.getMessage ()
-                                                  : "Error in AS4 sending with result code " + eResult;
+              final String sErrorMsg = ex != null ? ex.getMessage () : "Error in AS4 sending with result code " +
+                                                                       eResult;
               if (nNewAttemptCount >= APCoreConfig.getRetrySendingMaxAttempts ())
                 onPermanentFailure.accept (sErrorMsg);
               else
