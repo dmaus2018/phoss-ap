@@ -131,8 +131,8 @@ public class APServletInit
     HttpDebugger.setEnabled (false);
 
     // Sanity check
-    if (CommandMap.getDefaultCommandMap ()
-                  .createDataContentHandler (CMimeType.MULTIPART_RELATED.getAsString ()) == null)
+    if (CommandMap.getDefaultCommandMap ().createDataContentHandler (CMimeType.MULTIPART_RELATED.getAsString ()) ==
+        null)
     {
       throw new IllegalStateException ("No DataContentHandler for MIME Type '" +
                                        CMimeType.MULTIPART_RELATED.getAsString () +
@@ -275,8 +275,11 @@ public class APServletInit
                                                                                   null);
       if (eCheckResult.isInvalid ())
       {
-        throw new InitializationException ("The provided certificate is not a Peppol AP certificate. Check result: " +
-                                           eCheckResult);
+        if (!"true".equals (System.getProperty ("phossap.internal.skip-peppol-certificate-check")))
+          throw new InitializationException ("The provided certificate is not a Peppol AP certificate. Check result: " +
+                                             eCheckResult);
+
+        LOGGER.error ("No Peppol certificate present - skipping for unit test only!");
       }
       LOGGER.info ("Successfully checked that the provided Peppol AP certificate is from the correct CA");
 
