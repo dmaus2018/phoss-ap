@@ -185,7 +185,23 @@ public final class MlsOutcome
   @NonNull
   public static MlsOutcome acknowledging ()
   {
-    return new MlsOutcome (EPeppolMLSResponseCode.ACKNOWLEDGING, null, null);
+    return acknowledging (null);
+  }
+
+  /**
+   * Create an acknowledging outcome (response code AB) but including a response description. The
+   * document was forwarded to C4 without confirmation of receipt.
+   *
+   * @param sResponseText
+   *        The optional response to be used. May be <code>null</code>.
+   * @return A new {@link MlsOutcome} with response code
+   *         {@link EPeppolMLSResponseCode#ACKNOWLEDGING}.
+   * @since 0.10.1
+   */
+  @NonNull
+  public static MlsOutcome acknowledging (@Nullable final String sResponseText)
+  {
+    return new MlsOutcome (EPeppolMLSResponseCode.ACKNOWLEDGING, sResponseText, null);
   }
 
   /**

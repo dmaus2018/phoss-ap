@@ -193,8 +193,10 @@ public class PhormDocumentVerifier implements IInboundDocumentVerifierSPI, IOutb
                      aResultList.getAllErrors ().size () +
                      " error(s) found");
         if (LOGGER.isDebugEnabled ())
+        {
           aResultList.getAllErrors ()
                      .forEach (e -> LOGGER.debug ("  Validation error: " + e.getErrorText (CPhossAP.DEFAULT_LOCALE)));
+        }
       }
       else
       {

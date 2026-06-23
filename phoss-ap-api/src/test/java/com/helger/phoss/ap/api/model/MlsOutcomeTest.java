@@ -57,6 +57,17 @@ public final class MlsOutcomeTest
     final MlsOutcome a = MlsOutcome.acknowledging ();
     assertSame (EPeppolMLSResponseCode.ACKNOWLEDGING, a.getResponseCode ());
     assertEquals ("AB", a.getResponseCodeID ());
+    assertNull (a.getResponseText ());
+    assertFalse (a.hasIssues ());
+  }
+
+  @Test
+  public void testAcknowledgingWithResponse ()
+  {
+    final MlsOutcome a = MlsOutcome.acknowledging ("Test");
+    assertSame (EPeppolMLSResponseCode.ACKNOWLEDGING, a.getResponseCode ());
+    assertEquals ("AB", a.getResponseCodeID ());
+    assertEquals ("Test", a.getResponseText ());
     assertFalse (a.hasIssues ());
   }
 

@@ -151,6 +151,7 @@ public final class PhiveToMlsMapper
     final ICommonsList <MlsOutcomeIssue> aIssues = new CommonsArrayList <> ();
     for (final ValidationResult aResult : aResultList)
     {
+      // Ignore skipped layer
       if (aResult.getValidity ().isSkipped ())
         continue;
 

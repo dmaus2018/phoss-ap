@@ -279,9 +279,13 @@ public final class InboundOrchestrator
             {
               // Send asynchronously
               PhotonWorkerPool.getInstance ().run ("send-mls", () -> {
-                // Send negative MLS (RE) with FD reason back to C2
-                final MlsOutcome aOutcome = MlsOutcome.rejection ("Forwarding to C4 failed",
-                                                                  MlsOutcomeIssue.failureOfDelivery ("Permanent inability to forward document to C4"));
+                // Send negative MLS (RE) with AB reason back to C2
+                // The PNP states, that "FD" can only be used in case of "permanent failure". We
+                // still expect that this error is a "temporary failure", so we are supposed to send
+                // "acknowledging" as we assume it will be resolved later
+                final MlsOutcome aOutcome = true ? MlsOutcome.acknowledging ("Forwarding to C4 failed for now")
+                                                 : MlsOutcome.rejection ("Forwarding to C4 failed",
+                                                                         MlsOutcomeIssue.failureOfDelivery ("Permanent inability to forward document to C4"));
                 MlsHandler.triggerSendingInboundResultMls (aInboundTx, aOutcome);
               });
             }
