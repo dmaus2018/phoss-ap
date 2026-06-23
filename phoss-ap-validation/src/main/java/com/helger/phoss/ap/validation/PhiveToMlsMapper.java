@@ -120,6 +120,14 @@ public final class PhiveToMlsMapper
     return new MlsOutcomeIssue (sErrorField, eReason, sDescription);
   }
 
+  private static boolean _isSaxonTransformationWarning (@NonNull final IError aError)
+  {
+    return aError.getErrorLevel ().isEQ (EErrorLevel.WARN) &&
+           "Transformation warning".equals (aError.getErrorText (CPhossAP.DEFAULT_LOCALE)) &&
+           aError.getLinkedException () != null &&
+           "net.sf.saxon.trans.XPathException".equals (aError.getLinkedException ().getClass ().getName ());
+  }
+
   /**
    * Map a phive {@link ValidationResultList} to an {@link MlsOutcome}. When the result list
    * contains no errors the outcome is {@link MlsOutcome#acceptance()} (any warnings are dropped).
@@ -160,6 +168,9 @@ public final class PhiveToMlsMapper
       {
         // We only care about warning or higher
         if (aError.getErrorLevel ().isLT (EErrorLevel.WARN))
+          continue;
+
+        if (_isSaxonTransformationWarning (aError))
           continue;
 
         aIssues.add (_toIssue (aError, eBaseType, aEffectiveLocale));
