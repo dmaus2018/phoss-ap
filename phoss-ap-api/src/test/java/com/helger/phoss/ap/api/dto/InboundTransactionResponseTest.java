@@ -53,6 +53,7 @@ public final class InboundTransactionResponseTest
     assertNull (a.getProcessID ());
     assertNull (a.getAS4MessageID ());
     assertNull (a.getSbdhInstanceID ());
+    assertNull (a.getC2SeatID ());
     assertNull (a.getStatus ());
     assertEquals (0, a.getAttemptCount ());
     assertNull (a.getReceivedDT ());
@@ -77,6 +78,7 @@ public final class InboundTransactionResponseTest
     a.setProcessID ("process1");
     a.setAS4MessageID ("as4-1");
     a.setSbdhInstanceID ("sbdh-1");
+    a.setC2SeatID ("c2seat1");
     a.setStatus ("forwarded");
     a.setAttemptCount (3);
     a.setReceivedDT ("2026-03-29T10:00:00Z");
@@ -96,6 +98,7 @@ public final class InboundTransactionResponseTest
     assertEquals ("process1", a.getProcessID ());
     assertEquals ("as4-1", a.getAS4MessageID ());
     assertEquals ("sbdh-1", a.getSbdhInstanceID ());
+    assertEquals ("c2seat1", a.getC2SeatID ());
     assertEquals ("forwarded", a.getStatus ());
     assertEquals (3, a.getAttemptCount ());
     assertEquals ("2026-03-29T10:00:00Z", a.getReceivedDT ());
@@ -156,6 +159,7 @@ public final class InboundTransactionResponseTest
     assertEquals ("process-1", aResp.getProcessID ());
     assertEquals ("as4-msg-1", aResp.getAS4MessageID ());
     assertEquals ("sbdh-inst-1", aResp.getSbdhInstanceID ());
+    assertEquals ("C2-SEAT", aResp.getC2SeatID ());
     assertEquals ("forwarded", aResp.getStatus ());
     assertEquals (2, aResp.getAttemptCount ());
     assertNotNull (aResp.getReceivedDT ());
