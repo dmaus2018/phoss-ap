@@ -542,8 +542,10 @@ public final class OutboundOrchestrator
         String sReceiverAPURLOut = null;
         String sReceiverTechnicalContactOut = null;
 
+        // This guard checks, that this never happens in production
         if (APCoreConfig.isOutboundDevLoopbackEnabled ())
         {
+          // Get our own, hardcoded AP endpoint URL
           final String sAPURL = APCoreConfig.getPhase4EndpointAddress ();
           if (StringHelper.isEmpty (sAPURL))
           {
@@ -555,7 +557,9 @@ public final class OutboundOrchestrator
             return aSendingReport;
           }
 
-          final KeyStore.PrivateKeyEntry aPKE = AS4CryptoFactoryConfiguration.getDefaultInstance ().getPrivateKeyEntry ();
+          // Use the public certificate from our private key
+          final KeyStore.PrivateKeyEntry aPKE = AS4CryptoFactoryConfiguration.getDefaultInstance ()
+                                                                             .getPrivateKeyEntry ();
           if (aPKE == null || !(aPKE.getCertificate () instanceof final X509Certificate aOwnCert))
           {
             final String sMsg = "Outbound dev loopback could not load this AP's own certificate from the AS4 keystore";
@@ -569,14 +573,19 @@ public final class OutboundOrchestrator
 
           aSendingReport.setC3Cert (aReceiverCertOut);
           aSendingReport.setC3EndpointURL (sReceiverAPURLOut);
+          aSendingReport.setC3TechnicalContact ("Outbound dev loopback");
+          aSendingReport.setLookupDurationMillis (0);
 
           LOGGER.warn (sRealLogPrefix +
-                       "Outbound dev loopback is enabled; bypassing SMP lookup and sending receiver '{}' to this AP endpoint '{}'",
-                       aTx.getReceiverID (),
-                       sReceiverAPURLOut);
+                       "Outbound dev loopback is enabled; bypassing SMP lookup and sending receiver '" +
+                       aTx.getReceiverID () +
+                       "' to this AP endpoint '" +
+                       sReceiverAPURLOut +
+                       "'");
         }
         else
         {
+          // Perform SMP lookup
           boolean bSmpLookupSuccess = false;
           try (final ITelemetrySpan aSmpSpan = Telemetry.startSpan (CPhossAPOtel.SPAN_SMP_LOOKUP,
                                                                     ETelemetrySpanKind.CLIENT)
