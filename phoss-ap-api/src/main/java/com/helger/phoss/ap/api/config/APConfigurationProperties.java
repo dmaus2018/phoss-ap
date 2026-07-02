@@ -174,6 +174,10 @@ public final class APConfigurationProperties
   public static final String FORWARDING_FILESYSTEM_LAYOUT = "forwarding.filesystem.layout";
   public static final String FORWARDING_FILESYSTEM_LAYOUT_DEFAULT = "flat";
 
+  // Forwarding - SFTP
+  /** @since 0.10.2 */
+  public static final boolean FORWARDING_SFTP_WRITE_METADATA_DEFAULT = false;
+
   // Retry sending
   public static final String RETRY_SENDING_MAX_ATTEMPTS = "retry.sending.max-attempts";
   public static final int RETRY_SENDING_MAX_ATTEMPTS_DEFAULT = 3;

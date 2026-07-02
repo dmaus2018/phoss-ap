@@ -16,6 +16,7 @@
  */
 package com.helger.phoss.ap.forwarding.sftp;
 
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -32,7 +33,10 @@ import com.helger.base.tostring.ToStringGenerator;
 import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.io.file.FilenameHelper;
 import com.helger.jsch.sftp.ChannelSftpHelper;
+import com.helger.json.serialize.JsonWriterSettings;
 import com.helger.network.WebExceptionHelper;
+import com.helger.phoss.ap.api.config.APConfigurationProperties;
+import com.helger.phoss.ap.api.dto.InboundTransactionResponse;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
 import com.helger.phoss.ap.api.model.ForwardingResult;
@@ -63,8 +67,10 @@ public class SftpDocumentForwarder implements IDocumentForwarder
   // Configuration key suffix (relative to the configured base prefix) - no trailing dot, used as
   // the base path for SftpSettings.createFromConfig
   private static final String SUFFIX_SFTP_BASE = "sftp";
+  private static final String SUFFIX_SFTP_WRITE_METADATA = "sftp.write-metadata";
 
   private ISftpSettings m_aSftpSettings;
+  private boolean m_bWriteMetadata;
 
   /** {@inheritDoc} */
   @NonNull
@@ -79,6 +85,10 @@ public class SftpDocumentForwarder implements IDocumentForwarder
       LOGGER.error ("Failed to initialize SFTP settings from configuration '" + sSftpPrefix + ".*'");
       return ESuccess.FAILURE;
     }
+
+    m_bWriteMetadata = aConfig.getAsBoolean (sKeyPrefix + SUFFIX_SFTP_WRITE_METADATA,
+                                             APConfigurationProperties.FORWARDING_SFTP_WRITE_METADATA_DEFAULT);
+
     return ESuccess.SUCCESS;
   }
 
@@ -198,6 +208,31 @@ public class SftpDocumentForwarder implements IDocumentForwarder
     }
   }
 
+  /**
+   * Write a JSON metadata sidecar file next to the uploaded SBD. The content mirrors the metadata
+   * JSON written by the filesystem forwarder. A failure to write the sidecar is logged but does not
+   * fail the overall forwarding.
+   *
+   * @param aTransaction
+   *        The transaction to write the metadata for. May not be <code>null</code>.
+   * @param sBaseName
+   *        The base filename (without extension) of the uploaded SBD. May not be <code>null</code>.
+   */
+  private void _writeMetadataSidecar (@NonNull final IInboundTransaction aTransaction, @NonNull final String sBaseName)
+  {
+    final String sJson = InboundTransactionResponse.fromDomain (aTransaction)
+                                                   .getAsJson ()
+                                                   .getAsJsonString (JsonWriterSettings.DEFAULT_SETTINGS_FORMATTED);
+    final byte [] aJsonBytes = sJson.getBytes (StandardCharsets.UTF_8);
+
+    final ForwardingResult aResult = writeUploadedFile (m_aSftpSettings,
+                                                        "",
+                                                        sBaseName + ".json",
+                                                        HasInputStream.create (aJsonBytes));
+    if (aResult.isFailure ())
+      LOGGER.error ("Failed to write SFTP metadata sidecar for transaction '" + aTransaction.getID () + "'");
+  }
+
   @NonNull
   private ForwardingResult _doForwardDocument (@NonNull final IInboundTransaction aTransaction)
   {
@@ -205,17 +240,22 @@ public class SftpDocumentForwarder implements IDocumentForwarder
     {
       final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
 
-      // Layout: yyyyMMddHHmmss_(random value).xml
-      final String sTargetFilename = DateTimeFormatter.ofPattern (SFTP_DATETIME_PATTERN)
-                                                      .format (aTransaction.getReceivedDT ()) +
-                                     "_" +
-                                     FilenameHelper.getAsSecureValidASCIIFilename (aTransaction.getIncomingID ()) +
-                                     ".xml";
+      // Layout: yyyyMMddHHmmss_(random value)
+      final String sBaseName = DateTimeFormatter.ofPattern (SFTP_DATETIME_PATTERN)
+                                                .format (aTransaction.getReceivedDT ()) +
+                               "_" +
+                               FilenameHelper.getAsSecureValidASCIIFilename (aTransaction.getIncomingID ());
 
-      return writeUploadedFile (m_aSftpSettings,
-                                "",
-                                sTargetFilename,
-                                HasInputStream.multiple ( () -> aDocPayloadMgr.openDocumentStreamForRead (aTransaction.getDocumentPath ())));
+      final ForwardingResult aResult = writeUploadedFile (m_aSftpSettings,
+                                                          "",
+                                                          sBaseName + ".xml",
+                                                          HasInputStream.multiple (() -> aDocPayloadMgr.openDocumentStreamForRead (aTransaction.getDocumentPath ())));
+
+      // Optionally write a metadata JSON sidecar next to the uploaded SBD
+      if (m_bWriteMetadata && aResult.isSuccess ())
+        _writeMetadataSidecar (aTransaction, sBaseName);
+
+      return aResult;
     }
     catch (final Exception ex)
     {
@@ -244,6 +284,8 @@ public class SftpDocumentForwarder implements IDocumentForwarder
   @Override
   public String toString ()
   {
-    return new ToStringGenerator (this).append ("SftpSettings", m_aSftpSettings).getToString ();
+    return new ToStringGenerator (this).append ("SftpSettings", m_aSftpSettings)
+                                       .append ("WriteMetadata", m_bWriteMetadata)
+                                       .getToString ();
   }
 }
