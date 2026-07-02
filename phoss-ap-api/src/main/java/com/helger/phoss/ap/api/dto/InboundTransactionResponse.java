@@ -61,6 +61,9 @@ public class InboundTransactionResponse
   @Schema (description = "Peppol Seat ID of the sending AP (C2). Since v0.10.2.")
   private String c2SeatID;
 
+  @Schema (description = "Peppol Seat ID of the receiving AP (C3). Since v0.10.2.")
+  private String c3SeatID;
+
   @Schema (description = "Current transaction status",
            allowableValues = { "received", "rejected", "forwarding", "forwarded", "forward_failed",
                                "permanently_failed" })
@@ -130,6 +133,7 @@ public class InboundTransactionResponse
     ret.as4MessageID = aTx.getAS4MessageID ();
     ret.sbdhInstanceID = aTx.getSbdhInstanceID ();
     ret.c2SeatID = aTx.getC2SeatID ();
+    ret.c3SeatID = aTx.getC3SeatID ();
     ret.status = aTx.getStatus ().getID ();
     ret.attemptCount = aTx.getAttemptCount ();
     ret.receivedDT = aTx.getReceivedDT () != null ? aTx.getReceivedDT ().toString () : null;
@@ -266,6 +270,25 @@ public class InboundTransactionResponse
   public void setC2SeatID (final String s)
   {
     c2SeatID = s;
+  }
+
+  /**
+   * @return the Peppol Seat ID of the receiving AP (C3)
+   * @since v0.10.2
+   */
+  public String getC3SeatID ()
+  {
+    return c3SeatID;
+  }
+
+  /**
+   * @param s
+   *        The C3 Seat ID to set.
+   * @since v0.10.2
+   */
+  public void setC3SeatID (final String s)
+  {
+    c3SeatID = s;
   }
 
   /** @return the transaction status */
@@ -460,6 +483,8 @@ public class InboundTransactionResponse
       ret.add ("sbdhInstanceID", sbdhInstanceID);
     if (c2SeatID != null)
       ret.add ("c2SeatID", c2SeatID);
+    if (c3SeatID != null)
+      ret.add ("c3SeatID", c3SeatID);
     if (status != null)
       ret.add ("status", status);
     ret.add ("attemptCount", attemptCount);
