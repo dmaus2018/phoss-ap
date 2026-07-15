@@ -15,3 +15,6 @@ zz
 lgtm-container/
 .lgtm-env
 run-lgtm.sh
+.vscode/settings.json
+phoss-ap-webapp/src/main/resources/ap2026testg3.jks
+phoss-ap-webapp/src/main/resources/application.properties
