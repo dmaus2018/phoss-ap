@@ -341,6 +341,7 @@
     <module>phoss-ap-api</module>
     <module>phoss-ap-basic</module>
     <module>phoss-ap-db</module>
+    <module>phoss-ap-storage-db</module>
     <module>phoss-ap-forwarding</module>
     <module>phoss-ap-core</module>
     <module>phoss-ap-sentry</module>

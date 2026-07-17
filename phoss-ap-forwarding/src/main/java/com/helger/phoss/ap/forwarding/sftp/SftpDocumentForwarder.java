@@ -221,7 +221,7 @@ public class SftpDocumentForwarder implements IDocumentForwarder
   private void _writeMetadataSidecar (@NonNull final IInboundTransaction aTransaction, @NonNull final String sBaseName)
   {
     final String sJson = InboundTransactionResponse.fromDomain (aTransaction)
-                                                   .getAsJson ()
+                                                   .exportAsJson ()
                                                    .getAsJsonString (JsonWriterSettings.DEFAULT_SETTINGS_FORMATTED);
     final byte [] aJsonBytes = sJson.getBytes (StandardCharsets.UTF_8);
 

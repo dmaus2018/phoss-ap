@@ -70,21 +70,7 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
     LOGGER.info ("Initializing " + ClassHelper.getClassLocalName (this));
     try
     {
-      // Initialize document payload manager
-      m_aDocPayloadMgr = switch (APBasicConfig.getStorageMode ())
-      {
-        case FILE_SYSTEM ->
-        {
-          LOGGER.info ("Using filesystem document storage backend");
-          yield new DocumentPayloadManagerFileSystem ();
-        }
-        case S3 ->
-        {
-          LOGGER.info ("Using S3 document storage backend");
-          yield new DocumentPayloadManagerS3 ();
-        }
-      };
-      m_aDocPayloadMgr.verifyConfiguration ();
+      m_aTimestampMgr = new APTimestampManager ();
 
       // Determine identifier factory from configuration
       m_aIdentifierFactory = switch (APBasicConfig.getPeppolIdentifierMode ())
@@ -101,7 +87,29 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
         }
       };
 
-      m_aTimestampMgr = new APTimestampManager ();
+      // Initialize document payload manager
+      m_aDocPayloadMgr = switch (APBasicConfig.getStorageMode ())
+      {
+        case FILE_SYSTEM ->
+        {
+          LOGGER.info ("Using filesystem document storage backend");
+          yield new DocumentPayloadManagerFileSystem ();
+        }
+        case S3 ->
+        {
+          LOGGER.info ("Using S3 document storage backend");
+          yield new DocumentPayloadManagerS3 ();
+        }
+        case DB ->
+        {
+          LOGGER.info ("Using DB document storage backend via SPI");
+          yield java.util.ServiceLoader.load (com.helger.phoss.ap.api.spi.IDocumentPayloadManagerProviderSPI.class)
+                                       .findFirst ()
+                                       .orElseThrow (() -> new IllegalStateException ("No DB Payload Manager SPI provider found on the classpath!"))
+                                       .createManager ();
+        }
+      };
+      m_aDocPayloadMgr.verifyConfiguration ();
 
       LOGGER.info (ClassHelper.getClassLocalName (this) + " was initialized");
     }

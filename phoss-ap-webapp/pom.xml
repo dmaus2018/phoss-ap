@@ -137,6 +137,11 @@
       <version>${spring-boot.version}</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.helger.phoss.ap</groupId>
+      <artifactId>phoss-ap-storage-db</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 
   <build>
