@@ -133,7 +133,7 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
   private static void _writeMetadataJson (@NonNull final File aJsonFile, @NonNull final IInboundTransaction aTx)
   {
     final String sJson = InboundTransactionResponse.fromDomain (aTx)
-                                                   .getAsJson ()
+                                                   .exportAsJson ()
                                                    .getAsJsonString (JsonWriterSettings.DEFAULT_SETTINGS_FORMATTED);
     if (SimpleFileIO.writeFile (aJsonFile, sJson, StandardCharsets.UTF_8).isFailure ())
       LOGGER.error ("Failed to write metadata JSON to '" + aJsonFile.getAbsolutePath () + "'");

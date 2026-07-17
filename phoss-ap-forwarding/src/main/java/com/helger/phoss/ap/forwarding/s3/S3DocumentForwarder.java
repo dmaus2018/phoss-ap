@@ -136,7 +136,7 @@ public class S3DocumentForwarder implements IDocumentForwarder
                                       @NonNull final String sMetaKey)
   {
     final String sJson = InboundTransactionResponse.fromDomain (aTransaction)
-                                                   .getAsJson ()
+                                                   .exportAsJson ()
                                                    .getAsJsonString (JsonWriterSettings.DEFAULT_SETTINGS_FORMATTED);
     final byte [] aJsonBytes = sJson.getBytes (StandardCharsets.UTF_8);
 

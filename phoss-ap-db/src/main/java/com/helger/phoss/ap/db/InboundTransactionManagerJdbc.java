@@ -122,7 +122,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                                                             Long.valueOf (nDocumentSize),
                                                                                                             sDocumentHash,
                                                                                                             sAS4MessageID,
-                                                                                                            aAS4Timestamp,
+                                                                                                            toTS (aAS4Timestamp),
                                                                                                             sSbdhInstanceID,
                                                                                                             sC1CountryCode,
                                                                                                             null,
@@ -130,7 +130,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                                                             Boolean.valueOf (bIsDuplicateSBDH),
                                                                                                             EInboundStatus.RECEIVED.getID (),
                                                                                                             Integer.valueOf (0),
-                                                                                                            aNow,
+                                                                                                            toTS (aNow),
                                                                                                             null,
                                                                                                             EReportingStatus.PENDING.getID (),
                                                                                                             null,
@@ -296,7 +296,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       " WHERE id=?",
                                                                       new ConstantPreparedStatementDataProvider (eStatus.getID (),
                                                                                                                  Integer.valueOf (nAttemptCount),
-                                                                                                                 aNextRetryDT,
+                                                                                                                 toTS (aNextRetryDT),
                                                                                                                  sErrorDetails,
                                                                                                                  sID));
     return ESuccess.valueOf (nRowsAffected == 1);
@@ -311,7 +311,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       " SET status=?, completed_dt=?" +
                                                                       " WHERE id=?",
                                                                       new ConstantPreparedStatementDataProvider (eStatus.getID (),
-                                                                                                                 now (),
+                                                                                                                 toTS (now ()),
                                                                                                                  sID));
     return ESuccess.valueOf (nRowsAffected == 1);
   }
@@ -474,5 +474,22 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
   public String toString ()
   {
     return ToStringGenerator.getDerived (super.toString ()).append ("TableName", m_sTableName).getToString ();
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
+  public ICommonsList <IInboundTransaction> getAllTransactions (@Nonnegative final int nLimit, @Nonnegative final int nOffset)
+  {
+    final String sQuery = "SELECT " + COLS + " FROM " + m_sTableName +
+                          " UNION ALL SELECT " + COLS + " FROM " + m_sTableName + "_archive" +
+                          " ORDER BY received_dt DESC" +
+                          " LIMIT " + nLimit + " OFFSET " + nOffset;
+
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll (sQuery);
+    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
+    if (aRows != null)
+      for (final DBResultRow aRow : aRows)
+        ret.add (new InboundTransactionRow (aRow));
+    return ret;
   }
 }
