@@ -39,7 +39,11 @@ public enum EStorageMode implements IHasID <String>
   /**
    * Store messages on S3. Supported since v0.1.1
    */
-  S3 ("s3");
+  S3 ("s3"),
+  /**
+   * Store messages in the relational database. Supported since v0.10.4
+   */
+  DB ("db");
 
   public static final EStorageMode DEFAULT = FILE_SYSTEM;
 
