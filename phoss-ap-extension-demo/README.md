@@ -69,7 +69,8 @@ cp target/phoss-ap-extension-demo-*.jar ./ext/
 docker run --rm -p 8080:8080 \
   -v "$(pwd)/ext:/ext" \
   -e PHOSSAP_JDBC_URL=jdbc:postgresql://host.docker.internal:5432/phoss-ap \
-  -e PHOSSAP_JDBC_USER=peppol -e PHOSSAP_JDBC_PASSWORD=peppol \
+  -e PHOSSAP_JDBC_USER=peppol \
+  -e PHOSSAP_JDBC_PASSWORD=peppol \
   phelger/phoss-ap
 ```
 
@@ -81,7 +82,8 @@ Build a small image that layers the extension on top of a phoss-ap image (see `D
 ./assemble.sh
 docker run --rm -p 8080:8080 \
   -e PHOSSAP_JDBC_URL=jdbc:postgresql://host.docker.internal:5432/phoss-ap \
-  -e PHOSSAP_JDBC_USER=peppol -e PHOSSAP_JDBC_PASSWORD=peppol \
+  -e PHOSSAP_JDBC_USER=peppol \
+  -e PHOSSAP_JDBC_PASSWORD=peppol \
   phoss-ap-with-demo-ext
 ```
 

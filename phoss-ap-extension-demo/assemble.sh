@@ -36,10 +36,10 @@ REPO_ROOT="$(cd "${MODULE_DIR}/.." && pwd)"
 # Default image names by OS: the arm64 variants on macOS (Apple Silicon), the amd64
 # variants elsewhere. Override IMAGE_NAME / PHOSS_AP_IMAGE explicitly to bypass.
 if [ "$(uname -s)" = "Darwin" ]; then
-  IMAGE_NAME="${IMAGE_NAME:-phoss-ap-with-demo-ext-arm64}"
+  IMAGE_NAME="${IMAGE_NAME:-phelger/phoss-ap-with-demo-ext-arm64}"
   PHOSS_AP_IMAGE="${PHOSS_AP_IMAGE:-phelger/phoss-ap-arm64:latest}"
 else
-  IMAGE_NAME="${IMAGE_NAME:-phoss-ap-with-demo-ext}"
+  IMAGE_NAME="${IMAGE_NAME:-phelger/phoss-ap-with-demo-ext}"
   PHOSS_AP_IMAGE="${PHOSS_AP_IMAGE:-phelger/phoss-ap:latest}"
 fi
 JAR_ONLY=false

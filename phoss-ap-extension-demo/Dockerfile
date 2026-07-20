@@ -35,6 +35,11 @@ FROM ${PHOSS_AP_IMAGE}
 LABEL org.opencontainers.image.title="phoss-ap-with-demo-ext"
 LABEL org.opencontainers.image.description="phoss-ap with the SPI extension demo baked in"
 
+# Put the /ext extension directory on the runtime classpath. The base phoss-ap image
+# already sets this, but declaring it here keeps this image self-contained even when
+# layered on an older base that predates the extension mechanism.
+ENV LOADER_PATH=/ext
+
 # Copy the thin extension jar (built by "mvn package") into the classpath extension
 # directory. The wildcard matches the versioned artifact name; the *-sources /
 # *-javadoc jars are intentionally excluded by the explicit suffix pattern below.
