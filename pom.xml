@@ -352,5 +352,7 @@
     <!-- Test stuff -->
     <module>phoss-ap-testbackend</module>
     <module>phoss-ap-testsender</module>
+    <!-- Example runtime extension (SPI demo, loaded via /ext) -->
+    <module>phoss-ap-extension-demo</module>
   </modules>
 </project>
