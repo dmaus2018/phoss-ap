@@ -20,6 +20,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.Nonempty;
+import com.helger.annotation.misc.Since;
 import com.helger.base.id.IHasID;
 import com.helger.base.lang.EnumHelper;
 
@@ -41,9 +42,13 @@ public enum EStorageMode implements IHasID <String>
    */
   S3 ("s3"),
   /**
-   * Store messages in the relational database. Supported since v0.10.4
+   * Store messages via a deployment-provided
+   * {@link com.helger.phoss.ap.api.spi.IDocumentPayloadManagerProviderSPI} implementation, selected
+   * by its ID. This mode makes no assumption about the underlying storage technology (database,
+   * object store, message queue, ...).
    */
-  DB ("db");
+  @Since ("0.10.4")
+  SPI("spi");
 
   public static final EStorageMode DEFAULT = FILE_SYSTEM;
 

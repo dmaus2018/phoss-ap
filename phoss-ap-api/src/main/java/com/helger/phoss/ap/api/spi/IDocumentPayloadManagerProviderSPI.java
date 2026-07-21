@@ -18,20 +18,41 @@ package com.helger.phoss.ap.api.spi;
 
 import org.jspecify.annotations.NonNull;
 
+import com.helger.annotation.Nonempty;
 import com.helger.annotation.style.IsSPIInterface;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
 
 /**
- * SPI interface to dynamically load an {@link IDocumentPayloadManager} via {@link java.util.ServiceLoader}.
+ * SPI interface for deployment-provided document payload storage backends.
+ * <p>
+ * Implementations are loaded via {@link java.util.ServiceLoader}. When the storage mode is set to
+ * <code>spi</code>, the AP selects one provider by matching {@link #getID()} against the configured
+ * <code>storage.spi.id</code> value.
+ * <p>
+ * This is deliberately storage-technology agnostic: the returned {@link IDocumentPayloadManager} may
+ * be backed by a database, an object store, a message queue or anything else. Any technology-specific
+ * setup (schema creation, migrations, bucket provisioning, …) is the responsibility of the provider
+ * implementation itself, not of the AP core.
  *
  * @author Philip Helger
+ * @since 0.10.4
  */
 @IsSPIInterface
 public interface IDocumentPayloadManagerProviderSPI
 {
   /**
-   * @return A new instance of the document payload manager. Never <code>null</code>.
+   * @return The stable provider ID used in configuration. Never <code>null</code> nor empty.
    */
   @NonNull
-  IDocumentPayloadManager createManager ();
+  @Nonempty
+  String getID ();
+
+  /**
+   * Create a fresh document payload manager instance. The AP calls
+   * {@link IDocumentPayloadManager#verifyConfiguration()} on the returned instance afterwards.
+   *
+   * @return A document payload manager instance. Never <code>null</code>.
+   */
+  @NonNull
+  IDocumentPayloadManager createDocumentPayloadManager ();
 }

@@ -16,6 +16,8 @@
  */
 package com.helger.phoss.ap.basic;
 
+import java.util.ServiceLoader;
+
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,11 +25,14 @@ import org.slf4j.LoggerFactory;
 import com.helger.annotation.style.UsedViaReflection;
 import com.helger.base.exception.InitializationException;
 import com.helger.base.lang.clazz.ClassHelper;
+import com.helger.base.string.StringHelper;
 import com.helger.peppolid.factory.IIdentifierFactory;
 import com.helger.peppolid.factory.PeppolIdentifierFactory;
 import com.helger.peppolid.factory.PeppolLaxIdentifierFactory;
+import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
+import com.helger.phoss.ap.api.spi.IDocumentPayloadManagerProviderSPI;
 import com.helger.phoss.ap.basic.mgr.APTimestampManager;
 import com.helger.phoss.ap.basic.mgr.DocumentPayloadManagerFileSystem;
 import com.helger.phoss.ap.basic.mgr.DocumentPayloadManagerS3;
@@ -43,9 +48,9 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (APBasicMetaManager.class);
 
-  private IDocumentPayloadManager m_aDocPayloadMgr;
   private IIdentifierFactory m_aIdentifierFactory;
   private IAPTimestampManager m_aTimestampMgr;
+  private IDocumentPayloadManager m_aDocPayloadMgr;
 
   /**
    * @deprecated Only called via reflection
@@ -70,8 +75,6 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
     LOGGER.info ("Initializing " + ClassHelper.getClassLocalName (this));
     try
     {
-      m_aTimestampMgr = new APTimestampManager ();
-
       // Determine identifier factory from configuration
       m_aIdentifierFactory = switch (APBasicConfig.getPeppolIdentifierMode ())
       {
@@ -87,7 +90,9 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
         }
       };
 
-      // Initialize document payload manager
+      m_aTimestampMgr = new APTimestampManager ();
+
+      // Initialize document payload manager last
       m_aDocPayloadMgr = switch (APBasicConfig.getStorageMode ())
       {
         case FILE_SYSTEM ->
@@ -100,13 +105,11 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
           LOGGER.info ("Using S3 document storage backend");
           yield new DocumentPayloadManagerS3 ();
         }
-        case DB ->
+        case SPI ->
         {
-          LOGGER.info ("Using DB document storage backend via SPI");
-          yield java.util.ServiceLoader.load (com.helger.phoss.ap.api.spi.IDocumentPayloadManagerProviderSPI.class)
-                                       .findFirst ()
-                                       .orElseThrow (() -> new IllegalStateException ("No DB Payload Manager SPI provider found on the classpath!"))
-                                       .createManager ();
+          // Storage backend is provided by a deployment-supplied SPI implementation, selected by
+          // ID. The AP makes no assumption about the underlying storage technology.
+          yield _createSPIPayloadManager ();
         }
       };
       m_aDocPayloadMgr.verifyConfiguration ();
@@ -119,14 +122,27 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
     }
   }
 
-  /**
-   * @return The document payload manager for storing and retrieving documents on the filesystem.
-   *         Never <code>null</code>.
-   */
   @NonNull
-  public static IDocumentPayloadManager getDocPayloadMgr ()
+  private static IDocumentPayloadManager _createSPIPayloadManager ()
   {
-    return getInstance ().m_aDocPayloadMgr;
+    final String sProviderID = APBasicConfig.getStorageSpiID ();
+    if (StringHelper.isEmpty (sProviderID))
+      throw new InitializationException ("Storage mode 'spi' requires configuration property '" +
+                                         APConfigurationProperties.STORAGE_SPI_ID +
+                                         "' to be set");
+
+    for (final IDocumentPayloadManagerProviderSPI aProvider : ServiceLoader.load (IDocumentPayloadManagerProviderSPI.class))
+      if (sProviderID.equals (aProvider.getID ()))
+      {
+        LOGGER.info ("Using custom document storage backend via SPI provider '" + sProviderID + "'");
+        return aProvider.createDocumentPayloadManager ();
+      }
+
+    throw new InitializationException ("No document payload manager provider SPI found for ID '" +
+                                       sProviderID +
+                                       "' from configuration property '" +
+                                       APConfigurationProperties.STORAGE_SPI_ID +
+                                       "'");
   }
 
   /**
@@ -145,5 +161,15 @@ public final class APBasicMetaManager extends AbstractGlobalSingleton
   public static IIdentifierFactory getIdentifierFactory ()
   {
     return getInstance ().m_aIdentifierFactory;
+  }
+
+  /**
+   * @return The document payload manager for storing and retrieving documents on the filesystem.
+   *         Never <code>null</code>.
+   */
+  @NonNull
+  public static IDocumentPayloadManager getDocPayloadMgr ()
+  {
+    return getInstance ().m_aDocPayloadMgr;
   }
 }
