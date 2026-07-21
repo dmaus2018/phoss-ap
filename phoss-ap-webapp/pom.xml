@@ -157,6 +157,12 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
         <version>${spring-boot.version}</version>
+        <configuration>
+          <!-- The ZIP layout uses PropertiesLauncher, so external jars (custom DB drivers,
+               SPI extensions) can be added to the classpath at runtime via the LOADER_PATH
+               environment variable or -Dloader.path, without rebuilding this jar. -->
+          <layout>ZIP</layout>
+        </configuration>
         <executions>
           <execution>
             <goals>
