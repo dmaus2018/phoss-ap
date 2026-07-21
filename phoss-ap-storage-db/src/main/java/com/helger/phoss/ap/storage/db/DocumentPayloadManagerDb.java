@@ -31,10 +31,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonempty;
+import com.helger.annotation.style.IsSPIImplementation;
 
 import com.helger.db.jdbc.executor.DBExecutor;
 import com.helger.db.jdbc.executor.DBResultRow;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
+import com.helger.phoss.ap.api.spi.IDocumentPayloadManagerProviderSPI;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 import com.helger.phoss.ap.db.config.APJdbcConfiguration;
 import com.helger.phoss.ap.db.AbstractAPJdbcManager;
@@ -42,32 +44,82 @@ import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.db.jdbc.callback.ConstantPreparedStatementDataProvider;
 
 /**
- * Implementation of {@link IDocumentPayloadManager} that stores payloads in the database.
+ * Implementation of {@link IDocumentPayloadManager} and
+ * {@link IDocumentPayloadManagerProviderSPI} that stores payloads in the database.
  *
  * @author Philip Helger
  */
-public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements IDocumentPayloadManager
+@IsSPIImplementation
+public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements
+                                       IDocumentPayloadManager,
+                                       IDocumentPayloadManagerProviderSPI
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (DocumentPayloadManagerDb.class);
-  private final String m_sTableName;
+  private String m_sTableName;
 
   public DocumentPayloadManagerDb ()
   {
     super (APBasicMetaManager.getTimestampMgr ());
-    final APJdbcConfiguration aJdbcConfig = APJdbcMetaManager.getJdbcConfig ();
-    m_sTableName = com.helger.db.api.helper.DBSystemHelper.getTableNamePrefix (aJdbcConfig.getJdbcDatabaseSystemType (),
-                                                                               aJdbcConfig.getJdbcSchema ()) +
+  }
+
+  @NonNull
+  private String _getTableName ()
+  {
+    String sTableName = m_sTableName;
+    if (sTableName == null)
+    {
+      final APJdbcConfiguration aJdbcConfig = APJdbcMetaManager.getJdbcConfig ();
+      sTableName = com.helger.db.api.helper.DBSystemHelper.getTableNamePrefix (aJdbcConfig.getJdbcDatabaseSystemType (),
+                                                                                 aJdbcConfig.getJdbcSchema ()) +
                    "ap_payload";
+      m_sTableName = sTableName;
+    }
+    return sTableName;
+  }
+
+  @Override
+  @NonNull
+  @Nonempty
+  public String getID ()
+  {
+    return "db";
+  }
+
+  @Override
+  @NonNull
+  public IDocumentPayloadManager createDocumentPayloadManager ()
+  {
+    return this;
+  }
+
+  private void _initFlyway ()
+  {
+    final APJdbcConfiguration aJdbcConfig = APJdbcMetaManager.getJdbcConfig ();
+    final com.helger.config.IConfig aConfig = com.helger.phoss.ap.api.config.APConfigProvider.getConfig ();
+    final com.helger.db.flyway.FlywayConfiguration aFlywayCfg = new com.helger.phoss.ap.db.config.APFlywayConfigurationBuilder (aConfig,
+                                                                                                                                   aJdbcConfig).build ();
+    if (aFlywayCfg.isFlywayEnabled ())
+    {
+      final String sPayloadLocation = "db/phoss-ap-flyway-payload-" +
+                                      aJdbcConfig.getJdbcDatabaseSystemType ().getID ();
+      LOGGER.info ("Running payload Flyway migrations from " + sPayloadLocation);
+      com.helger.db.flyway.FlywayMigrationRunner.runFlyway (aJdbcConfig,
+                                                            aFlywayCfg,
+                                                            sPayloadLocation,
+                                                            (org.flywaydb.core.api.migration.JavaMigration []) null,
+                                                            (org.flywaydb.core.api.callback.Callback []) null);
+    }
   }
 
   @Override
   public void verifyConfiguration ()
   {
+    _initFlyway ();
     try
     {
-      final boolean bExists = newExecutor ().queryCount ("SELECT COUNT(*) FROM " + m_sTableName) >= 0;
+      final boolean bExists = newExecutor ().queryCount ("SELECT COUNT(*) FROM " + _getTableName ()) >= 0;
       if (!bExists)
-        throw new IllegalStateException ("Table " + m_sTableName + " is missing!");
+        throw new IllegalStateException ("Table " + _getTableName () + " is missing!");
     }
     catch (final Exception ex)
     {
@@ -95,7 +147,7 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements I
     if (existsDocument (sPath))
     {
       final int nRows = (int) aExecutor.insertOrUpdateOrDelete ("UPDATE " +
-                                                                m_sTableName +
+                                                                _getTableName () +
                                                                 " SET reference_dt=?, content=? WHERE file_path=?",
                                                                 new ConstantPreparedStatementDataProvider (toTS (aReferenceDT),
                                                                                                            aBytes,
@@ -108,7 +160,7 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements I
     else
     {
       final int nRows = (int) aExecutor.insertOrUpdateOrDelete ("INSERT INTO " +
-                                                                m_sTableName +
+                                                                _getTableName () +
                                                                 " (file_path, reference_dt, content) VALUES (?, ?, ?)",
                                                                 new ConstantPreparedStatementDataProvider (sPath,
                                                                                                            toTS (aReferenceDT),
@@ -166,7 +218,7 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements I
     final String sTargetPath = _createPath (sTargetDir, sBaseName + sFileExt);
     final DBExecutor aExecutor = newExecutor ();
     final int nRows = (int) aExecutor.insertOrUpdateOrDelete ("UPDATE " +
-                                                              m_sTableName +
+                                                              _getTableName () +
                                                               " SET file_path=? WHERE file_path=?",
                                                               new ConstantPreparedStatementDataProvider (sTargetPath,
                                                                                                          sSrcFile));
@@ -185,7 +237,7 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements I
     final javax.sql.DataSource aDS = aDSP.getDataSource ();
 
     try (final java.sql.Connection aConn = aDS.getConnection ();
-         final java.sql.PreparedStatement aPS = aConn.prepareStatement ("SELECT content FROM " + m_sTableName + " WHERE file_path=?"))
+         final java.sql.PreparedStatement aPS = aConn.prepareStatement ("SELECT content FROM " + _getTableName () + " WHERE file_path=?"))
     {
       aPS.setString (1, sAbsolutePath);
       try (final java.sql.ResultSet aRS = aPS.executeQuery ())
@@ -239,7 +291,7 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements I
   public boolean deleteDocument (@NonNull final String sAbsolutePath)
   {
     final DBExecutor aExecutor = newExecutor ();
-    final int nRows = (int) aExecutor.insertOrUpdateOrDelete ("DELETE FROM " + m_sTableName + " WHERE file_path=?",
+    final int nRows = (int) aExecutor.insertOrUpdateOrDelete ("DELETE FROM " + _getTableName () + " WHERE file_path=?",
                                                               new ConstantPreparedStatementDataProvider (sAbsolutePath));
     return nRows > 0;
   }
@@ -248,7 +300,7 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements I
   public boolean existsDocument (@NonNull final String sAbsolutePath)
   {
     final DBExecutor aExecutor = newExecutor ();
-    final long nCount = aExecutor.queryCount ("SELECT COUNT(*) FROM " + m_sTableName + " WHERE file_path=?",
+    final long nCount = aExecutor.queryCount ("SELECT COUNT(*) FROM " + _getTableName () + " WHERE file_path=?",
                                               new ConstantPreparedStatementDataProvider (sAbsolutePath));
     return nCount > 0;
   }

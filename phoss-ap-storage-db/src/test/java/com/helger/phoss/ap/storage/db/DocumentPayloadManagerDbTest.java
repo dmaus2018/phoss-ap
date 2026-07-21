@@ -45,6 +45,7 @@ public final class DocumentPayloadManagerDbTest
   @Test
   public void testBasicOperations () throws Exception
   {
+    com.helger.phoss.ap.db.APJdbcMetaManager.getInstance ();
     final DocumentPayloadManagerDb aMgr = new DocumentPayloadManagerDb ();
     aMgr.verifyConfiguration ();
 
