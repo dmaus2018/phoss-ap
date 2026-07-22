@@ -17,6 +17,7 @@
 package com.helger.phoss.ap.extension.demo;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 
 import org.jspecify.annotations.NonNull;
@@ -27,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import com.helger.annotation.Nonnegative;
 import com.helger.annotation.style.IsSPIImplementation;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
+import com.helger.phoss.ap.api.codelist.EMlsReceptionStatus;
 import com.helger.phoss.ap.api.spi.IAPLifecycleEventSPI;
 
 /**
@@ -96,7 +98,11 @@ public final class DemoLifecycleEventSPI implements IAPLifecycleEventSPI
   /** {@inheritDoc} */
   public void onInboundMLSCorrelated (@NonNull final String sMlsTransactionID,
                                       @NonNull final String sReferencedSbdhInstanceID,
+                                      @NonNull final String sCorrelatedOutboundTransactionID,
                                       @NonNull final EPeppolMLSResponseCode eMlsResponseCode,
+                                      @NonNull final EMlsReceptionStatus eMlsReceptionStatus,
+                                      @Nullable final String sMlsDocumentID,
+                                      @NonNull final OffsetDateTime aMlsReceivedDT,
                                       @Nullable final Duration aRoundTrip)
   {
     LOGGER.info (PREFIX +
@@ -104,8 +110,16 @@ public final class DemoLifecycleEventSPI implements IAPLifecycleEventSPI
                  sMlsTransactionID +
                  ", referencedSbdhInstanceID=" +
                  sReferencedSbdhInstanceID +
+                 ", correlatedOutboundTransactionID=" +
+                 sCorrelatedOutboundTransactionID +
                  ", mlsResponseCode=" +
                  eMlsResponseCode +
+                 ", mlsReceptionStatus=" +
+                 eMlsReceptionStatus +
+                 ", mlsDocumentID=" +
+                 sMlsDocumentID +
+                 ", mlsReceivedDT=" +
+                 aMlsReceivedDT +
                  ", roundTrip=" +
                  aRoundTrip);
   }
