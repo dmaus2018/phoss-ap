@@ -322,7 +322,14 @@ public final class MlsHandler
     final Duration aRoundTrip = aOutboundCompletedDT != null ? Duration.between (aOutboundCompletedDT,
                                                                                  aMlsAS4ReceivedDT) : null;
     for (final var aHandler : APCoreMetaManager.getAllLifecycleHandlers ())
-      aHandler.onInboundMLSCorrelated (sMlsInboundTransactionID, sSbdhInstanceID, eResponseCode, aRoundTrip);
+      aHandler.onInboundMLSCorrelated (sMlsInboundTransactionID,
+                                       sSbdhInstanceID,
+                                       aTx.getID (),
+                                       eResponseCode,
+                                       eMlsStatus,
+                                       sMlsID,
+                                       aMlsAS4ReceivedDT,
+                                       aRoundTrip);
 
     return ESuccess.SUCCESS;
   }

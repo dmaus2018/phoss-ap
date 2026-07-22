@@ -100,6 +100,8 @@ public final class CPhossAPOtel
   public static final String ATTR_DOCTYPE_ID = "phoss.ap.doctype.id";
   public static final String ATTR_PROCESS_ID = "phoss.ap.process.id";
   public static final String ATTR_MLS_RESPONSE_CODE = "phoss.ap.mls.response_code";
+  /** @since 0.11.0 */
+  public static final String ATTR_MLS_RECEPTION_STATUS = "phoss.ap.mls.reception_status";
   public static final String ATTR_REPORT_TYPE = "phoss.ap.report.type";
   public static final String ATTR_REPORT_YEAR_MONTH = "phoss.ap.report.year_month";
   public static final String ATTR_REPORT_ITEM_COUNT = "phoss.ap.report.item_count";
