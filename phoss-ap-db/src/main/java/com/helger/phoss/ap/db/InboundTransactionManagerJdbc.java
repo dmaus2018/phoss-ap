@@ -500,21 +500,4 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
   {
     return ToStringGenerator.getDerived (super.toString ()).append ("TableName", m_sTableName).getToString ();
   }
-
-  /** {@inheritDoc} */
-  @NonNull
-  public ICommonsList <IInboundTransaction> getAllTransactions (@Nonnegative final int nLimit, @Nonnegative final int nOffset)
-  {
-    final String sQuery = "SELECT " + COLS + " FROM " + m_sTableName +
-                          " UNION ALL SELECT " + COLS + " FROM " + m_sTableName + "_archive" +
-                          " ORDER BY received_dt DESC" +
-                          " LIMIT " + nLimit + " OFFSET " + nOffset;
-
-    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll (sQuery);
-    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
-    if (aRows != null)
-      for (final DBResultRow aRow : aRows)
-        ret.add (new InboundTransactionRow (aRow));
-    return ret;
-  }
 }
