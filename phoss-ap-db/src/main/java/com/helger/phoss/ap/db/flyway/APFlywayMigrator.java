@@ -56,9 +56,17 @@ public final class APFlywayMigrator
       return;
     }
 
+    final String sBaseLocation = "db/phoss-ap-flyway-" + aJdbcConfig.getJdbcDatabaseSystemType ().getID ();
+    final boolean bHasPayloadDbSPI = java.util.ServiceLoader.load (com.helger.phoss.ap.api.spi.IDocumentPayloadManagerProviderSPI.class)
+                                                            .iterator ()
+                                                            .hasNext ();
+
+    final String sLocations = bHasPayloadDbSPI ? sBaseLocation + ",db/phoss-ap-flyway-payload-" + aJdbcConfig.getJdbcDatabaseSystemType ().getID ()
+                                               : sBaseLocation;
+
     FlywayMigrationRunner.runFlyway (aJdbcConfig,
                                      aFlywayCfg,
-                                     "db/phoss-ap-flyway-" + aJdbcConfig.getJdbcDatabaseSystemType ().getID (),
+                                     sLocations,
                                      (JavaMigration []) null,
                                      (Callback []) null);
   }

@@ -244,4 +244,79 @@ public class InboundController
 
     return ResponseEntity.ok (InboundTransactionResponse.fromDomain (aTx));
   }
+
+  /**
+   * Voluntarily replay (re-forward) an inbound transaction.
+   *
+   * @param sbdhInstanceID
+   *        The SBDH Instance ID of the transaction to replay.
+   * @return 200 on success, 404 if not found, 500 on failure.
+   */
+  @PostMapping ("/{sbdhInstanceID}/replay")
+  @Operation (summary = "Replay an inbound transaction",
+              description = "Forces a re-forwarding of an existing inbound transaction.")
+  @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Transaction replay initiated"),
+                   @ApiResponse (responseCode = "404", description = "Transaction not found", content = @Content) })
+  public ResponseEntity <Void> replayInbound (@Parameter(description = "SBDH Instance ID", required = true) @PathVariable("sbdhInstanceID") final String sbdhInstanceID)
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final IInboundTransaction aTx = aTxMgr.getBySbdhInstanceIDIncludingArchive (sbdhInstanceID);
+    if (aTx == null)
+      return ResponseEntity.notFound ().build ();
+    
+    com.helger.base.state.ESuccess eSuccess = com.helger.phoss.ap.core.inbound.InboundOrchestrator.forwardDocument ("API Replay: ", aTx);
+    if (eSuccess.isSuccess ())
+      return ResponseEntity.ok ().build ();
+    return ResponseEntity.internalServerError ().build ();
+  }
+
+  /**
+   * Get historical inbound transactions with pagination.
+   *
+   * @param limit
+   *        Maximum number of transactions to return.
+   * @param offset
+   *        Pagination offset.
+   * @return A paginated list of historical inbound transactions.
+   */
+  @GetMapping ("/history")
+  @Operation (summary = "Get historical inbound transactions", description = "Returns a paginated list of historical inbound transactions.")
+  @ApiResponses ({ @ApiResponse (responseCode = "200", description = "List of transactions") })
+  public ResponseEntity <List <InboundTransactionResponse>> getHistory (@RequestParam (name = "limit", defaultValue = "50") final int limit,
+                                                                        @RequestParam (name = "offset", defaultValue = "0") final int offset)
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final var aTxs = aTxMgr.getAllTransactions (limit, offset);
+    return ResponseEntity.ok (aTxs.getAllMapped (InboundTransactionResponse::fromDomain));
+  }
+
+  /**
+   * Fetch the raw document payload for a transaction.
+   *
+   * @param sbdhInstanceID
+   *        The SBDH Instance ID.
+   * @return The raw byte content of the document.
+   */
+  @GetMapping (value = "/{sbdhInstanceID}/payload", produces = org.springframework.http.MediaType.APPLICATION_OCTET_STREAM_VALUE)
+  @Operation (summary = "Get the payload of an inbound transaction", description = "Returns the raw byte content of the document.")
+  @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Payload content"),
+                   @ApiResponse (responseCode = "404", description = "Transaction or payload not found", content = @Content) })
+  public ResponseEntity <byte []> getPayload (@Parameter(description = "SBDH Instance ID", required = true) @PathVariable("sbdhInstanceID") final String sbdhInstanceID)
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final IInboundTransaction aTx = aTxMgr.getBySbdhInstanceIDIncludingArchive (sbdhInstanceID);
+    if (aTx == null)
+      return ResponseEntity.notFound ().build ();
+    
+    try
+    {
+      byte [] aBytes = com.helger.phoss.ap.basic.APBasicMetaManager.getDocPayloadMgr ().readDocument (aTx.getDocumentPath ());
+      return ResponseEntity.ok (aBytes);
+    }
+    catch (Exception ex)
+    {
+      LOGGER.error ("Failed to read payload for " + sbdhInstanceID, ex);
+      return ResponseEntity.notFound ().build ();
+    }
+  }
 }

@@ -22,7 +22,7 @@
   <parent>
     <groupId>com.helger.phoss.ap</groupId>
     <artifactId>phoss-ap-parent-pom</artifactId>
-    <version>0.10.4-SNAPSHOT</version>
+    <version>0.11.0-SNAPSHOT</version>
   </parent>
   <artifactId>phoss-ap-db</artifactId>
   <packaging>jar</packaging>
@@ -86,6 +86,26 @@
       <groupId>com.mysql</groupId>
       <artifactId>mysql-connector-j</artifactId>
       <scope>runtime</scope>
+    </dependency>
+    <!-- DB2 support is driver-agnostic at build time: the IBM jcc driver and the
+         flyway-database-db2 dialect are supplied at runtime via the /ext extension directory,
+         so they are intentionally not declared as dependencies here. -->
+
+    <!-- Optional DB2 dependencies -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-db2</artifactId>
+      <!-- Inherited from parent? No, flyway-database-db2 is not in parent pom dependency management, so we add version -->
+      <version>${flyway.version}</version>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.ibm.db2</groupId>
+      <artifactId>jcc</artifactId>
+      <!-- Need version since it's not managed in the parent. Let's use 11.5.9.0 -->
+      <version>11.5.9.0</version>
+      <scope>runtime</scope>
+      <optional>true</optional>
     </dependency>
 
     <dependency>

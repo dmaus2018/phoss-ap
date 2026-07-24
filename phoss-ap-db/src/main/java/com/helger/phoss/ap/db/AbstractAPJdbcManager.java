@@ -57,10 +57,23 @@ public abstract class AbstractAPJdbcManager extends AbstractJDBCEnabledManager
     return m_aTimestampMgr.getCurrentDateTimeUTC ();
   }
 
+  /**
+   * Convert an {@link OffsetDateTime} to a {@link java.sql.Timestamp} for use as a JDBC parameter.
+   * <p>
+   * DB2's JDBC driver does not accept {@code OffsetDateTime} via {@code setObject()}, but all major
+   * databases accept {@code java.sql.Timestamp}. Use this method whenever an {@code OffsetDateTime}
+   * needs to be passed as a prepared-statement parameter.
+   * </p>
+   *
+   * @param aDT
+   *        The date-time to convert. May be <code>null</code>.
+   * @return A {@link Timestamp} representing the same instant, or <code>null</code> if the input is
+   *         <code>null</code>.
+   */
   @Nullable
-  protected static Timestamp toTS (@Nullable final OffsetDateTime aODT)
+  protected static Timestamp toTS (@Nullable final OffsetDateTime aDT)
   {
-    return aODT == null ? null : Timestamp.from (aODT.toInstant ());
+    return aDT == null ? null : Timestamp.from (aDT.toInstant ());
   }
 
   @Override

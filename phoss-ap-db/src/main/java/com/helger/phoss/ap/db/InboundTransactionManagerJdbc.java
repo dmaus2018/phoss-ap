@@ -29,6 +29,7 @@ import com.helger.base.state.ESuccess;
 import com.helger.base.tostring.ToStringGenerator;
 import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
+import com.helger.db.api.helper.DBValueHelper;
 import com.helger.db.jdbc.callback.ConstantPreparedStatementDataProvider;
 import com.helger.db.jdbc.executor.DBExecutor;
 import com.helger.db.jdbc.executor.DBResultRow;
@@ -122,7 +123,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                                                             Long.valueOf (nDocumentSize),
                                                                                                             sDocumentHash,
                                                                                                             sAS4MessageID,
-                                                                                                            toTS (aAS4Timestamp),
+                                                                                                            DBValueHelper.toTimestamp (aAS4Timestamp),
                                                                                                             sSbdhInstanceID,
                                                                                                             sC1CountryCode,
                                                                                                             null,
@@ -130,7 +131,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                                                             Boolean.valueOf (bIsDuplicateSBDH),
                                                                                                             EInboundStatus.RECEIVED.getID (),
                                                                                                             Integer.valueOf (0),
-                                                                                                            toTS (aNow),
+                                                                                                            DBValueHelper.toTimestamp (aNow),
                                                                                                             null,
                                                                                                             EReportingStatus.PENDING.getID (),
                                                                                                             null,
@@ -296,7 +297,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       " WHERE id=?",
                                                                       new ConstantPreparedStatementDataProvider (eStatus.getID (),
                                                                                                                  Integer.valueOf (nAttemptCount),
-                                                                                                                 toTS (aNextRetryDT),
+                                                                                                                 DBValueHelper.toTimestamp (aNextRetryDT),
                                                                                                                  sErrorDetails,
                                                                                                                  sID));
     return ESuccess.valueOf (nRowsAffected == 1);
@@ -311,7 +312,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       " SET status=?, completed_dt=?" +
                                                                       " WHERE id=?",
                                                                       new ConstantPreparedStatementDataProvider (eStatus.getID (),
-                                                                                                                 toTS (now ()),
+                                                                                                                 DBValueHelper.toTimestamp (now ()),
                                                                                                                  sID));
     return ESuccess.valueOf (nRowsAffected == 1);
   }
@@ -463,6 +464,30 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       " ORDER BY received_dt",
                                                                       new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARDED.getID (),
                                                                                                                  EReportingStatus.PENDING.getID ()));
+    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
+    if (aRows != null)
+      for (final DBResultRow aRow : aRows)
+        ret.add (new InboundTransactionRow (aRow));
+    return ret;
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
+  public ICommonsList <IInboundTransaction> getAllTransactions (@Nonnegative final int nLimit,
+                                                                @Nonnegative final int nOffset)
+  {
+    ValueEnforcer.isGE0 (nLimit, "Limit");
+    ValueEnforcer.isGE0 (nOffset, "Offset");
+
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM " +
+                                                                      m_sTableName +
+                                                                      " ORDER BY received_dt DESC" +
+                                                                      " LIMIT " +
+                                                                      nLimit +
+                                                                      " OFFSET " +
+                                                                      nOffset);
     final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)
