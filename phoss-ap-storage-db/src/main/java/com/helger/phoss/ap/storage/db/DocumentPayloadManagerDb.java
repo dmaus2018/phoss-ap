@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import com.helger.annotation.Nonempty;
 import com.helger.annotation.style.IsSPIImplementation;
 
+import com.helger.db.api.helper.DBValueHelper;
 import com.helger.db.jdbc.executor.DBExecutor;
 import com.helger.db.jdbc.executor.DBResultRow;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
@@ -149,7 +150,7 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements
       final int nRows = (int) aExecutor.insertOrUpdateOrDelete ("UPDATE " +
                                                                 _getTableName () +
                                                                 " SET reference_dt=?, content=? WHERE file_path=?",
-                                                                new ConstantPreparedStatementDataProvider (toTS (aReferenceDT),
+                                                                new ConstantPreparedStatementDataProvider (DBValueHelper.toTimestamp (aReferenceDT),
                                                                                                            aBytes,
                                                                                                            sPath));
       if (nRows == 1)
@@ -163,7 +164,7 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements
                                                                 _getTableName () +
                                                                 " (file_path, reference_dt, content) VALUES (?, ?, ?)",
                                                                 new ConstantPreparedStatementDataProvider (sPath,
-                                                                                                           toTS (aReferenceDT),
+                                                                                                           DBValueHelper.toTimestamp (aReferenceDT),
                                                                                                            aBytes));
       if (nRows == 1)
         LOGGER.info ("Stored database payload for " + sPath);
