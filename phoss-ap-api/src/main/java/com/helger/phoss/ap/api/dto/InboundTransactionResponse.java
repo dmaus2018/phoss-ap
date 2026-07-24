@@ -464,6 +464,7 @@ public class InboundTransactionResponse
    * @return This response as a ph-json {@link IJsonObject}. Never <code>null</code>.
    */
   @NonNull
+  @Schema (hidden = true)
   public IJsonObject getAsJson ()
   {
     final IJsonObject ret = new JsonObject ();
