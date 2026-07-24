@@ -16,6 +16,7 @@
  */
 package com.helger.phoss.ap.webapp.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -80,7 +81,7 @@ public class OperationsController
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final var aTxs = aTxMgr.getAllTransactions (offset, limit);
-    return ResponseEntity.ok (aTxs.getAllMapped (InboundTransactionResponse::fromDomain));
+    return ResponseEntity.ok (new ArrayList <> (aTxs.getAllMapped (InboundTransactionResponse::fromDomain)));
   }
 
   /**
@@ -169,7 +170,7 @@ public class OperationsController
   {
     final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
     final var aTxs = aTxMgr.getAllTransactions (offset, limit);
-    return ResponseEntity.ok (aTxs.getAllMapped (OutboundTransactionResponse::fromDomain));
+    return ResponseEntity.ok (new ArrayList <> (aTxs.getAllMapped (OutboundTransactionResponse::fromDomain)));
   }
 
   /**
