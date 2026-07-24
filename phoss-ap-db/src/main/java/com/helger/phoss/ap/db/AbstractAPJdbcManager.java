@@ -16,10 +16,12 @@
  */
 package com.helger.phoss.ap.db;
 
+import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.Nonempty;
 import com.helger.base.tostring.ToStringGenerator;
@@ -53,6 +55,12 @@ public abstract class AbstractAPJdbcManager extends AbstractJDBCEnabledManager
   protected final OffsetDateTime now ()
   {
     return m_aTimestampMgr.getCurrentDateTimeUTC ();
+  }
+
+  @Nullable
+  protected static Timestamp toTS (@Nullable final OffsetDateTime aODT)
+  {
+    return aODT == null ? null : Timestamp.from (aODT.toInstant ());
   }
 
   @Override
