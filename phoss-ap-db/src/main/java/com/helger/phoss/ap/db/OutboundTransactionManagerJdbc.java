@@ -381,11 +381,11 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
 
   /** {@inheritDoc} */
   @NonNull
-  public ICommonsList <IOutboundTransaction> getAllTransactions (@Nonnegative final int nLimit,
-                                                                 @Nonnegative final int nOffset)
+  public ICommonsList <IOutboundTransaction> getAllTransactions (@Nonnegative final int nOffset,
+                                                                 @Nonnegative final int nLimit)
   {
-    ValueEnforcer.isGE0 (nLimit, "Limit");
     ValueEnforcer.isGE0 (nOffset, "Offset");
+    ValueEnforcer.isGE0 (nLimit, "Limit");
 
     final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
                                                                       COLS +
@@ -401,6 +401,13 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
       for (final DBResultRow aRow : aRows)
         ret.add (new OutboundTransactionRow (aRow));
     return ret;
+  }
+
+  /** {@inheritDoc} */
+  @Nonnegative
+  public long getTransactionCount ()
+  {
+    return newExecutor ().queryCount ("SELECT COUNT(*) FROM " + m_sTableName);
   }
 
   @Override

@@ -66,21 +66,35 @@ public class OperationsController
   /**
    * Get historical inbound transactions with pagination.
    *
-   * @param limit
-   *        Maximum number of transactions to return.
    * @param offset
    *        Pagination offset.
+   * @param limit
+   *        Maximum number of transactions to return.
    * @return A paginated list of historical inbound transactions.
    */
   @GetMapping ("/inbound/history")
   @Operation (summary = "Get historical inbound transactions", description = "Returns a paginated list of historical inbound transactions.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "List of transactions") })
-  public ResponseEntity <List <InboundTransactionResponse>> getInboundHistory (@RequestParam (name = "limit", defaultValue = "50") final int limit,
-                                                                               @RequestParam (name = "offset", defaultValue = "0") final int offset)
+  public ResponseEntity <List <InboundTransactionResponse>> getInboundHistory (@RequestParam (name = "offset", defaultValue = "0") final int offset,
+                                                                               @RequestParam (name = "limit", defaultValue = "50") final int limit)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
-    final var aTxs = aTxMgr.getAllTransactions (limit, offset);
+    final var aTxs = aTxMgr.getAllTransactions (offset, limit);
     return ResponseEntity.ok (aTxs.getAllMapped (InboundTransactionResponse::fromDomain));
+  }
+
+  /**
+   * Get the total count of active inbound transactions.
+   *
+   * @return The count of active (non-archived) inbound transactions.
+   */
+  @GetMapping ("/inbound/size")
+  @Operation (summary = "Get total count of active inbound transactions", description = "Returns the count of active (non-archived) inbound transactions.")
+  @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Transaction count") })
+  public ResponseEntity <Long> getInboundSize ()
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    return ResponseEntity.ok (Long.valueOf (aTxMgr.getTransactionCount ()));
   }
 
   /**
@@ -141,21 +155,35 @@ public class OperationsController
   /**
    * Get historical outbound transactions with pagination.
    *
-   * @param limit
-   *        Maximum number of transactions to return.
    * @param offset
    *        Pagination offset.
+   * @param limit
+   *        Maximum number of transactions to return.
    * @return A paginated list of historical outbound transactions.
    */
   @GetMapping ("/outbound/history")
   @Operation (summary = "Get historical outbound transactions", description = "Returns a paginated list of historical outbound transactions.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "List of transactions") })
-  public ResponseEntity <List <OutboundTransactionResponse>> getOutboundHistory (@RequestParam (name = "limit", defaultValue = "50") final int limit,
-                                                                                @RequestParam (name = "offset", defaultValue = "0") final int offset)
+  public ResponseEntity <List <OutboundTransactionResponse>> getOutboundHistory (@RequestParam (name = "offset", defaultValue = "0") final int offset,
+                                                                                 @RequestParam (name = "limit", defaultValue = "50") final int limit)
   {
     final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
-    final var aTxs = aTxMgr.getAllTransactions (limit, offset);
+    final var aTxs = aTxMgr.getAllTransactions (offset, limit);
     return ResponseEntity.ok (aTxs.getAllMapped (OutboundTransactionResponse::fromDomain));
+  }
+
+  /**
+   * Get the total count of active outbound transactions.
+   *
+   * @return The count of active (non-archived) outbound transactions.
+   */
+  @GetMapping ("/outbound/size")
+  @Operation (summary = "Get total count of active outbound transactions", description = "Returns the count of active (non-archived) outbound transactions.")
+  @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Transaction count") })
+  public ResponseEntity <Long> getOutboundSize ()
+  {
+    final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    return ResponseEntity.ok (Long.valueOf (aTxMgr.getTransactionCount ()));
   }
 
   /**

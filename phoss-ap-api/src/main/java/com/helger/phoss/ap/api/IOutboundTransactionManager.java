@@ -271,12 +271,18 @@ public interface IOutboundTransactionManager
   /**
    * Get historical transactions with pagination.
    *
-   * @param nLimit
-   *        Maximum number of transactions to return. Must be &ge; 0.
    * @param nOffset
    *        Offset to start from. Must be &ge; 0.
+   * @param nLimit
+   *        Maximum number of transactions to return. Must be &ge; 0.
    * @return The list of transactions. Never <code>null</code>.
    */
   @NonNull
-  ICommonsList <IOutboundTransaction> getAllTransactions (@Nonnegative int nLimit, @Nonnegative int nOffset);
+  ICommonsList <IOutboundTransaction> getAllTransactions (@Nonnegative int nOffset, @Nonnegative int nLimit);
+
+  /**
+   * @return The total count of active (non-archived) outbound transactions. Must be &ge; 0.
+   */
+  @Nonnegative
+  long getTransactionCount ();
 }
