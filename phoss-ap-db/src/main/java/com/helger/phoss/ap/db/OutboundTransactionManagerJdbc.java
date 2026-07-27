@@ -391,7 +391,7 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
-                                                                      " ORDER BY init_dt DESC" +
+                                                                      " ORDER BY created_dt DESC" +
                                                                       " LIMIT " +
                                                                       nLimit +
                                                                       " OFFSET " +

@@ -129,7 +129,7 @@ final class OperationsControllerTest
       when (aTxMgr.getBySbdhInstanceIDIncludingArchive ("missing-id")).thenReturn (null);
       aMock.when (APJdbcMetaManager::getInboundTransactionMgr).thenReturn (aTxMgr);
 
-      final ResponseEntity <Void> aResp = m_aController.replayInbound ("missing-id");
+      final ResponseEntity <InboundTransactionResponse> aResp = m_aController.replayInbound ("missing-id");
       assertEquals (HttpStatus.NOT_FOUND, aResp.getStatusCode ());
     }
   }
@@ -142,13 +142,17 @@ final class OperationsControllerTest
     {
       final IInboundTransactionManager aTxMgr = mock (IInboundTransactionManager.class);
       final IInboundTransaction aTx = mock (IInboundTransaction.class);
+      when (aTx.getStatus ()).thenReturn (com.helger.phoss.ap.api.codelist.EInboundStatus.FORWARDED);
+      when (aTx.getReportingStatus ()).thenReturn (com.helger.phoss.ap.api.codelist.EReportingStatus.PENDING);
+      when (aTx.getMlsType ()).thenReturn (com.helger.peppol.sbdh.EPeppolMLSType.ALWAYS_SEND);
       when (aTxMgr.getBySbdhInstanceIDIncludingArchive ("tx-123")).thenReturn (aTx);
       aMockJdbc.when (APJdbcMetaManager::getInboundTransactionMgr).thenReturn (aTxMgr);
 
       aMockOrchestrator.when (() -> InboundOrchestrator.forwardDocument ("API Replay: ", aTx)).thenReturn (ESuccess.SUCCESS);
 
-      final ResponseEntity <Void> aResp = m_aController.replayInbound ("tx-123");
+      final ResponseEntity <InboundTransactionResponse> aResp = m_aController.replayInbound ("tx-123");
       assertEquals (HttpStatus.OK, aResp.getStatusCode ());
+      assertNotNull (aResp.getBody ());
     }
   }
 

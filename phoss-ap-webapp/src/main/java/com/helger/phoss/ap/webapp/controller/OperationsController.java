@@ -140,7 +140,7 @@ public class OperationsController
               description = "Forces a re-forwarding of an existing inbound transaction.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Transaction replay initiated"),
                    @ApiResponse (responseCode = "404", description = "Transaction not found", content = @Content) })
-  public ResponseEntity <Void> replayInbound (@Parameter (description = "SBDH Instance ID", required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
+  public ResponseEntity <InboundTransactionResponse> replayInbound (@Parameter (description = "SBDH Instance ID", required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final IInboundTransaction aTx = aTxMgr.getBySbdhInstanceIDIncludingArchive (sbdhInstanceID);
@@ -148,9 +148,12 @@ public class OperationsController
       return ResponseEntity.notFound ().build ();
 
     final ESuccess eSuccess = InboundOrchestrator.forwardDocument ("API Replay: ", aTx);
+    final IInboundTransaction aUpdatedTx = aTxMgr.getBySbdhInstanceIDIncludingArchive (sbdhInstanceID);
+    final IInboundTransaction aFinalTx = aUpdatedTx != null ? aUpdatedTx : aTx;
+
     if (eSuccess.isSuccess ())
-      return ResponseEntity.ok ().build ();
-    return ResponseEntity.internalServerError ().build ();
+      return ResponseEntity.ok (InboundTransactionResponse.fromDomain (aFinalTx));
+    return ResponseEntity.internalServerError ().body (InboundTransactionResponse.fromDomain (aFinalTx));
   }
 
   /**
