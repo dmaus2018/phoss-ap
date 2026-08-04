@@ -305,4 +305,22 @@ public interface IInboundTransactionManager
    */
   @NonNull
   ICommonsList <IInboundTransaction> getAllWithoutC4CountryCode ();
+
+  /**
+   * Get historical transactions with pagination.
+   *
+   * @param nOffset
+   *        Offset to start from. Must be &ge; 0.
+   * @param nLimit
+   *        Maximum number of transactions to return. Must be &ge; 0.
+   * @return The list of transactions. Never <code>null</code>.
+   */
+  @NonNull
+  ICommonsList <IInboundTransaction> getAllTransactions (@Nonnegative int nOffset, @Nonnegative int nLimit);
+
+  /**
+   * @return The total count of active (non-archived) inbound transactions. Must be &ge; 0.
+   */
+  @Nonnegative
+  long getTransactionCount ();
 }

@@ -146,7 +146,7 @@ public class InboundController
                                  content = @Content) })
   public ResponseEntity <InboundTransactionResponse> getStatus (@Parameter (description = "Peppol SBDH Instance Identifier of the inbound message",
                                                                             required = true,
-                                                                            example = "550e8400-e29b-41d4-a716-446655440000") @PathVariable final String sbdhInstanceID,
+                                                                            example = "550e8400-e29b-41d4-a716-446655440000") @PathVariable("sbdhInstanceID") final String sbdhInstanceID,
                                                                 @Parameter (description = "When true, the archive table is consulted if the transaction is not in the active table. Since 0.9.0.") @RequestParam (name = "includeArchive",
                                                                                                                                                                                                                   defaultValue = "false") final boolean bIncludeArchive)
   {
@@ -232,7 +232,7 @@ public class InboundController
                                  content = @Content) })
   public ResponseEntity <InboundTransactionResponse> getMissingC4CountryCodeForTransaction (@Parameter (description = "Peppol SBDH Instance Identifier of the inbound message",
                                                                                                         required = true,
-                                                                                                        example = "550e8400-e29b-41d4-a716-446655440000") @PathVariable final String sbdhInstanceID)
+                                                                                                        example = "550e8400-e29b-41d4-a716-446655440000") @PathVariable("sbdhInstanceID") final String sbdhInstanceID)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final IInboundTransaction aTx = aTxMgr.getBySbdhInstanceID (sbdhInstanceID);
