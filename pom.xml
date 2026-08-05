@@ -26,7 +26,7 @@
   </parent>
   <groupId>com.helger.phoss.ap</groupId>
   <artifactId>phoss-ap-parent-pom</artifactId>
-  <version>0.11.0-SNAPSHOT</version>
+  <version>0.11.1-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>phoss-ap-parent-pom</name>
   <description>phoss Peppol Access Point - Parent POM</description>
@@ -52,7 +52,7 @@
     <java.version>21</java.version>
 
     <!-- External dependency versions -->
-    <awssdk.version>2.50.2</awssdk.version>
+    <awssdk.version>2.51.0</awssdk.version>
     <commons-compression.version>1.28.0</commons-compression.version>
     <commons-lang.version>3.20.0</commons-lang.version>
     <failsafe.version>3.3.2</failsafe.version>
@@ -73,12 +73,12 @@
     <swagger-annotations.version>2.2.53</swagger-annotations.version>
     <sshd-sftp.version>2.19.0</sshd-sftp.version>
 
-    <ph-commons.version>12.3.3</ph-commons.version>
+    <ph-commons.version>12.3.4</ph-commons.version>
     <ph-telemetry.version>1.0.1</ph-telemetry.version>
     <ph-db.version>8.4.1</ph-db.version>
     <ph-web.version>11.4.3</ph-web.version>
     <ph-oton.version>10.3.0</ph-oton.version>
-    <peppol-commons.version>12.6.1</peppol-commons.version>
+    <peppol-commons.version>12.7.0</peppol-commons.version>
     <phive.version>12.1.0</phive.version>
     <phase4.version>4.5.4</phase4.version>
     <ddd.version>0.8.10</ddd.version>

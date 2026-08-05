@@ -82,13 +82,13 @@ import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.APCoreConfig;
 import com.helger.phoss.ap.core.APCoreMetaManager;
 import com.helger.phoss.ap.core.CircuitBreakerManager;
+import com.helger.phoss.ap.core.SMPClientManager;
 import com.helger.phoss.ap.core.helper.BackoffCalculator;
 import com.helger.phoss.ap.core.helper.CopyingInputStream;
 import com.helger.phoss.ap.core.helper.HashHelper;
 import com.helger.phoss.ap.core.reporting.APPeppolReportingHelper;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 import com.helger.security.certificate.TrustedCAChecker;
-import com.helger.smpclient.peppol.CachingSMPClientReadOnly;
 import com.helger.smpclient.peppol.SMPClientReadOnly;
 import com.helger.smpclient.url.PeppolNaptrURLProvider;
 import com.helger.smpclient.url.SMPDNSResolutionException;
@@ -599,8 +599,8 @@ public final class OutboundOrchestrator
         final SMPClientReadOnly aSMPClient;
         try
         {
-          aSMPClient = new CachingSMPClientReadOnly (PeppolNaptrURLProvider.INSTANCE, aReceiverID, aSMLInfo);
-          APBasicConfig.applyHttpProxySettings (aSMPClient.httpClientSettings ());
+          // Uses the shared SMP client cache and the shared HTTP connection pool
+          aSMPClient = SMPClientManager.createSMPClient (PeppolNaptrURLProvider.INSTANCE, aReceiverID, aSMLInfo);
 
           // Remember the host URL from NAPTR lookup
           aSendingReport.setC3SMPURL (aSMPClient.getSMPHostURI ());

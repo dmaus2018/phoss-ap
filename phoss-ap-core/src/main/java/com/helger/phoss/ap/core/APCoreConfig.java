@@ -70,6 +70,29 @@ public final class APCoreConfig
   }
 
   /**
+   * Resolve a duration-typed configuration value. The key accepts compound expressions like
+   * <code>10s</code>, <code>5m</code>, <code>2d 5h 30m</code>. If the key is missing, blank, or
+   * fails to parse, the supplied default is returned.
+   *
+   * @param sDurationKey
+   *        The duration-grammar configuration key (e.g. <code>"peppol.smp.cache.ttl"</code>).
+   * @param aDefault
+   *        The default value if the key is not configured.
+   * @return The resolved duration. Never <code>null</code>.
+   * @since 0.11.0
+   */
+  @NonNull
+  private static Duration _getDuration (@NonNull final String sDurationKey, @NonNull final Duration aDefault)
+  {
+    final Duration aDuration = _getConfig ().getAsConfigDuration (sDurationKey,
+                                                                  sErr -> LOGGER.warn ("Failed to parse configuration key '" +
+                                                                                       sDurationKey +
+                                                                                       "' as duration: " +
+                                                                                       sErr));
+    return aDuration != null ? aDuration : aDefault;
+  }
+
+  /**
    * Resolve a duration-typed configuration value, preferring the duration-grammar key over the
    * legacy millisecond-typed key. The duration-grammar key accepts compound expressions like
    * <code>10s</code>, <code>5m</code>, <code>2d 5h 30m</code>. If the duration key is missing,
@@ -243,6 +266,40 @@ public final class APCoreConfig
   {
     return _getConfig ().getAsBoolean (APConfigurationProperties.PEPPOL_REVOCATION_SOFT_FAIL,
                                        APConfigurationProperties.PEPPOL_REVOCATION_SOFT_FAIL_DEFAULT);
+  }
+
+  /**
+   * @return {@code true} if the in-memory caching of Peppol SMP Service Group and Service Metadata
+   *         responses is enabled. Default is
+   *         {@link APConfigurationProperties#PEPPOL_SMP_CACHE_ENABLED_DEFAULT}.
+   * @since 0.11.0
+   */
+  public static boolean isPeppolSmpCacheEnabled ()
+  {
+    return _getConfig ().getAsBoolean (APConfigurationProperties.PEPPOL_SMP_CACHE_ENABLED,
+                                       APConfigurationProperties.PEPPOL_SMP_CACHE_ENABLED_DEFAULT);
+  }
+
+  /**
+   * @return The time to live of each Peppol SMP client cache entry. Never <code>null</code>.
+   * @since 0.11.0
+   */
+  @NonNull
+  public static Duration getPeppolSmpCacheTTL ()
+  {
+    return _getDuration (APConfigurationProperties.PEPPOL_SMP_CACHE_TTL,
+                         APConfigurationProperties.PEPPOL_SMP_CACHE_TTL_DEFAULT);
+  }
+
+  /**
+   * @return The maximum number of entries of each of the two internal Peppol SMP client caches
+   *         (Service Group and Service Metadata). All values &le; 0 indicate an unlimited size.
+   * @since 0.11.0
+   */
+  public static int getPeppolSmpCacheMaxSize ()
+  {
+    return _getConfig ().getAsInt (APConfigurationProperties.PEPPOL_SMP_CACHE_MAX_SIZE,
+                                   APConfigurationProperties.PEPPOL_SMP_CACHE_MAX_SIZE_DEFAULT);
   }
 
   /**

@@ -46,6 +46,19 @@ public final class APConfigurationProperties
   // Certificate revocation (since 0.9.0)
   public static final String PEPPOL_REVOCATION_SOFT_FAIL = "peppol.revocation.soft-fail";
   public static final boolean PEPPOL_REVOCATION_SOFT_FAIL_DEFAULT = false;
+  // SMP client cache (since 0.11.0)
+  /** @since 0.11.0 */
+  public static final String PEPPOL_SMP_CACHE_ENABLED = "peppol.smp.cache.enabled";
+  /** @since 0.11.0 */
+  public static final boolean PEPPOL_SMP_CACHE_ENABLED_DEFAULT = true;
+  /** @since 0.11.0 */
+  public static final String PEPPOL_SMP_CACHE_TTL = "peppol.smp.cache.ttl";
+  /** @since 0.11.0 */
+  public static final Duration PEPPOL_SMP_CACHE_TTL_DEFAULT = Duration.ofMinutes (15);
+  /** @since 0.11.0 */
+  public static final String PEPPOL_SMP_CACHE_MAX_SIZE = "peppol.smp.cache.max-size";
+  /** @since 0.11.0 */
+  public static final int PEPPOL_SMP_CACHE_MAX_SIZE_DEFAULT = 1_000;
 
   // AS4 endpoint
   public static final String PHASE4_ENDPOINT_ADDRESS = "phase4.endpoint.address";

@@ -48,9 +48,6 @@ import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.model.MlsOutcome;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
-import com.helger.telemetry.Telemetry;
-import com.helger.telemetry.ETelemetrySpanKind;
-import com.helger.telemetry.ITelemetrySpan;
 import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.phoss.ap.core.APCoreConfig;
@@ -59,6 +56,9 @@ import com.helger.phoss.ap.core.helper.HashHelper;
 import com.helger.phoss.ap.core.outbound.MlsSmpFallback;
 import com.helger.phoss.ap.core.outbound.OutboundOrchestrator;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
+import com.helger.telemetry.ETelemetrySpanKind;
+import com.helger.telemetry.ITelemetrySpan;
+import com.helger.telemetry.Telemetry;
 
 /**
  * Handler for Peppol Message Level Status (MLS) responses. Responsible for creating outbound MLS
@@ -144,7 +144,7 @@ public final class MlsHandler
       // prefix). It is the fallback target if a custom MLS_TO is not reachable (MLS SPOG 5.4).
       final String sDefaultSpidValue = SPIDHelper.SPIS_PARTICIPANT_ID_SCHEME +
                                        ":" +
-                                       aInboundTx.getC2SeatID ().substring (3);
+                                       SPIDHelper.getMainIDFromSeatID (aInboundTx.getC2SeatID ());
       final IParticipantIdentifier aDefaultSpidReceiverPID = aIF.createParticipantIdentifierWithDefaultScheme (sDefaultSpidValue);
       if (aDefaultSpidReceiverPID == null)
       {
@@ -262,8 +262,7 @@ public final class MlsHandler
 
       // Perform actual sending. Provide the default SPID as MLS fallback target in case the custom
       // MLS_TO receiver is not reachable via SMP (MLS SPOG section 5.4).
-      final MlsSmpFallback aMlsFallback = new MlsSmpFallback (aDefaultSpidReceiverPID,
-                                                             aInboundTx.getSbdhInstanceID ());
+      final MlsSmpFallback aMlsFallback = new MlsSmpFallback (aDefaultSpidReceiverPID, aInboundTx.getSbdhInstanceID ());
       final Phase4PeppolSendingReport aSendingReport = OutboundOrchestrator.processPendingOutbound ("[SubmitMLS] ",
                                                                                                     aMlsTx,
                                                                                                     aMlsFallback);
