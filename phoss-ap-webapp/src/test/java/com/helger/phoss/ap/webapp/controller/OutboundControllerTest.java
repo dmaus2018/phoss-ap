@@ -38,7 +38,11 @@ import com.helger.peppolid.factory.PeppolLaxIdentifierFactory;
  */
 final class OutboundControllerTest
 {
-  /** France Factur-X - the syntax specific ID "urn:peppol:doctype:pdf+xml" is not XML */
+  /**
+   * France Factur-X - the syntax specific ID "urn:peppol:doctype:pdf+xml" is not XML. The SBDH
+   * values used below are the ones from "Peppol - France - Solution Architecture 1.3.0" section
+   * 6.1.1 - note that the TypeVersion is "0" and not the "D22B" from the document type ID.
+   */
   private static final String DOCTYPE_PDF = "busdox-docid-qns::urn:peppol:doctype:pdf+xml##urn:cen.eu:en16931:2017#conformant#urn:peppol:france:billing:Factur-X:1.0::D22B";
   /** Regular Peppol BIS Billing UBL Invoice - the syntax specific ID is XML */
   private static final String DOCTYPE_XML = "busdox-docid-qns::urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1";
@@ -90,8 +94,8 @@ final class OutboundControllerTest
   {
     _assertBadRequest (OutboundController.validateNonXMLPayloadParams (_docType (DOCTYPE_PDF),
                                                                        null,
-                                                                       "D22B",
-                                                                       "factur-x",
+                                                                       "0",
+                                                                       "Invoice",
                                                                        "application/pdf"), "sbdhStandard");
   }
 
@@ -101,7 +105,7 @@ final class OutboundControllerTest
     _assertBadRequest (OutboundController.validateNonXMLPayloadParams (_docType (DOCTYPE_PDF),
                                                                        "urn:peppol:doctype:pdf+xml",
                                                                        null,
-                                                                       "factur-x",
+                                                                       "Invoice",
                                                                        "application/pdf"), "sbdhTypeVersion");
   }
 
@@ -110,7 +114,7 @@ final class OutboundControllerTest
   {
     _assertBadRequest (OutboundController.validateNonXMLPayloadParams (_docType (DOCTYPE_PDF),
                                                                        "urn:peppol:doctype:pdf+xml",
-                                                                       "D22B",
+                                                                       "0",
                                                                        null,
                                                                        "application/pdf"), "sbdhType");
   }
@@ -120,8 +124,8 @@ final class OutboundControllerTest
   {
     assertNull (OutboundController.validateNonXMLPayloadParams (_docType (DOCTYPE_PDF),
                                                                 "urn:peppol:doctype:pdf+xml",
-                                                                "D22B",
-                                                                "factur-x",
+                                                                "0",
+                                                                "Invoice",
                                                                 "application/pdf"));
   }
 
