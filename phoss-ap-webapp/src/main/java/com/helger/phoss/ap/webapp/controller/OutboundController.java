@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.w3c.dom.Document;
 
+import com.helger.annotation.style.VisibleForTesting;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.base.string.StringHelper;
 import com.helger.collection.commons.ICommonsList;
@@ -45,6 +46,8 @@ import com.helger.peppolid.IDocumentTypeIdentifier;
 import com.helger.peppolid.IParticipantIdentifier;
 import com.helger.peppolid.IProcessIdentifier;
 import com.helger.peppolid.factory.IIdentifierFactory;
+import com.helger.peppolid.peppol.doctype.PeppolDocumentTypeIdentifierParts;
+import com.helger.peppolid.peppol.doctype.PeppolGenericDocumentTypeIdentifierParts;
 import com.helger.phase4.peppol.Phase4PeppolSendingReport;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.dto.OutboundS3SubmitRequest;
@@ -121,6 +124,94 @@ public class OutboundController
   }
 
   /**
+   * Validate the SBDH override parameters against the syntax used by the provided document type
+   * identifier. Document types with a non-XML syntax specific ID (like
+   * <code>urn:peppol:doctype:pdf+xml</code> used for the French Factur-X document types) carry
+   * neither an XML root element namespace URI nor an XML root element local name, so phase4 can
+   * derive neither the SBDH <code>Standard</code>, <code>TypeVersion</code> nor <code>Type</code>
+   * from them, and it must be told explicitly that the payload is not XML. Without these parameters
+   * the transmission fails deep inside phase4 - either with
+   * "Failed to parse payload InputStream to a DOM node" or with an unspecific
+   * <code>INVALID_PARAMETERS</code> sending result that has no exception attached at all.
+   *
+   * @param aDocTypeID
+   *        The parsed document type identifier. May not be <code>null</code>.
+   * @param sSbdhStandard
+   *        The SBDH Standard override. May be <code>null</code>.
+   * @param sSbdhTypeVersion
+   *        The SBDH TypeVersion override. May be <code>null</code>.
+   * @param sSbdhType
+   *        The SBDH Type override. May be <code>null</code>.
+   * @param sPayloadMimeType
+   *        The payload MIME type. May be <code>null</code>.
+   * @return A 400 Bad Request response describing the first missing parameter, or <code>null</code>
+   *         if the parameters are consistent with the document type identifier.
+   * @since 0.11.1
+   */
+  @Nullable
+  @VisibleForTesting
+  static ResponseEntity <String> validateNonXMLPayloadParams (@NonNull final IDocumentTypeIdentifier aDocTypeID,
+                                                              @Nullable final String sSbdhStandard,
+                                                              @Nullable final String sSbdhTypeVersion,
+                                                              @Nullable final String sSbdhType,
+                                                              @Nullable final String sPayloadMimeType)
+  {
+    final String sSyntaxSpecificID;
+    try
+    {
+      sSyntaxSpecificID = PeppolGenericDocumentTypeIdentifierParts.extractFromIdentifier (aDocTypeID)
+                                                                  .getSyntaxSpecificID ();
+    }
+    catch (final IllegalArgumentException ex)
+    {
+      // Not an OpenPeppol document type identifier layout - nothing to check here
+      return null;
+    }
+
+    if (PeppolDocumentTypeIdentifierParts.isSyntaxSpecificIDLookingLikeXML (sSyntaxSpecificID))
+    {
+      // XML syntax - all SBDH fields can be derived from the document type ID
+      if (StringHelper.isNotEmpty (sPayloadMimeType))
+        LOGGER.warn ("The document type ID '" +
+                     aDocTypeID.getURIEncoded () +
+                     "' uses the XML syntax '" +
+                     sSyntaxSpecificID +
+                     "' but the payload MIME type '" +
+                     sPayloadMimeType +
+                     "' was provided. The payload will be wrapped in a 'BinaryContent' element, which the receiver most likely does not expect.");
+      return null;
+    }
+
+    // Non-XML syntax - everything must be provided from the outside
+    final String sPrefix = "The document type ID '" +
+                           aDocTypeID.getURIEncoded () +
+                           "' uses the non-XML syntax '" +
+                           sSyntaxSpecificID +
+                           "'. The '";
+    if (StringHelper.isEmpty (sPayloadMimeType))
+      return ResponseEntity.badRequest ()
+                           .body (JsonValue.create (sPrefix +
+                                                    "payloadMimeType' parameter is mandatory for such document types, because the payload cannot be parsed as XML")
+                                           .getAsJsonString ());
+    if (StringHelper.isEmpty (sSbdhStandard))
+      return ResponseEntity.badRequest ()
+                           .body (JsonValue.create (sPrefix +
+                                                    "sbdhStandard' parameter is mandatory for such document types, because the SBDH Standard cannot be derived from the document type ID")
+                                           .getAsJsonString ());
+    if (StringHelper.isEmpty (sSbdhTypeVersion))
+      return ResponseEntity.badRequest ()
+                           .body (JsonValue.create (sPrefix +
+                                                    "sbdhTypeVersion' parameter is mandatory for such document types, because the SBDH TypeVersion cannot be derived from the document type ID")
+                                           .getAsJsonString ());
+    if (StringHelper.isEmpty (sSbdhType))
+      return ResponseEntity.badRequest ()
+                           .body (JsonValue.create (sPrefix +
+                                                    "sbdhType' parameter is mandatory for such document types, because the SBDH Type cannot be derived from the document type ID")
+                                           .getAsJsonString ());
+    return null;
+  }
+
+  /**
    * Submit a raw (payload-only) document for outbound sending via the Peppol network. The document
    * payload is read from the HTTP request body. Peppol identifiers are parsed from the URL path
    * variables.
@@ -167,7 +258,7 @@ public class OutboundController
                             "Returns a Phase4PeppolSendingReport as JSON.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Document accepted and sent successfully"),
                    @ApiResponse (responseCode = "400",
-                                 description = "Invalid Peppol identifier (sender, receiver, document type or process)"),
+                                 description = "Invalid Peppol identifier (sender, receiver, document type or process), or missing SBDH parameters for a non-XML document type"),
                    @ApiResponse (responseCode = "401",
                                  description = "Missing or invalid API token",
                                  content = @Content),
@@ -195,14 +286,14 @@ public class OutboundController
                                                                                                                                                                                             required = false) final String sSbdhInstanceID,
                                                     @Parameter (description = "Alternative Peppol Participant ID to receive MLS responses") @RequestParam (value = "mlsTo",
                                                                                                                                                             required = false) final String sMlsTo,
-                                                    @Parameter (description = "SBDH Standard override for non-XML payloads (e.g., urn:peppol:doctype:pdf+xml). Auto-derived from the document type when omitted.") @RequestParam (value = "sbdhStandard",
-                                                                                                                                                                                                                                  required = false) final String sSbdhStandard,
-                                                    @Parameter (description = "SBDH TypeVersion override (e.g., 0). Auto-derived from the document type when omitted.") @RequestParam (value = "sbdhTypeVersion",
-                                                                                                                                                                                       required = false) final String sSbdhTypeVersion,
-                                                    @Parameter (description = "SBDH Type override (e.g., factur-x). Auto-derived from the document type when omitted.") @RequestParam (value = "sbdhType",
-                                                                                                                                                                                       required = false) final String sSbdhType,
-                                                    @Parameter (description = "MIME type for binary payloads (e.g., application/pdf). When set, the payload is wrapped in <BinaryContent>; otherwise treated as XML.") @RequestParam (value = "payloadMimeType",
-                                                                                                                                                                                                                                      required = false) final String sPayloadMimeType,
+                                                    @Parameter (description = "SBDH Standard override for non-XML payloads (e.g., urn:peppol:doctype:pdf+xml). Auto-derived from the document type when omitted, but mandatory for document types with a non-XML syntax specific ID.") @RequestParam (value = "sbdhStandard",
+                                                                                                                                                                                                                                                                                              required = false) final String sSbdhStandard,
+                                                    @Parameter (description = "SBDH TypeVersion override (e.g., 0). Auto-derived from the document type when omitted, but mandatory for document types with a non-XML syntax specific ID.") @RequestParam (value = "sbdhTypeVersion",
+                                                                                                                                                                                                                                                           required = false) final String sSbdhTypeVersion,
+                                                    @Parameter (description = "SBDH Type override (e.g., factur-x). Auto-derived from the document type when omitted, but mandatory for document types with a non-XML syntax specific ID.") @RequestParam (value = "sbdhType",
+                                                                                                                                                                                                                                                           required = false) final String sSbdhType,
+                                                    @Parameter (description = "MIME type for binary payloads (e.g., application/pdf). When set, the payload is wrapped in <BinaryContent>; otherwise treated as XML. Mandatory for document types with a non-XML syntax specific ID.") @RequestParam (value = "payloadMimeType",
+                                                                                                                                                                                                                                                                                                     required = false) final String sPayloadMimeType,
                                                     @Parameter (description = "Optional custom field 1 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom1",
                                                                                                                                                                                                           required = false) final String sCustom1,
                                                     @Parameter (description = "Optional custom field 2 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom2",
@@ -279,6 +370,14 @@ public class OutboundController
                            .body (JsonValue.create ("Failed to parse the process ID '" + sProcessID + "'")
                                            .getAsJsonString ());
     }
+
+    final ResponseEntity <String> aSbdhErr = validateNonXMLPayloadParams (aDocTypeID,
+                                                                          sSbdhStandard,
+                                                                          sSbdhTypeVersion,
+                                                                          sSbdhType,
+                                                                          sPayloadMimeType);
+    if (aSbdhErr != null)
+      return aSbdhErr;
 
     // Read the InputStream only once
     try (final InputStream aIS = aServletRequest.getInputStream ())
@@ -603,7 +702,7 @@ public class OutboundController
                             "Requires 'outbound.s3.enabled=true'. Since v0.1.1.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Document fetched, accepted and sent successfully"),
                    @ApiResponse (responseCode = "400",
-                                 description = "Outbound S3 disabled, missing required fields, invalid identifiers, or S3 fetch failed"),
+                                 description = "Outbound S3 disabled, missing required fields, invalid identifiers, missing SBDH parameters for a non-XML document type, or S3 fetch failed"),
                    @ApiResponse (responseCode = "401",
                                  description = "Missing or invalid API token",
                                  content = @Content),
@@ -693,6 +792,14 @@ public class OutboundController
                            .body (JsonValue.create ("Failed to parse the process ID '" + aRequest.getProcessID () + "'")
                                            .getAsJsonString ());
     }
+
+    final ResponseEntity <String> aSbdhErr = validateNonXMLPayloadParams (aDocTypeID,
+                                                                          aRequest.getSbdhStandard (),
+                                                                          aRequest.getSbdhTypeVersion (),
+                                                                          aRequest.getSbdhType (),
+                                                                          aRequest.getPayloadMimeType ());
+    if (aSbdhErr != null)
+      return aSbdhErr;
 
     // Determine the S3 region - use from configuration
     final String sS3Region = APCoreConfig.getOutboundS3Region ();
