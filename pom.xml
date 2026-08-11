@@ -202,6 +202,11 @@
         <artifactId>phoss-ap-validation</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.helger.phoss.ap</groupId>
+        <artifactId>phoss-ap-virusscan</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
       <!-- External dependencies -->
       <dependency>
@@ -355,6 +360,7 @@
     <module>phoss-ap-otel</module>
     <module>phoss-ap-dirsender</module>
     <module>phoss-ap-validation</module>
+    <module>phoss-ap-virusscan</module>
     <!-- Spring Boot App -->
     <module>phoss-ap-webapp</module>
     <!-- Test stuff -->

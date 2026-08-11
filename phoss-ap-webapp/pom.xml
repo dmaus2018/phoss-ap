@@ -70,6 +70,10 @@
       <groupId>com.helger.phoss.ap</groupId>
       <artifactId>phoss-ap-validation</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.helger.phoss.ap</groupId>
+      <artifactId>phoss-ap-virusscan</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.flywaydb</groupId>
