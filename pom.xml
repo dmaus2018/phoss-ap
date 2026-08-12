@@ -52,7 +52,7 @@
     <java.version>21</java.version>
 
     <!-- External dependency versions -->
-    <awssdk.version>2.51.3</awssdk.version>
+    <awssdk.version>2.52.0</awssdk.version>
     <commons-compression.version>1.28.0</commons-compression.version>
     <commons-lang.version>3.20.0</commons-lang.version>
     <failsafe.version>3.3.2</failsafe.version>
@@ -77,7 +77,7 @@
     <ph-telemetry.version>1.0.1</ph-telemetry.version>
     <ph-db.version>8.4.1</ph-db.version>
     <ph-web.version>11.4.3</ph-web.version>
-    <ph-oton.version>10.3.0</ph-oton.version>
+    <ph-oton.version>10.3.1</ph-oton.version>
     <peppol-commons.version>12.7.0</peppol-commons.version>
     <phive.version>12.1.0</phive.version>
     <phase4.version>4.5.4</phase4.version>
