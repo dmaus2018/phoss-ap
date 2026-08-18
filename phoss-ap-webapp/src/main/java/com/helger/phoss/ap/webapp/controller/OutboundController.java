@@ -146,7 +146,7 @@ public class OutboundController
    *        The payload MIME type. May be <code>null</code>.
    * @return A 400 Bad Request response describing the first missing parameter, or <code>null</code>
    *         if the parameters are consistent with the document type identifier.
-   * @since 0.11.1
+   * @since 0.12.0
    */
   @Nullable
   @VisibleForTesting
