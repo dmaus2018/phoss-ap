@@ -37,8 +37,7 @@ public class InboundTransactionResponse
   @Schema (description = "Internal transaction ID assigned by the AP")
   private String id;
 
-  @Schema (description = "Peppol Participant ID of the sender",
-           example = "iso6523-actorid-upis::0088:senderbackend")
+  @Schema (description = "Peppol Participant ID of the sender", example = "iso6523-actorid-upis::0088:senderbackend")
   private String senderID;
 
   @Schema (description = "Peppol Participant ID of the receiver",
@@ -54,8 +53,7 @@ public class InboundTransactionResponse
   @Schema (description = "AS4 Message ID from the inbound message")
   private String as4MessageID;
 
-  @Schema (description = "Peppol SBDH Instance Identifier",
-           example = "550e8400-e29b-41d4-a716-446655440000")
+  @Schema (description = "Peppol SBDH Instance Identifier", example = "550e8400-e29b-41d4-a716-446655440000")
   private String sbdhInstanceID;
 
   @Schema (description = "Peppol Seat ID of the sending AP (C2). Since v0.10.2.")
@@ -65,15 +63,18 @@ public class InboundTransactionResponse
   private String c3SeatID;
 
   @Schema (description = "Current transaction status",
-           allowableValues = { "received", "rejected", "forwarding", "forwarded", "forward_failed",
+           allowableValues = { "received",
+                               "rejected",
+                               "forwarding",
+                               "forwarded",
+                               "forward_failed",
                                "permanently_failed" })
   private String status;
 
   @Schema (description = "Total number of forwarding attempts")
   private int attemptCount;
 
-  @Schema (description = "When the message was received (ISO-8601, UTC)",
-           example = "2026-03-27T14:30:00Z")
+  @Schema (description = "When the message was received (ISO-8601, UTC)", example = "2026-03-27T14:30:00Z")
   private String receivedDT;
 
   @Schema (description = "When the transaction was successfully completed; null if not yet completed",
@@ -81,8 +82,7 @@ public class InboundTransactionResponse
            nullable = true)
   private String completedDT;
 
-  @Schema (description = "Whether Peppol Reporting has been triggered",
-           allowableValues = { "pending", "reported" })
+  @Schema (description = "Whether Peppol Reporting has been triggered", allowableValues = { "pending", "reported" })
   private String reportingStatus;
 
   @Schema (description = "Planned date/time of the next forwarding retry; null unless status is forward_failed",
@@ -462,10 +462,11 @@ public class InboundTransactionResponse
 
   /**
    * @return This response as a ph-json {@link IJsonObject}. Never <code>null</code>.
+   * @since v0.12.0 - was previously called <code>getAsJson</code>
    */
   @NonNull
   @Schema (hidden = true)
-  public IJsonObject getAsJson ()
+  public IJsonObject toJson ()
   {
     final IJsonObject ret = new JsonObject ();
     if (id != null)
