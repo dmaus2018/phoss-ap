@@ -31,6 +31,7 @@ import org.junit.Test;
 import com.helger.peppolid.IDocumentTypeIdentifier;
 import com.helger.peppolid.IProcessIdentifier;
 import com.helger.peppolid.factory.IIdentifierFactory;
+import com.helger.phoss.ap.api.codelist.EVerificationFailMode;
 import com.helger.phoss.ap.api.codelist.EVerificationOutcomeCategory;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 import com.helger.scope.mock.ScopeTestRule;
@@ -46,12 +47,13 @@ public final class VirusScanInboundVerifierTest
   public final ScopeTestRule m_aRule = new ScopeTestRule ();
 
   @Test
-  public void testDisabledByDefault ()
+  public void testDisabledByDefault () throws Exception
   {
     assertFalse (VirusScanConfig.isEnabled ());
     assertEquals ("localhost", VirusScanConfig.getHost ());
     assertEquals (1344, VirusScanConfig.getPort ());
     assertEquals ("avscan", VirusScanConfig.getService ());
+    assertEquals (EVerificationFailMode.DEFAULT, VirusScanConfig.getFailMode ());
 
     final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
     final IDocumentTypeIdentifier aDocTypeID = aIF.createDocumentTypeIdentifierWithDefaultScheme ("dummy-doctype");

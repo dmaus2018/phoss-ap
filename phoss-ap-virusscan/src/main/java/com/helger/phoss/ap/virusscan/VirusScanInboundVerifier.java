@@ -28,7 +28,7 @@ import com.helger.annotation.style.IsSPIImplementation;
 import com.helger.peppol.mls.EPeppolMLSStatusReasonCode;
 import com.helger.peppolid.IDocumentTypeIdentifier;
 import com.helger.peppolid.IProcessIdentifier;
-import com.helger.phoss.ap.api.exception.InboundVerifierDeferredException;
+import com.helger.phoss.ap.api.exception.InboundVerifierUnavailableException;
 import com.helger.phoss.ap.api.model.MlsOutcome;
 import com.helger.phoss.ap.api.model.MlsOutcomeIssue;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
@@ -47,8 +47,8 @@ public class VirusScanInboundVerifier implements IInboundDocumentVerifierSPI
 
   @Nullable
   public MlsOutcome verifyInboundDocument (@NonNull @Nonempty final String sDocumentPath,
-                                            @NonNull final IDocumentTypeIdentifier aDocTypeID,
-                                            @NonNull final IProcessIdentifier aProcessID)
+                                           @NonNull final IDocumentTypeIdentifier aDocTypeID,
+                                           @NonNull final IProcessIdentifier aProcessID) throws InboundVerifierUnavailableException
   {
     if (!VirusScanConfig.isInboundEnabled ())
     {
@@ -58,9 +58,9 @@ public class VirusScanInboundVerifier implements IInboundDocumentVerifierSPI
     }
 
     final IcapScanClient aClient = new IcapScanClient (VirusScanConfig.getHost (),
-                                                      VirusScanConfig.getPort (),
-                                                      VirusScanConfig.getService (),
-                                                      VirusScanConfig.getTimeoutDuration ());
+                                                       VirusScanConfig.getPort (),
+                                                       VirusScanConfig.getService (),
+                                                       VirusScanConfig.getTimeoutDuration ());
 
     VirusScanAttachmentExtractor.AttachmentScanResult aAttResult = null;
 
@@ -110,7 +110,7 @@ public class VirusScanInboundVerifier implements IInboundDocumentVerifierSPI
 
   @Nullable
   private static MlsOutcome _handleResult (@NonNull final String sDocumentPath,
-                                           @NonNull final IcapScanResult aResult)
+                                           @NonNull final IcapScanResult aResult) throws InboundVerifierUnavailableException
   {
     if (aResult.isPassed ())
       return null;
@@ -124,25 +124,10 @@ public class VirusScanInboundVerifier implements IInboundDocumentVerifierSPI
                                                          "Virus detected: " + sThreat));
     }
 
-    final String sFailMode = VirusScanConfig.getFailMode ();
     final String sErr = aResult.getErrorMessage ();
-
-    if ("open".equalsIgnoreCase (sFailMode))
-    {
-      LOGGER.error ("ICAP virus scanner unavailable for '" + sDocumentPath + "' (fail-open mode), bypassing check: " + sErr);
-      return null;
-    }
-
-    if ("deferred".equalsIgnoreCase (sFailMode))
-    {
-      LOGGER.warn ("ICAP virus scanner unavailable for '" + sDocumentPath + "' (deferred mode), throwing deferred exception: " + sErr);
-      throw new InboundVerifierDeferredException ("VirusScanInboundVerifier", "ICAP virus scanner unavailable: " + sErr);
-    }
-
-    // Default: closed
-    LOGGER.warn ("ICAP virus scanner unavailable for '" + sDocumentPath + "' (fail-closed mode), rejecting document: " + sErr);
+    LOGGER.warn ("ICAP virus scanner unavailable for '" + sDocumentPath + "': " + sErr);
     return MlsOutcome.serviceUnavailable ("Virus scan service unavailable: " + sErr,
-                                         MlsOutcomeIssue.ofNA (EPeppolMLSStatusReasonCode.FAILURE_OF_DELIVERY,
-                                                               "Virus scan service unavailable: " + sErr));
+                                          MlsOutcomeIssue.ofNA (EPeppolMLSStatusReasonCode.FAILURE_OF_DELIVERY,
+                                                                "Virus scan service unavailable: " + sErr));
   }
 }

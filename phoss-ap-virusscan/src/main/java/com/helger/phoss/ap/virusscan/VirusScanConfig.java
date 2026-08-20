@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import com.helger.annotation.concurrent.Immutable;
 import com.helger.base.string.StringHelper;
 import com.helger.config.IConfig;
+import com.helger.phoss.ap.api.codelist.EVerificationFailMode;
 import com.helger.phoss.ap.api.config.APConfigProvider;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 
@@ -146,19 +147,31 @@ public final class VirusScanConfig
   }
 
   /**
-   * @return The effective fail-mode for ICAP virus scanning ("closed", "open", or "deferred").
-   *         Checks <code>virusscan.icap.fail-mode</code> first, falling back to global
+   * @return The effective fail-mode for ICAP virus scanning ({@link EVerificationFailMode#CLOSED},
+   *         {@link EVerificationFailMode#OPEN}, or {@link EVerificationFailMode#DEFERRED}). Checks
+   *         <code>virusscan.icap.fail-mode</code> first, falling back to global
    *         <code>verification.verifier-fail-mode</code>.
    */
   @NonNull
-  public static String getFailMode ()
+  public static EVerificationFailMode getFailMode ()
   {
     final String sSpecific = _getConfig ().getAsString (VIRUSSCAN_ICAP_FAIL_MODE);
     if (StringHelper.hasText (sSpecific))
-      return sSpecific;
+    {
+      final EVerificationFailMode eMode = EVerificationFailMode.getFromIDOrNull (sSpecific);
+      if (eMode != null)
+        return eMode;
+    }
 
-    return _getConfig ().getAsString (APConfigurationProperties.VERIFICATION_VERIFIER_FAIL_MODE,
-                                      APConfigurationProperties.VERIFICATION_VERIFIER_FAIL_MODE_DEFAULT);
+    final String sGlobal = _getConfig ().getAsString (APConfigurationProperties.VERIFICATION_FAIL_MODE);
+    if (StringHelper.hasText (sGlobal))
+    {
+      final EVerificationFailMode eMode = EVerificationFailMode.getFromIDOrNull (sGlobal);
+      if (eMode != null)
+        return eMode;
+    }
+
+    return EVerificationFailMode.DEFAULT;
   }
 
   /**

@@ -27,6 +27,7 @@ import com.helger.annotation.style.IsSPIImplementation;
 import com.helger.base.state.ESuccess;
 import com.helger.peppolid.IDocumentTypeIdentifier;
 import com.helger.peppolid.IProcessIdentifier;
+import com.helger.phoss.ap.api.codelist.EVerificationFailMode;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 
@@ -117,10 +118,10 @@ public class VirusScanOutboundVerifier implements IOutboundDocumentVerifierSPI
       return ESuccess.FAILURE;
     }
 
-    final String sFailMode = VirusScanConfig.getFailMode ();
+    final EVerificationFailMode eFailMode = VirusScanConfig.getFailMode ();
     final String sErr = aResult.getErrorMessage ();
 
-    if ("open".equalsIgnoreCase (sFailMode))
+    if (eFailMode == EVerificationFailMode.OPEN)
     {
       LOGGER.error ("Outbound ICAP virus scanner unavailable for '" + sDocumentPath + "' (fail-open mode), bypassing check: " + sErr);
       return ESuccess.SUCCESS;
