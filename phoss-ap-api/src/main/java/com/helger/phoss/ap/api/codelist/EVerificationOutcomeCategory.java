@@ -24,17 +24,23 @@ import com.helger.base.id.IHasID;
 import com.helger.base.lang.EnumHelper;
 
 /**
- * Outcome category of a document verification attempt.
+ * Category of a document verification outcome. It distinguishes a verdict about the document
+ * itself from the inability of a verifier to make a verdict at all, because its backend service
+ * was not reachable. See {@link EVerificationFailMode} for the resulting behaviour.
  *
  * @author Philip Helger
+ * @since 0.12.0
  */
 public enum EVerificationOutcomeCategory implements IHasID <String>
 {
-  /** Document inspected and passed (clean / valid schema). */
+  /** The document was inspected and accepted. */
   PASSED ("passed"),
-  /** Document inspected and explicitly rejected due to content/rules (malware, invalid UBL). */
+  /** The document was inspected and rejected because of its content (e.g. malware, invalid XML). */
   REJECTION ("rejection"),
-  /** Verifier backend service was unavailable (ICAP socket connection refused, Phorm 5xx). */
+  /**
+   * The document could not be inspected, because the verifier backend service was unavailable
+   * (e.g. connection refused, HTTP 5xx, timeout).
+   */
   SERVICE_UNAVAILABLE ("service_unavailable");
 
   private final String m_sID;

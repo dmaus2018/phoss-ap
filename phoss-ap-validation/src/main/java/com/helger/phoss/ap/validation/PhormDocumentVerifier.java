@@ -78,7 +78,10 @@ public class PhormDocumentVerifier implements IInboundDocumentVerifierSPI, IOutb
   {
     /** Phorm is not configured - skip verification */
     SKIPPED,
-    /** Phorm call could not be completed (configuration error, HTTP, parse) - fail closed */
+    /**
+     * Phorm call could not be completed (configuration error, HTTP, parse) - the service is
+     * considered unavailable
+     */
     FAILED,
     /** Phorm call completed - {@link PhormCallResult#results} is non-null */
     COMPLETED
@@ -247,9 +250,12 @@ public class PhormDocumentVerifier implements IInboundDocumentVerifierSPI, IOutb
     return switch (aCall.state ())
     {
       case SKIPPED -> null;
-      case FAILED -> MlsOutcome.rejection ("Document verifier call failed",
-                                           MlsOutcomeIssue.ofNA (EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_FATAL,
-                                                                 "Phorm validation service call failed - see server log for details"));
+      // The document was not validated at all, so this is no rejection of the document itself.
+      // Depending on the configured EVerificationFailMode this leads to a deferral, a rejection or
+      // an acceptance
+      case FAILED -> MlsOutcome.serviceUnavailable ("Document verifier call failed",
+                                                    MlsOutcomeIssue.ofNA (EPeppolMLSStatusReasonCode.FAILURE_OF_DELIVERY,
+                                                                          "Phorm validation service call failed - see server log for details"));
       case COMPLETED -> PhiveToMlsMapper.toMlsOutcome (aCall.results (),
                                                        CPhossAP.DEFAULT_LOCALE,
                                                        "Document validation failed");

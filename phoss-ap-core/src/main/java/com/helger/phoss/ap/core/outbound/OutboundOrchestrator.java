@@ -1011,6 +1011,8 @@ public final class OutboundOrchestrator
                                                                              : PeppolTrustedCA.peppolTestAP ();
 
           PeppolReportingItem aReportingItem = null;
+          // The C1 participant identifier is the End User of an outbound transaction
+          final String sEndUserID = APPeppolReportingHelper.getEffectiveEndUserID (aSenderID);
           try
           {
             // Actual sending using Phase4PeppolSender
@@ -1120,7 +1122,7 @@ public final class OutboundOrchestrator
                 // be created AFTER sending", which would mask the real transport exception
                 // captured in aCaughtSendingEx and handled below.
                 if (eResult.isSuccess () && aCaughtSendingEx.isNotSet ())
-                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (aSenderID.getURIEncoded ());
+                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sEndUserID);
                 break;
               }
               case PREBUILT_SBD:
@@ -1221,7 +1223,7 @@ public final class OutboundOrchestrator
                 // be created AFTER sending", which would mask the real transport exception
                 // captured in aCaughtSendingEx and handled below.
                 if (eResult.isSuccess () && aCaughtSendingEx.isNotSet ())
-                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (aSenderID.getURIEncoded ());
+                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sEndUserID);
                 break;
               }
               default:

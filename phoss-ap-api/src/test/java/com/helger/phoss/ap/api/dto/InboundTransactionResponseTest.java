@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.lang.reflect.Method;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -29,6 +30,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.Test;
 
+import com.helger.json.IJson;
+import com.helger.json.IJsonObject;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
 import com.helger.peppol.sbdh.EPeppolMLSType;
 import com.helger.phoss.ap.api.codelist.EInboundStatus;
@@ -113,6 +116,46 @@ public final class InboundTransactionResponseTest
     assertTrue (a.isDuplicateAS4 ());
     assertTrue (a.isDuplicateSBDH ());
     assertEquals ("AP", a.getMlsResponseCode ());
+  }
+
+  @Test
+  public void testToJson ()
+  {
+    final InboundTransactionResponse a = new InboundTransactionResponse ();
+    a.setID ("id1");
+    a.setSenderID ("sender1");
+    a.setAS4MessageID ("as4-1");
+    a.setAttemptCount (3);
+    a.setDuplicateAS4 (true);
+    a.setDuplicateSBDH (false);
+
+    final IJsonObject aJson = a.toJson ();
+    assertNotNull (aJson);
+    assertEquals ("id1", aJson.getValue ("id"));
+    assertEquals ("sender1", aJson.getValue ("senderID"));
+    assertEquals ("as4-1", aJson.getValue ("as4MessageID"));
+    assertEquals (Integer.valueOf (3), aJson.getValue ("attemptCount"));
+    assertEquals (Boolean.TRUE, aJson.getValue ("isDuplicateAS4"));
+    assertEquals (Boolean.FALSE, aJson.getValue ("isDuplicateSBDH"));
+
+    // Fields that were never set must not be contained
+    assertFalse (aJson.containsKey ("receiverID"));
+    assertFalse (aJson.containsKey ("errorDetails"));
+  }
+
+  @Test
+  public void testNoJavaBeanGetterReturnsJson ()
+  {
+    // A JavaBean getter returning a ph-json type is picked up as a property by
+    // Jackson and breaks the serialization of all REST responses - see
+    // https://github.com/phax/phoss-ap/issues/77
+    for (final Method aMethod : InboundTransactionResponse.class.getMethods ())
+    {
+      final String sName = aMethod.getName ();
+      if (aMethod.getParameterCount () == 0 && (sName.startsWith ("get") || sName.startsWith ("is")))
+        assertFalse ("The JavaBean getter '" + sName + "' must not return a ph-json type",
+                     IJson.class.isAssignableFrom (aMethod.getReturnType ()));
+    }
   }
 
   @Test

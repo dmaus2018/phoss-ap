@@ -20,14 +20,17 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.annotation.Nonempty;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
 import com.helger.peppol.reporting.api.PeppolReportingItem;
 import com.helger.peppol.reporting.api.backend.PeppolReportingBackend;
 import com.helger.peppolid.IDocumentTypeIdentifier;
+import com.helger.peppolid.IParticipantIdentifier;
 import com.helger.peppolid.IProcessIdentifier;
 import com.helger.peppolid.factory.IIdentifierFactory;
+import com.helger.peppolid.peppol.enduser.PeppolEndUserHelper;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EReportingStatus;
@@ -47,6 +50,40 @@ public final class APPeppolReportingHelper
 
   private APPeppolReportingHelper ()
   {}
+
+  /**
+   * Determine the End User ID to be used for Peppol Reporting from the provided participant
+   * identifier. When sending, that is the C1 (sender) participant identifier, when receiving it is
+   * the C4 (receiver) participant identifier.
+   * <p>
+   * The participant identifier is not used as-is, because several countries have multiple
+   * identifier schemes running in parallel that all identify the same End User - e.g.
+   * <code>0208:0123456789</code> and <code>9925:BE0123456789</code> in Belgium. Using the
+   * participant identifier directly would therefore count a single End User multiple times in the
+   * End User Statistics Report (EUSR). {@link PeppolEndUserHelper} unifies the identifier and
+   * applies its mapping rules - see
+   * <a href="https://github.com/phax/peppol-commons/issues/80">peppol-commons issue #80</a>.
+   * Deployments can customize the mapping rules via the static methods of
+   * {@link PeppolEndUserHelper}.
+   * </p>
+   *
+   * @param aParticipantID
+   *        The participant identifier to determine the End User ID of. May not be
+   *        <code>null</code>.
+   * @return The URI encoded representation of the effective End User participant identifier - e.g.
+   *         <code>iso6523-actorid-upis::0208:0123456789</code>. Neither <code>null</code> nor
+   *         empty.
+   */
+  @NonNull
+  @Nonempty
+  public static String getEffectiveEndUserID (@NonNull final IParticipantIdentifier aParticipantID)
+  {
+    ValueEnforcer.notNull (aParticipantID, "ParticipantID");
+
+    final String ret = PeppolEndUserHelper.getEffectiveEndUserID (aParticipantID);
+    // Fallback for participant identifiers with an empty value
+    return StringHelper.isNotEmpty (ret) ? ret : aParticipantID.getURIEncoded ();
+  }
 
   /**
    * Store a Peppol Reporting item for the given outbound transaction and update its reporting
@@ -146,6 +183,17 @@ public final class APPeppolReportingHelper
                                          "'");
       }
 
+      // The C4 participant identifier is the End User of an inbound transaction
+      final IParticipantIdentifier aReceiverID = aIF.parseParticipantIdentifier (aTx.getReceiverID ());
+      if (aReceiverID == null)
+      {
+        throw new IllegalStateException ("Inbound transaction '" +
+                                         sTransactionID +
+                                         "' contains the invalid receiver participant ID '" +
+                                         aTx.getReceiverID () +
+                                         "'");
+      }
+
       final PeppolReportingItem aReportingItem = PeppolReportingItem.builder ()
                                                                     .exchangeDateTime (aTx.getAS4Timestamp ())
                                                                     .directionReceiving ()
@@ -156,7 +204,7 @@ public final class APPeppolReportingHelper
                                                                     .transportProtocolPeppolAS4v2 ()
                                                                     .c1CountryCode (aTx.getC1CountryCode ())
                                                                     .c4CountryCode (aTx.getC4CountryCode ())
-                                                                    .endUserID (aTx.getReceiverID ())
+                                                                    .endUserID (getEffectiveEndUserID (aReceiverID))
                                                                     .build ();
 
       PeppolReportingBackend.withBackendDo (APConfigProvider.getConfig (),

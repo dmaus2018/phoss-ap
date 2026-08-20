@@ -29,6 +29,7 @@ import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
 import com.helger.base.timing.StopWatch;
 import com.helger.collection.commons.ICommonsList;
+import com.helger.phoss.ap.api.codelist.EInboundStatus;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
@@ -119,6 +120,51 @@ public final class RetryScheduler
       aHandler.onRetrySchedulerCycle (true, nProcessed, aCycleDuration);
   }
 
+  private static void _retryDeferredVerification (@Nonnegative final int nBatchSize)
+  {
+    final var aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    int nProcessed = 0;
+
+    try
+    {
+      final ICommonsList <IInboundTransaction> aTransactions = aInboundMgr.getAllForVerificationRetry (nBatchSize);
+
+      if (aTransactions.isNotEmpty ())
+      {
+        LOGGER.info ("Re-verifying " + aTransactions.size () + " inbound transactions");
+        final String sLogPrefix = "[RetryVerification] ";
+
+        for (final IInboundTransaction aInboundTx : aTransactions)
+        {
+          nProcessed++;
+          if (InboundOrchestrator.resumeDeferredInboundDocument (sLogPrefix, aInboundTx).isFailure ())
+          {
+            // A still unavailable verifier is not a forwarding error, so the notification handlers
+            // are only called, if the document left the deferred state
+            final IInboundTransaction aUpdatedTx = aInboundMgr.getByID (aInboundTx.getID ());
+            if (aUpdatedTx != null && aUpdatedTx.getStatus () != EInboundStatus.VERIFICATION_DEFERRED)
+              for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+                aHandler.onInboundForwardingError (aInboundTx.getID (), true);
+          }
+        }
+      }
+      else
+      {
+        if (LOGGER.isDebugEnabled ())
+          LOGGER.debug ("Found no inbound transactions for re-verification");
+      }
+    }
+    catch (final Exception ex)
+    {
+      LOGGER.error ("Internal error in inbound re-verification cycle", ex);
+
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("RetryScheduler._retryDeferredVerification",
+                                        "Internal error in inbound re-verification cycle",
+                                        ex);
+    }
+  }
+
   private static void _retryInbound (@Nonnegative final int nBatchSize)
   {
     final var aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
@@ -203,6 +249,7 @@ public final class RetryScheduler
       {
         _retryOutbound (nBatchSize);
         _retryInbound (nBatchSize);
+        _retryDeferredVerification (nBatchSize);
       }
     }, nIntervalMs, nIntervalMs);
   }
