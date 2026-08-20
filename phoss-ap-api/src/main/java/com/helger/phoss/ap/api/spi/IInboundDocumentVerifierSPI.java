@@ -23,6 +23,7 @@ import com.helger.annotation.Nonempty;
 import com.helger.annotation.style.IsSPIInterface;
 import com.helger.peppolid.IDocumentTypeIdentifier;
 import com.helger.peppolid.IProcessIdentifier;
+import com.helger.phoss.ap.api.exception.InboundVerifierUnavailableException;
 import com.helger.phoss.ap.api.model.MlsOutcome;
 
 /**
@@ -47,10 +48,18 @@ public interface IInboundDocumentVerifierSPI
    * @return <code>null</code> or an {@link MlsOutcome} with a non-failing response code if the
    *         verifier has no objection. A non-<code>null</code> {@link MlsOutcome} with response
    *         code {@link com.helger.peppol.mls.EPeppolMLSResponseCode#REJECTION REJECTION} signals
-   *         that the document is rejected; its issues are propagated into the MLS response.
+   *         that the document is rejected; its issues are propagated into the MLS response. If the
+   *         verifier backend service is unavailable, return an {@link MlsOutcome} created with
+   *         {@link MlsOutcome#serviceUnavailable(String, MlsOutcomeIssue)} or throw an
+   *         {@link InboundVerifierUnavailableException} &mdash; both are handled according to the
+   *         configured {@link com.helger.phoss.ap.api.codelist.EVerificationFailMode} and are never
+   *         an implicit rejection.
+   * @throws InboundVerifierUnavailableException
+   *         If the document could not be verified, because the verifier backend service was
+   *         unavailable. Since 0.12.0.
    */
   @Nullable
   MlsOutcome verifyInboundDocument (@NonNull @Nonempty String sDocumentPath,
                                     @NonNull IDocumentTypeIdentifier aDocTypeID,
-                                    @NonNull IProcessIdentifier aProcessID);
+                                    @NonNull IProcessIdentifier aProcessID) throws InboundVerifierUnavailableException;
 }
