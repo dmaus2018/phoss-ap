@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.style.IsSPIImplementation;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
+import com.helger.phoss.ap.api.model.VerifierResult;
 import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
 
 /**
@@ -103,13 +104,17 @@ public final class DemoNotificationHandlerSPI implements IAPNotificationHandlerS
 
   /** {@inheritDoc} */
   public void onOutboundVerificationRejection (@NonNull final String sSbdhInstanceID,
-                                               @Nullable final String sErrorDetails)
+                                               @NonNull final VerifierResult aVerifierResult)
   {
     LOGGER.info (PREFIX +
                  "onOutboundVerificationRejection: sbdhInstanceID=" +
                  sSbdhInstanceID +
+                 ", verifierName=" +
+                 aVerifierResult.verifierName () +
                  ", errorDetails=" +
-                 sErrorDetails);
+                 aVerifierResult.outcome ().getMessage () +
+                 ", issues=" +
+                 aVerifierResult.outcome ().getAllIssues ());
   }
 
   /** {@inheritDoc} */

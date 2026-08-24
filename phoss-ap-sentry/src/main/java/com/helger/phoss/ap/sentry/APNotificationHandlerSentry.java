@@ -27,6 +27,7 @@ import com.helger.base.enforce.ValueEnforcer;
 import com.helger.collection.commons.CommonsLinkedHashMap;
 import com.helger.collection.commons.ICommonsOrderedMap;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
+import com.helger.phoss.ap.api.model.VerifierResult;
 import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
 
 import io.sentry.Sentry;
@@ -112,10 +113,17 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
 
   /** {@inheritDoc} */
   public void onOutboundVerificationRejection (@NonNull final String sSbdhInstanceID,
-                                               @Nullable final String sErrorDetails)
+                                               @NonNull final VerifierResult aVerifierResult)
   {
     _logError ("onOutboundVerificationRejection",
-               _params ("sbdhInstanceID", sSbdhInstanceID, "errorDetails", sErrorDetails));
+               _params ("sbdhInstanceID",
+                       sSbdhInstanceID,
+                       "verifierName",
+                       aVerifierResult.verifierName (),
+                       "errorDetails",
+                       aVerifierResult.outcome ().getMessage (),
+                       "issueCount",
+                       Integer.toString (aVerifierResult.outcome ().getAllIssues ().size ())));
   }
 
   /** {@inheritDoc} */
