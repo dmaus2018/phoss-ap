@@ -305,11 +305,32 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
 
   /** {@inheritDoc} */
   @NonNull
-  public ESuccess updateStatusCompleted (@NonNull final String sID, @NonNull final EInboundStatus eStatus)
+  public ESuccess updateStatusAndNextRetry (@NonNull final String sID,
+                                            @NonNull final EInboundStatus eStatus,
+                                            @Nullable final OffsetDateTime aNextRetryDT,
+                                            @Nullable final String sErrorDetails)
   {
     final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
                                                                       m_sTableName +
-                                                                      " SET status=?, completed_dt=?" +
+                                                                      " SET status=?, next_retry_dt=?, error_details=?" +
+                                                                      " WHERE id=?",
+                                                                      new ConstantPreparedStatementDataProvider (eStatus.getID (),
+                                                                                                                 DBValueHelper.toTimestamp (aNextRetryDT),
+                                                                                                                 sErrorDetails,
+                                                                                                                 sID));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
+  public ESuccess updateStatusCompleted (@NonNull final String sID, @NonNull final EInboundStatus eStatus)
+  {
+    // The next retry and the error details of the previous failure or deferral are cleared, so that
+    // a completed transaction does not look like it still has something pending
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                                      m_sTableName +
+                                                                      " SET status=?, completed_dt=?," +
+                                                                      " next_retry_dt=NULL, error_details=NULL" +
                                                                       " WHERE id=?",
                                                                       new ConstantPreparedStatementDataProvider (eStatus.getID (),
                                                                                                                  DBValueHelper.toTimestamp (now ()),
@@ -368,8 +389,9 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
-                                                                      " WHERE status IN (?,?,?)",
+                                                                      " WHERE status IN (?,?,?,?)",
                                                                       new ConstantPreparedStatementDataProvider (EInboundStatus.RECEIVED.getID (),
+                                                                                                                 EInboundStatus.VERIFICATION_DEFERRED.getID (),
                                                                                                                  EInboundStatus.FORWARDING.getID (),
                                                                                                                  EInboundStatus.FORWARD_FAILED.getID ()));
     final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
@@ -393,6 +415,27 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       nBatchSize +
                                                                       " FOR UPDATE SKIP LOCKED",
                                                                       new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARD_FAILED.getID ()));
+    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
+    if (aRows != null)
+      for (final DBResultRow aRow : aRows)
+        ret.add (new InboundTransactionRow (aRow));
+    return ret;
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
+  public ICommonsList <IInboundTransaction> getAllForVerificationRetry (@Nonnegative final int nBatchSize)
+  {
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM " +
+                                                                      m_sTableName +
+                                                                      " WHERE status=? AND next_retry_dt <= NOW()" +
+                                                                      " ORDER BY next_retry_dt" +
+                                                                      " LIMIT " +
+                                                                      nBatchSize +
+                                                                      " FOR UPDATE SKIP LOCKED",
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.VERIFICATION_DEFERRED.getID ()));
     final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)
