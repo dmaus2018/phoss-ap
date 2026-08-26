@@ -62,6 +62,7 @@ import com.helger.phoss.ap.api.codelist.EInboundStatus;
 import com.helger.phoss.ap.api.codelist.EVerificationFailMode;
 import com.helger.phoss.ap.api.codelist.EVerificationIssueLevel;
 import com.helger.phoss.ap.api.codelist.EVerificationOutcomeCategory;
+import com.helger.phoss.ap.api.codelist.EVerificationResult;
 import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
@@ -214,9 +215,9 @@ public final class InboundOrchestrator
    * Get the MLS details to be sent to C2 when the AP rejects the document. The response code is
    * always RE, because this is only called once the rejection has been decided - but the findings
    * only become the <em>reason</em> of the rejection if at least one of them is an
-   * {@link EVerificationIssueLevel#ERROR}. Warnings alone never explain a rejection, so in that case
-   * a synthesized error line response naming the verifier is used and the warnings are appended to
-   * it.
+   * {@link EVerificationIssueLevel#ERROR}. Warnings alone never explain a rejection, so in that
+   * case a synthesized error line response naming the verifier is used and the warnings are
+   * appended to it.
    * <p>
    * The individual severities survive the projection: an error becomes SV or BV and a warning
    * becomes BW.
@@ -250,8 +251,7 @@ public final class InboundOrchestrator
     // A verifier that rejects with warnings only is contradictory - keep them as extra details
     aMlsIssues.addAll (getAllMlsIssues (aVR));
     return MlsOutcome.rejection (aVR.outcome ().isServiceUnavailable () ? "Document verification could not be performed"
-                                                                       : "Document verification failed",
-                                 aMlsIssues);
+                                                                        : "Document verification failed", aMlsIssues);
   }
 
   /**
@@ -334,6 +334,19 @@ public final class InboundOrchestrator
   }
 
   /**
+   * Render the findings of a verification for the <code>verification_details</code> column.
+   *
+   * @param aOutcome
+   *        The outcome whose findings are to be stored. May not be <code>null</code>.
+   * @return <code>null</code> if the verifier provided no individual findings.
+   */
+  @Nullable
+  private static String _getVerificationDetails (@NonNull final VerificationOutcome aOutcome)
+  {
+    return aOutcome.hasIssues () ? aOutcome.getAllIssuesAsJson ().getAsJsonString () : null;
+  }
+
+  /**
    * Reject an inbound document, because it did not pass the verification. The forwarding attempt
    * count is deliberately left unchanged, because the document is never forwarded.
    *
@@ -351,7 +364,7 @@ public final class InboundOrchestrator
    */
   private static void _rejectAfterVerification (@NonNull final String sLogPrefix,
                                                 @NonNull final IInboundTransaction aInboundTx,
-                                                @NonNull final MlsOutcome aOutcome,
+                                                @NonNull final VerifierResult aVR,
                                                 @NonNull final String sErrorDetails,
                                                 @NonNull final String sReason)
   {
@@ -361,17 +374,23 @@ public final class InboundOrchestrator
 
     LOGGER.warn (sLogPrefix + "Inbound document verification failed for '" + sSbdhInstanceID + "': " + sReason);
 
+    // Record the verdict separately from the status, so that it survives a later forwarding and is
+    // not cleared together with the error details on completion. The details are the neutral
+    // findings, not their MLS projection - MLS is only how C2 is answered
+    aTxMgr.updateVerificationResult (sTxID, EVerificationResult.REJECTED, _getVerificationDetails (aVR.outcome ()));
+
     // Don't touch the forwarding attempt count - the document is never forwarded
     aTxMgr.updateStatusAndNextRetry (sTxID, EInboundStatus.REJECTED, null, sErrorDetails);
 
     // Don't send MLS as response to MLR or MLS
     if (!CPhossAP.isMLR (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()) &&
-        !CPhossAP.isMLS (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()))
+      !CPhossAP.isMLS (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()))
     {
+      final MlsOutcome aMlsOutcome = getRejectionMlsOutcome (aVR);
       // Send asynchronously
       PhotonWorkerPool.getInstance ().run ("send-mls", () -> {
         // Send negative MLS (RE) back to C2 with the verifier's detailed outcome
-        MlsHandler.triggerSendingInboundResultMls (aInboundTx, aOutcome);
+        MlsHandler.triggerSendingInboundResultMls (aInboundTx, aMlsOutcome);
       });
     }
 
@@ -400,6 +419,7 @@ public final class InboundOrchestrator
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final OffsetDateTime aNow = APBasicMetaManager.getTimestampMgr ().getCurrentDateTimeUTC ();
+
     final String sErrorDetails = ERROR_DETAILS_VERIFIER_UNAVAILABLE +
                                  " [" +
                                  aVR.verifierName () +
@@ -417,7 +437,7 @@ public final class InboundOrchestrator
                              aMaxDuration;
       _rejectAfterVerification (sLogPrefix,
                                 aInboundTx,
-                                getRejectionMlsOutcome (aVR),
+                                aVR,
                                 sErrorDetails + " (maximum deferral duration of " + aMaxDuration + " exceeded)",
                                 sReason);
       return;
@@ -466,16 +486,17 @@ public final class InboundOrchestrator
    *         <code>EContinue.BREAK</code> if the document was rejected or if its verification was
    *         deferred.
    */
-  private static @NonNull EContinue _handleVerifierResult (@NonNull final String sLogPrefix,
-                                                           @NonNull final IInboundTransaction aInboundTx,
-                                                           @NonNull final VerifierResult aVR)
+  @VisibleForTesting
+  static @NonNull EContinue handleVerifierResult (@NonNull final String sLogPrefix,
+                                                  @NonNull final IInboundTransaction aInboundTx,
+                                                  @NonNull final VerifierResult aVR)
   {
     if (aVR.outcome ().isRejected ())
     {
       final String sText = StringHelper.getNotNull (aVR.outcome ().getMessage (), "Verification failed");
       _rejectAfterVerification (sLogPrefix,
                                 aInboundTx,
-                                getRejectionMlsOutcome (aVR),
+                                aVR,
                                 ERROR_DETAILS_VERIFICATION_REJECTED + " [" + aVR.verifierName () + "]: " + sText,
                                 "The document verifier '" + aVR.verifierName () + "' rejected the document");
       return EContinue.BREAK;
@@ -502,6 +523,12 @@ public final class InboundOrchestrator
                        "' - forwarding the unverified document '" +
                        aInboundTx.getSbdhInstanceID () +
                        "'");
+          // Remember that this document was never inspected - otherwise a forwarded document is
+          // indistinguishable from a properly verified one
+          APJdbcMetaManager.getInboundTransactionMgr ()
+                           .updateVerificationResult (aInboundTx.getID (),
+                                                      EVerificationResult.UNVERIFIED,
+                                                      _getVerificationDetails (aVR.outcome ()));
           yield EContinue.CONTINUE;
         }
         default ->
@@ -515,7 +542,7 @@ public final class InboundOrchestrator
                                  "'";
           _rejectAfterVerification (sLogPrefix,
                                     aInboundTx,
-                                    getRejectionMlsOutcome (aVR),
+                                    aVR,
                                     ERROR_DETAILS_VERIFIER_UNAVAILABLE + " [" + aVR.verifierName () + "]: " + sText,
                                     sReason);
           yield EContinue.BREAK;
@@ -524,6 +551,13 @@ public final class InboundOrchestrator
     }
 
     // All verifiers accepted
+    // The findings of an accepted document are warnings - keep them, they are also sent to C2 as
+    // line responses of the positive MLS
+    APJdbcMetaManager.getInboundTransactionMgr ()
+                     .updateVerificationResult (aInboundTx.getID (),
+                                                EVerificationResult.PASSED,
+                                                _getVerificationDetails (aVR.outcome ()));
+
     for (final var aHandler : APCoreMetaManager.getAllLifecycleHandlers ())
       aHandler.onInboundVerificationAccepted (aInboundTx.getID (), aInboundTx.getSbdhInstanceID ());
     return EContinue.CONTINUE;
@@ -574,7 +608,7 @@ public final class InboundOrchestrator
         if (aVR.outcome ().isServiceUnavailable ())
           aVerifySpan.setStatusError ("Inbound verifier service unavailable");
 
-      final EContinue eContinue = _handleVerifierResult (sLogPrefix, aInboundTx, aVR);
+      final EContinue eContinue = handleVerifierResult (sLogPrefix, aInboundTx, aVR);
       if (eContinue.isContinue ())
       {
         // The document was accepted - any remaining findings are warnings and are reported to C2
@@ -683,7 +717,7 @@ public final class InboundOrchestrator
       // Try to send back positive MLS
       // Don't send MLS as response to MLS
       if (!CPhossAP.isMLR (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()) &&
-          !CPhossAP.isMLS (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()))
+        !CPhossAP.isMLS (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()))
       {
         // Send asynchronously
         PhotonWorkerPool.getInstance ().run ("send-mls", () -> {
@@ -715,7 +749,7 @@ public final class InboundOrchestrator
   {
     // Don't send MLS as response to MLR or MLS
     if (!CPhossAP.isMLR (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()) &&
-        !CPhossAP.isMLS (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()))
+      !CPhossAP.isMLS (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()))
     {
       // Send asynchronously
       PhotonWorkerPool.getInstance ().run ("send-mls", () -> {
@@ -1377,6 +1411,7 @@ public final class InboundOrchestrator
     {
       // The stored identifiers are URI encoded, so they must be parsed and not created
       final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
+
       final IDocumentTypeIdentifier aDocTypeID = aIF.parseDocumentTypeIdentifier (aInboundTx.getDocTypeID ());
       final IProcessIdentifier aProcessID = aIF.parseProcessIdentifier (aInboundTx.getProcessID ());
       if (aDocTypeID == null || aProcessID == null)
