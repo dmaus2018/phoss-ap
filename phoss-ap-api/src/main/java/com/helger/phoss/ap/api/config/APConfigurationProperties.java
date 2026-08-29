@@ -192,6 +192,8 @@ public final class APConfigurationProperties
   // Forwarding - SFTP
   /** @since 0.10.2 */
   public static final boolean FORWARDING_SFTP_WRITE_METADATA_DEFAULT = false;
+  /** @since 0.12.0 */
+  public static final String FORWARDING_SFTP_FILENAME_PATTERN_DEFAULT = "{datetime}_{incoming-id}";
 
   // Retry sending
   public static final String RETRY_SENDING_MAX_ATTEMPTS = "retry.sending.max-attempts";
