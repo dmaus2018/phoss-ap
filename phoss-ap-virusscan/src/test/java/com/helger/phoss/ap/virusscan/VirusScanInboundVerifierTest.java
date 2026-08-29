@@ -60,7 +60,7 @@ public final class VirusScanInboundVerifierTest
     final IProcessIdentifier aProcessID = aIF.createProcessIdentifierWithDefaultScheme ("dummy-process");
 
     final VirusScanInboundVerifier aVerifier = new VirusScanInboundVerifier ();
-    assertNull (aVerifier.verifyInboundDocument ("dummy-path", aDocTypeID, aProcessID));
+    assertTrue (aVerifier.verifyInboundDocument ("dummy-path", aDocTypeID, aProcessID).isPassed ());
   }
 
   @Test

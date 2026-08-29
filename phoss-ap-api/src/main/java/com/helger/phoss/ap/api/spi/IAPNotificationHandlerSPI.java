@@ -16,12 +16,14 @@
  */
 package com.helger.phoss.ap.api.spi;
 
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import com.helger.annotation.style.IsSPIInterface;
+import com.helger.phoss.ap.api.model.VerifierResult;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
 
 /**
@@ -69,17 +71,51 @@ public interface IAPNotificationHandlerSPI
                                        @Nullable String sErrorDetails);
 
   /**
+   * Called when the verification of an inbound document was deferred, because a document verifier
+   * made no verdict about the document - e.g. because its backend service was unavailable - and
+   * the configured fail mode is <code>deferred</code>. The document is neither forwarded nor
+   * rejected yet and <b>no MLS was sent to C2</b>; it is re-verified at the provided date and time.
+   * <p>
+   * This callback is fired for every deferral, i.e. also for every unsuccessful re-verification. It
+   * is the signal that a verifier needs operator attention: if the situation is not resolved within
+   * <code>verification.deferred.max-duration</code>, the document is rejected and
+   * {@link #onInboundVerificationRejection(String, String, String)} is fired.
+   * </p>
+   *
+   * @param sTransactionID
+   *        The transaction ID. Never <code>null</code>.
+   * @param sSbdhInstanceID
+   *        The SBDH Instance Identifier. Never <code>null</code>.
+   * @param sVerifierName
+   *        The name of the document verifier that made no verdict. Never <code>null</code>.
+   * @param aNextRetryDT
+   *        The date and time of the next scheduled re-verification. Never <code>null</code>.
+   * @param sErrorDetails
+   *        Optional error details. May be <code>null</code>.
+   * @since 0.12.0
+   */
+  void onInboundVerificationDeferred (@NonNull String sTransactionID,
+                                      @NonNull String sSbdhInstanceID,
+                                      @NonNull String sVerifierName,
+                                      @NonNull OffsetDateTime aNextRetryDT,
+                                      @Nullable String sErrorDetails);
+
+  /**
    * Called when an outbound document fails optional verification before sending and is rejected. No
    * outbound transaction has been created yet, so this callback only carries the SBDH Instance
    * Identifier.
    *
    * @param sSbdhInstanceID
    *        The SBDH Instance Identifier. Never <code>null</code>.
-   * @param sErrorDetails
-   *        Optional error details. May be <code>null</code>.
-   * @since 0.9.0
+   * @param aVerifierResult
+   *        The result that led to the rejection, carrying the name of the decisive verifier, the
+   *        human-readable reason and the individual
+   *        {@link com.helger.phoss.ap.api.model.VerificationIssue}s. Never <code>null</code>. The
+   *        outcome category also states whether the document was actually found to be invalid or
+   *        whether the verifier could not make a verdict at all.
+   * @since 0.9.0 - carries the {@link VerifierResult} instead of a flat error string since 0.12.0
    */
-  void onOutboundVerificationRejection (@NonNull String sSbdhInstanceID, @Nullable String sErrorDetails);
+  void onOutboundVerificationRejection (@NonNull String sSbdhInstanceID, @NonNull VerifierResult aVerifierResult);
 
   /**
    * Called when an inbound AS4 message is rejected because it was detected as a duplicate before an

@@ -19,18 +19,16 @@ package com.helger.phoss.ap.virusscan;
 import java.io.InputStream;
 
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonempty;
 import com.helger.annotation.style.IsSPIImplementation;
-import com.helger.peppol.mls.EPeppolMLSStatusReasonCode;
+import com.helger.collection.commons.CommonsArrayList;
 import com.helger.peppolid.IDocumentTypeIdentifier;
 import com.helger.peppolid.IProcessIdentifier;
-import com.helger.phoss.ap.api.exception.InboundVerifierUnavailableException;
-import com.helger.phoss.ap.api.model.MlsOutcome;
-import com.helger.phoss.ap.api.model.MlsOutcomeIssue;
+import com.helger.phoss.ap.api.model.VerificationIssue;
+import com.helger.phoss.ap.api.model.VerificationOutcome;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 
@@ -45,16 +43,16 @@ public class VirusScanInboundVerifier implements IInboundDocumentVerifierSPI
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (VirusScanInboundVerifier.class);
 
-  @Nullable
-  public MlsOutcome verifyInboundDocument (@NonNull @Nonempty final String sDocumentPath,
-                                           @NonNull final IDocumentTypeIdentifier aDocTypeID,
-                                           @NonNull final IProcessIdentifier aProcessID) throws InboundVerifierUnavailableException
+  @NonNull
+  public VerificationOutcome verifyInboundDocument (@NonNull @Nonempty final String sDocumentPath,
+                                                    @NonNull final IDocumentTypeIdentifier aDocTypeID,
+                                                    @NonNull final IProcessIdentifier aProcessID)
   {
     if (!VirusScanConfig.isInboundEnabled ())
     {
       if (LOGGER.isDebugEnabled ())
         LOGGER.debug ("ICAP virus scanning is disabled for inbound documents");
-      return null;
+      return VerificationOutcome.passed ();
     }
 
     final IcapScanClient aClient = new IcapScanClient (VirusScanConfig.getHost (),
@@ -86,7 +84,7 @@ public class VirusScanInboundVerifier implements IInboundDocumentVerifierSPI
       {
         if (LOGGER.isDebugEnabled ())
           LOGGER.debug ("Document '" + sDocumentPath + "' is pure XML with 0 attachments; bypassing ICAP scan (attachments-only mode)");
-        return null;
+        return VerificationOutcome.passed ();
       }
     }
 
@@ -108,26 +106,25 @@ public class VirusScanInboundVerifier implements IInboundDocumentVerifierSPI
     return _handleResult (sDocumentPath, aResult);
   }
 
-  @Nullable
-  private static MlsOutcome _handleResult (@NonNull final String sDocumentPath,
-                                           @NonNull final IcapScanResult aResult) throws InboundVerifierUnavailableException
+  @NonNull
+  private static VerificationOutcome _handleResult (@NonNull final String sDocumentPath,
+                                                   @NonNull final IcapScanResult aResult)
   {
     if (aResult.isPassed ())
-      return null;
+      return VerificationOutcome.passed ();
 
     if (aResult.isRejection ())
     {
       final String sThreat = aResult.getThreatName ();
       LOGGER.warn ("Virus scan REJECTED document '" + sDocumentPath + "': Threat=" + sThreat);
-      return MlsOutcome.rejection ("Virus detected in document payload: " + sThreat,
-                                   MlsOutcomeIssue.ofNA (EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_FATAL,
-                                                         "Virus detected: " + sThreat));
+      return VerificationOutcome.rejected ("Virus detected in document payload: " + sThreat,
+                                           new CommonsArrayList <> (VerificationIssue.businessRuleViolation (null,
+                                                                                                            null,
+                                                                                                            "Virus detected: " + sThreat)));
     }
 
     final String sErr = aResult.getErrorMessage ();
     LOGGER.warn ("ICAP virus scanner unavailable for '" + sDocumentPath + "': " + sErr);
-    return MlsOutcome.serviceUnavailable ("Virus scan service unavailable: " + sErr,
-                                          MlsOutcomeIssue.ofNA (EPeppolMLSStatusReasonCode.FAILURE_OF_DELIVERY,
-                                                                "Virus scan service unavailable: " + sErr));
+    return VerificationOutcome.serviceUnavailable ("Virus scan service unavailable: " + sErr);
   }
 }

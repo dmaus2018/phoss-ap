@@ -24,10 +24,11 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonempty;
 import com.helger.annotation.style.IsSPIImplementation;
-import com.helger.base.state.ESuccess;
+import com.helger.collection.commons.CommonsArrayList;
 import com.helger.peppolid.IDocumentTypeIdentifier;
 import com.helger.peppolid.IProcessIdentifier;
-import com.helger.phoss.ap.api.codelist.EVerificationFailMode;
+import com.helger.phoss.ap.api.model.VerificationIssue;
+import com.helger.phoss.ap.api.model.VerificationOutcome;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
 
@@ -43,21 +44,21 @@ public class VirusScanOutboundVerifier implements IOutboundDocumentVerifierSPI
   private static final Logger LOGGER = LoggerFactory.getLogger (VirusScanOutboundVerifier.class);
 
   @NonNull
-  public ESuccess verifyOutboundDocument (@NonNull @Nonempty final String sDocumentPath,
-                                          @NonNull final IDocumentTypeIdentifier aDocTypeID,
-                                          @NonNull final IProcessIdentifier aProcessID)
+  public VerificationOutcome verifyOutboundDocument (@NonNull @Nonempty final String sDocumentPath,
+                                                     @NonNull final IDocumentTypeIdentifier aDocTypeID,
+                                                     @NonNull final IProcessIdentifier aProcessID)
   {
     if (!VirusScanConfig.isOutboundEnabled ())
     {
       if (LOGGER.isDebugEnabled ())
         LOGGER.debug ("ICAP virus scanning is disabled for outbound documents");
-      return ESuccess.SUCCESS;
+      return VerificationOutcome.passed ();
     }
 
     final IcapScanClient aClient = new IcapScanClient (VirusScanConfig.getHost (),
-                                                      VirusScanConfig.getPort (),
-                                                      VirusScanConfig.getService (),
-                                                      VirusScanConfig.getTimeoutDuration ());
+                                                       VirusScanConfig.getPort (),
+                                                       VirusScanConfig.getService (),
+                                                       VirusScanConfig.getTimeoutDuration ());
 
     VirusScanAttachmentExtractor.AttachmentScanResult aAttResult = null;
 
@@ -83,7 +84,7 @@ public class VirusScanOutboundVerifier implements IOutboundDocumentVerifierSPI
       {
         if (LOGGER.isDebugEnabled ())
           LOGGER.debug ("Outbound document '" + sDocumentPath + "' is pure XML with 0 attachments; bypassing ICAP scan (attachments-only mode)");
-        return ESuccess.SUCCESS;
+        return VerificationOutcome.passed ();
       }
     }
 
@@ -106,28 +107,23 @@ public class VirusScanOutboundVerifier implements IOutboundDocumentVerifierSPI
   }
 
   @NonNull
-  private static ESuccess _handleResult (@NonNull final String sDocumentPath,
-                                         @NonNull final IcapScanResult aResult)
+  private static VerificationOutcome _handleResult (@NonNull final String sDocumentPath,
+                                                   @NonNull final IcapScanResult aResult)
   {
     if (aResult.isPassed ())
-      return ESuccess.SUCCESS;
+      return VerificationOutcome.passed ();
 
     if (aResult.isRejection ())
     {
       LOGGER.warn ("Outbound document '" + sDocumentPath + "' REJECTED by virus scan: Threat=" + aResult.getThreatName ());
-      return ESuccess.FAILURE;
+      return VerificationOutcome.rejected ("Outbound document rejected by virus scan: Threat=" + aResult.getThreatName (),
+                                           new CommonsArrayList <> (VerificationIssue.businessRuleViolation (null,
+                                                                                                            null,
+                                                                                                            "Virus detected: " + aResult.getThreatName ())));
     }
 
-    final EVerificationFailMode eFailMode = VirusScanConfig.getFailMode ();
     final String sErr = aResult.getErrorMessage ();
-
-    if (eFailMode == EVerificationFailMode.OPEN)
-    {
-      LOGGER.error ("Outbound ICAP virus scanner unavailable for '" + sDocumentPath + "' (fail-open mode), bypassing check: " + sErr);
-      return ESuccess.SUCCESS;
-    }
-
-    LOGGER.warn ("Outbound ICAP virus scanner unavailable for '" + sDocumentPath + "' (fail-closed mode), rejecting outbound submission: " + sErr);
-    return ESuccess.FAILURE;
+    LOGGER.warn ("Outbound ICAP virus scanner unavailable for '" + sDocumentPath + "': " + sErr);
+    return VerificationOutcome.serviceUnavailable ("Outbound ICAP virus scanner unavailable: " + sErr);
   }
 }

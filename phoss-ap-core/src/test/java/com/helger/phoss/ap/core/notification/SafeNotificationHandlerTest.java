@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -29,6 +30,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.Test;
 
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
+import com.helger.phoss.ap.api.model.VerificationOutcome;
+import com.helger.phoss.ap.api.model.VerifierResult;
 import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
 
 /**
@@ -44,6 +47,7 @@ public final class SafeNotificationHandlerTest
   private static final class CountingHandler implements IAPNotificationHandlerSPI
   {
     final AtomicInteger m_aInboundVerificationRejectionCount = new AtomicInteger (0);
+    final AtomicInteger m_aInboundVerificationDeferredCount = new AtomicInteger (0);
     final AtomicInteger m_aOutboundVerificationRejectionCount = new AtomicInteger (0);
     final AtomicInteger m_aInboundDuplicateRejectedCount = new AtomicInteger (0);
     final AtomicReference <String> m_aInboundDuplicateRejectedSenderProviderID = new AtomicReference <> ();
@@ -64,8 +68,17 @@ public final class SafeNotificationHandlerTest
       m_aInboundVerificationRejectionCount.incrementAndGet ();
     }
 
+    public void onInboundVerificationDeferred (@NonNull final String sTransactionID,
+                                               @NonNull final String sSbdhInstanceID,
+                                               @NonNull final String sVerifierName,
+                                               @NonNull final OffsetDateTime aNextRetryDT,
+                                               @Nullable final String sErrorDetails)
+    {
+      m_aInboundVerificationDeferredCount.incrementAndGet ();
+    }
+
     public void onOutboundVerificationRejection (@NonNull final String sSbdhInstanceID,
-                                                 @Nullable final String sErrorDetails)
+                                                 @NonNull final VerifierResult aVerifierResult)
     {
       m_aOutboundVerificationRejectionCount.incrementAndGet ();
     }
@@ -159,8 +172,17 @@ public final class SafeNotificationHandlerTest
       throw new IllegalStateException ("test-onInboundVerificationRejection");
     }
 
+    public void onInboundVerificationDeferred (@NonNull final String sTransactionID,
+                                               @NonNull final String sSbdhInstanceID,
+                                               @NonNull final String sVerifierName,
+                                               @NonNull final OffsetDateTime aNextRetryDT,
+                                               @Nullable final String sErrorDetails)
+    {
+      throw new IllegalStateException ("test-onInboundVerificationDeferred");
+    }
+
     public void onOutboundVerificationRejection (@NonNull final String sSbdhInstanceID,
-                                                 @Nullable final String sErrorDetails)
+                                                 @NonNull final VerifierResult aVerifierResult)
     {
       throw new IllegalStateException ("test-onOutboundVerificationRejection");
     }
@@ -250,7 +272,11 @@ public final class SafeNotificationHandlerTest
     aSafe.onInboundVerificationRejection ("tx-1", "sbdh-1", "error");
     assertEquals (1, aInner.m_aInboundVerificationRejectionCount.get ());
 
-    aSafe.onOutboundVerificationRejection ("sbdh-out", "error");
+    aSafe.onInboundVerificationDeferred ("tx-1", "sbdh-1", "Verifier", OffsetDateTime.now (), "unavailable");
+    assertEquals (1, aInner.m_aInboundVerificationDeferredCount.get ());
+
+    aSafe.onOutboundVerificationRejection ("sbdh-out",
+                                          new VerifierResult (VerificationOutcome.rejected ("error"), "V1"));
     assertEquals (1, aInner.m_aOutboundVerificationRejectionCount.get ());
 
     aSafe.onInboundDuplicateRejected ("sender",
@@ -301,7 +327,9 @@ public final class SafeNotificationHandlerTest
 
     // None of these should throw
     aSafe.onInboundVerificationRejection ("tx-1", "sbdh-1", "error");
-    aSafe.onOutboundVerificationRejection ("sbdh-out", "error");
+    aSafe.onInboundVerificationDeferred ("tx-1", "sbdh-1", "Verifier", OffsetDateTime.now (), "unavailable");
+    aSafe.onOutboundVerificationRejection ("sbdh-out",
+                                          new VerifierResult (VerificationOutcome.rejected ("error"), "V1"));
     aSafe.onInboundDuplicateRejected ("sender",
                                       "receiver",
                                       "doctype",

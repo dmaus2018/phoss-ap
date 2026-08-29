@@ -16,6 +16,7 @@
  */
 package com.helger.phoss.ap.core.notification;
 
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 
 import org.jspecify.annotations.NonNull;
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.tostring.ToStringGenerator;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
+import com.helger.phoss.ap.api.model.VerifierResult;
 import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
 
 /**
@@ -69,12 +71,33 @@ public final class SafeNotificationHandler implements IAPNotificationHandlerSPI
   }
 
   /** {@inheritDoc} */
-  public void onOutboundVerificationRejection (@NonNull final String sSbdhInstanceID,
-                                               @Nullable final String sErrorDetails)
+  public void onInboundVerificationDeferred (@NonNull final String sTransactionID,
+                                             @NonNull final String sSbdhInstanceID,
+                                             @NonNull final String sVerifierName,
+                                             @NonNull final OffsetDateTime aNextRetryDT,
+                                             @Nullable final String sErrorDetails)
   {
     try
     {
-      m_aHdl.onOutboundVerificationRejection (sSbdhInstanceID, sErrorDetails);
+      m_aHdl.onInboundVerificationDeferred (sTransactionID,
+                                            sSbdhInstanceID,
+                                            sVerifierName,
+                                            aNextRetryDT,
+                                            sErrorDetails);
+    }
+    catch (final Exception ex)
+    {
+      LOGGER.error ("Internal error invoking onInboundVerificationDeferred on " + m_aHdl, ex);
+    }
+  }
+
+  /** {@inheritDoc} */
+  public void onOutboundVerificationRejection (@NonNull final String sSbdhInstanceID,
+                                               @NonNull final VerifierResult aVerifierResult)
+  {
+    try
+    {
+      m_aHdl.onOutboundVerificationRejection (sSbdhInstanceID, aVerifierResult);
     }
     catch (final Exception ex)
     {
