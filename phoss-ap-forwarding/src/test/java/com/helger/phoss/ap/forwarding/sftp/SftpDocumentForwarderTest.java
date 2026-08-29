@@ -93,11 +93,11 @@ public final class SftpDocumentForwarderTest
     public int getAttemptCount () { return 0; }
     @NonNull public OffsetDateTime getReceivedDT () { return m_aReceivedDT; }
     @Nullable public OffsetDateTime getCompletedDT () { return null; }
-    @NonNull public EReportingStatus getReportingStatus () { return EReportingStatus.NOT_REPORTED; }
+    @NonNull public EReportingStatus getReportingStatus () { return EReportingStatus.PENDING; }
     @Nullable public OffsetDateTime getNextRetryDT () { return null; }
     @Nullable public String getErrorDetails () { return null; }
     @Nullable public String getMlsTo () { return null; }
-    @NonNull public EPeppolMLSType getMlsType () { return EPeppolMLSType.NONE; }
+    @NonNull public EPeppolMLSType getMlsType () { return EPeppolMLSType.ALWAYS_SEND; }
     @Nullable public EPeppolMLSResponseCode getMlsResponseCode () { return null; }
     @Nullable public String getMlsOutboundTransactionID () { return null; }
     @Nullable public EVerificationResult getVerificationResult () { return null; }
