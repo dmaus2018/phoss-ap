@@ -164,14 +164,6 @@ public class OperationsController
    *
    * @param sbdhInstanceID
    *        The SBDH Instance ID of the transaction to re-verify and forward.
-   * @return 200 on success, 404 if not found, 500 if the verification or the forwarding failed.
-   * @since 0.12.0
-   */
-  /**
-   * Re-verify an inbound transaction whose verification was deferred and forward it to C4.
-   *
-   * @param sbdhInstanceID
-   *        The SBDH Instance ID of the transaction to re-verify and forward.
    * @return 200 on success, 404 if not found, 409 if the transaction is not in status
    *         <code>verification_deferred</code>, 500 if the verification or the forwarding failed.
    * @since 0.12.0
