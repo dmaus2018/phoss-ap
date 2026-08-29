@@ -153,11 +153,10 @@ public class OperationsController
     final IInboundTransaction aUpdatedTx = aTxMgr.getBySbdhInstanceIDIncludingArchive (sbdhInstanceID);
     final IInboundTransaction aFinalTx = aUpdatedTx != null ? aUpdatedTx : aTx;
 
-  if (eSuccess.isSuccess ())
+    if (eSuccess.isSuccess ())
       return ResponseEntity.ok (InboundTransactionResponse.fromDomain (aFinalTx));
     return ResponseEntity.internalServerError ().body (InboundTransactionResponse.fromDomain (aFinalTx));
   }
-
 
   /**
    * Re-verify an inbound transaction whose verification was deferred and forward it to C4.
