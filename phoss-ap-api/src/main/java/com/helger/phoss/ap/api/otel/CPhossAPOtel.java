@@ -62,6 +62,8 @@ public final class CPhossAPOtel
   public static final String METRIC_INBOUND_VERIFICATION_ACCEPTED = "phoss.ap.inbound.verification.accepted";
   public static final String METRIC_INBOUND_MLS_CORRELATED = "phoss.ap.inbound.mls.correlated";
   public static final String METRIC_INBOUND_FORWARDED = "phoss.ap.inbound.forwarded";
+  /** @since 0.12.0 */
+  public static final String METRIC_INBOUND_VERIFICATION_REJECTIONS_FORWARDED = "phoss.ap.inbound.verification.rejections.forwarded";
   public static final String METRIC_OUTBOUND_ACCEPTED = "phoss.ap.outbound.accepted";
   public static final String METRIC_OUTBOUND_VERIFICATION_ACCEPTED = "phoss.ap.outbound.verification.accepted";
   public static final String METRIC_OUTBOUND_SENT = "phoss.ap.outbound.sent";
@@ -80,6 +82,8 @@ public final class CPhossAPOtel
   public static final String SPAN_INBOUND_DUPLICATE_CHECK = "phoss.ap.inbound.duplicate_check";
   public static final String SPAN_INBOUND_FORWARD = "phoss.ap.inbound.forward";
   public static final String SPAN_INBOUND_FORWARD_SECONDARY = "phoss.ap.inbound.forward.secondary";
+  /** @since 0.12.0 */
+  public static final String SPAN_INBOUND_FORWARD_REJECTED = "phoss.ap.inbound.forward.rejected";
   public static final String SPAN_INBOUND_C4_RESOLVE = "phoss.ap.inbound.c4_resolve";
   public static final String SPAN_OUTBOUND_SEND = "phoss.ap.outbound.send";
   public static final String SPAN_OUTBOUND_AS4_SEND = "phoss.ap.outbound.as4_send";
