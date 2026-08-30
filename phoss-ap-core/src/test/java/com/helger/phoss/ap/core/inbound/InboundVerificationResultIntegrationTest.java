@@ -205,11 +205,10 @@ public final class InboundVerificationResultIntegrationTest
   private static VerifierResult _createRejection ()
   {
     final VerificationIssue aError = VerificationIssue.businessRuleViolation ("BR-1",
-                                                                             "/Invoice",
-                                                                             "The document is invalid");
+                                                                              "/Invoice",
+                                                                              "The document is invalid");
     return new VerifierResult (VerificationOutcome.rejected ("Document verification failed",
-                                                             new CommonsArrayList <> (aError)),
-                               "Scanner");
+                                                             new CommonsArrayList <> (aError)), "Scanner");
   }
 
   /**
@@ -300,8 +299,7 @@ public final class InboundVerificationResultIntegrationTest
   {
     // A rejected but forwarded document was already answered with the negative MLS (RE) - no
     // further MLS may be sent for it, no matter which code path asks
-    final IInboundTransaction aRejected = _rejectWithMode (EVerificationRejectionForwarding.RETRY,
-                                                           EContinue.CONTINUE);
+    final IInboundTransaction aRejected = _rejectWithMode (EVerificationRejectionForwarding.RETRY, EContinue.CONTINUE);
     assertTrue (InboundOrchestrator.isMlsSuppressedAfterRejection (aRejected));
 
     // A stale instance - loaded before the verdict was written - must not be used for the decision

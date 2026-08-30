@@ -315,21 +315,21 @@ public final class APPeppolReportHelper
       final String sCustom2 = null;
       final String sCustom3 = null;
       final OutboundSubmitResult aSubmitResult = OutboundOrchestrator.submitRawDocument ("[PeppolReporting] ",
-                                                                               aSenderID,
-                                                                               aReceiverID,
-                                                                               aDocTypeID,
-                                                                               aProcessID,
-                                                                               PeppolSBDHData.createRandomSBDHInstanceIdentifier (),
-                                                                               sC1CountryCode,
-                                                                               new NonBlockingByteArrayInputStream (sMessagePayload.getBytes (StandardCharsets.UTF_8)),
-                                                                               sMlsTo,
-                                                                               sSbdhStandard,
-                                                                               sSbdhTypeVersion,
-                                                                               sSbdhType,
-                                                                               sPayloadMimeType,
-                                                                               sCustom1,
-                                                                               sCustom2,
-                                                                               sCustom3);
+                                                                                         aSenderID,
+                                                                                         aReceiverID,
+                                                                                         aDocTypeID,
+                                                                                         aProcessID,
+                                                                                         PeppolSBDHData.createRandomSBDHInstanceIdentifier (),
+                                                                                         sC1CountryCode,
+                                                                                         new NonBlockingByteArrayInputStream (sMessagePayload.getBytes (StandardCharsets.UTF_8)),
+                                                                                         sMlsTo,
+                                                                                         sSbdhStandard,
+                                                                                         sSbdhTypeVersion,
+                                                                                         sSbdhType,
+                                                                                         sPayloadMimeType,
+                                                                                         sCustom1,
+                                                                                         sCustom2,
+                                                                                         sCustom3);
       if (aSubmitResult.isFailure ())
         throw new IllegalStateException ("Failed to submit Peppol Reporting document for transmission: " +
                                          (aSubmitResult.isVerificationRejected () ? aSubmitResult.getVerificationOutcome ()

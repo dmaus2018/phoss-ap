@@ -171,12 +171,10 @@ public final class InboundOrchestratorVerifierTest
     assertEquals (2, aMls.getIssues ().size ());
     assertTrue (aMls.getIssues ()
                     .stream ()
-                    .anyMatch (x -> x.getStatusReasonCode () ==
-                                    EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_FATAL));
+                    .anyMatch (x -> x.getStatusReasonCode () == EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_FATAL));
     assertTrue (aMls.getIssues ()
                     .stream ()
-                    .anyMatch (x -> x.getStatusReasonCode () ==
-                                    EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_WARNING));
+                    .anyMatch (x -> x.getStatusReasonCode () == EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_WARNING));
   }
 
   @Test
