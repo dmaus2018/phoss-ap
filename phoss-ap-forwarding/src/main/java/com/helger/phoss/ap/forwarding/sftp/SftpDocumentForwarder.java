@@ -24,6 +24,7 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.annotation.Nonempty;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.io.iface.IHasInputStream;
 import com.helger.base.io.stream.HasInputStream;
@@ -34,6 +35,7 @@ import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.io.file.FilenameHelper;
 import com.helger.jsch.sftp.ChannelSftpHelper;
 import com.helger.network.WebExceptionHelper;
+import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
@@ -260,11 +262,20 @@ public class SftpDocumentForwarder implements IDocumentForwarder
   }
 
   /** {@inheritDoc} */
+
+  @NonNull
+  @Nonempty
+  public String getID ()
+  {
+    return EForwardingMode.SFTP.getID ();
+  }
+
   @NonNull
   public ForwardingResult forwardDocument (@NonNull final IForwardableDocument aDocument)
   {
     return Telemetry.withSpan (CPhossAPOtel.SPAN_FORWARDER_DISPATCH, ETelemetrySpanKind.CLIENT, aSpan -> {
       aSpan.setAttribute (CPhossAPOtel.ATTR_FORWARDER_TYPE, "sftp")
+           .setAttribute (CPhossAPOtel.ATTR_FORWARDER_ID, getID ())
            .setAttribute (CPhossAPOtel.ATTR_TRANSACTION_ID, aDocument.id ());
       return _doForwardDocument (aDocument);
     });

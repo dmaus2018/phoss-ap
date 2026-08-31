@@ -26,6 +26,7 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.annotation.Nonempty;
 import com.helger.annotation.style.VisibleForTesting;
 import com.helger.base.codec.base64.Base64;
 import com.helger.base.enforce.ValueEnforcer;
@@ -172,11 +173,21 @@ public class HttpDocumentForwarder implements IDocumentForwarder
   }
 
   /** {@inheritDoc} */
+
+  @NonNull
+  @Nonempty
+  public String getID ()
+  {
+    // The HTTP forwarder serves both the synchronous and the asynchronous mode
+    return m_eMode.getID ();
+  }
+
   @NonNull
   public ForwardingResult forwardDocument (@NonNull final IForwardableDocument aDocument)
   {
     return Telemetry.withSpan (CPhossAPOtel.SPAN_FORWARDER_DISPATCH, ETelemetrySpanKind.CLIENT, aSpan -> {
       aSpan.setAttribute (CPhossAPOtel.ATTR_FORWARDER_TYPE, "http")
+           .setAttribute (CPhossAPOtel.ATTR_FORWARDER_ID, getID ())
            .setAttribute (CPhossAPOtel.ATTR_TRANSACTION_ID, aDocument.id ());
       return _doForwardDocument (aDocument);
     });

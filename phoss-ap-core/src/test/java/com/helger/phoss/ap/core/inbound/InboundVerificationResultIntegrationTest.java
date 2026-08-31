@@ -133,7 +133,8 @@ public final class InboundVerificationResultIntegrationTest
     assertNull (aTx.getVerificationResult ());
 
     final VerifierResult aVR = new VerifierResult (VerificationOutcome.serviceUnavailable ("Connection refused"),
-                                                   "Scanner");
+                                                   "Scanner",
+                                                   "id1");
     // Fail mode "open" forwards the document, so processing continues ...
     assertSame (EContinue.CONTINUE, InboundOrchestrator.handleVerifierResult (LOG_PREFIX, aTx, aVR));
 
@@ -154,7 +155,8 @@ public final class InboundVerificationResultIntegrationTest
     final IInboundTransaction aTx = _createInboundTx ();
 
     final VerifierResult aVR = new VerifierResult (VerificationOutcome.serviceUnavailable ("Connection refused"),
-                                                   "Scanner");
+                                                   "Scanner",
+                                                   "id1");
     assertSame (EContinue.BREAK, InboundOrchestrator.handleVerifierResult (LOG_PREFIX, aTx, aVR));
 
     final IInboundTransaction aUpdated = aMgr.getByID (aTx.getID ());
@@ -208,7 +210,7 @@ public final class InboundVerificationResultIntegrationTest
                                                                               "/Invoice",
                                                                               "The document is invalid");
     return new VerifierResult (VerificationOutcome.rejected ("Document verification failed",
-                                                             new CommonsArrayList <> (aError)), "Scanner");
+                                                             new CommonsArrayList <> (aError)), "Scanner", "id1");
   }
 
   /**

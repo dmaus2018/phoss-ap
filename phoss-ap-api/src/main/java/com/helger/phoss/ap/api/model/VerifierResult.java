@@ -39,11 +39,24 @@ import com.helger.base.string.StringHelper;
  *        {@link com.helger.phoss.ap.api.spi.IDocumentVerifier#getVerifierName()}. <code>null</code>
  *        if and only if all verifiers accepted the document, because then no single verifier is
  *        decisive.
+ * @param verifierID
+ *        Verifier ID
  * @author Philip Helger
  * @since 0.12.0
  */
-public record VerifierResult (@NonNull VerificationOutcome outcome, @Nullable String verifierName)
+public record VerifierResult (@NonNull VerificationOutcome outcome,
+                              @Nullable String verifierName,
+                              @Nullable String verifierID)
 {
+  /**
+   * @return <code>true</code> if a verifier ID is present.
+   * @since 0.12.0
+   */
+  public boolean hasVerifierID ()
+  {
+    return StringHelper.isNotEmpty (verifierID);
+  }
+
   /**
    * @return <code>true</code> if a decisive verifier is known.
    */
@@ -61,6 +74,6 @@ public record VerifierResult (@NonNull VerificationOutcome outcome, @Nullable St
   @NonNull
   public static VerifierResult passed (@NonNull final VerificationOutcome aOutcome)
   {
-    return new VerifierResult (aOutcome, null);
+    return new VerifierResult (aOutcome, null, null);
   }
 }

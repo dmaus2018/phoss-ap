@@ -24,9 +24,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.style.ReturnsMutableCopy;
+import com.helger.annotation.style.VisibleForTesting;
 import com.helger.base.exception.InitializationException;
 import com.helger.base.string.StringHelper;
 import com.helger.collection.commons.CommonsArrayList;
+import com.helger.collection.commons.CommonsHashMap;
+import com.helger.collection.commons.ICommonsMap;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.collection.commons.ICommonsOrderedSet;
 import com.helger.config.fallback.IConfigWithFallback;
@@ -39,6 +42,8 @@ import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.spi.IAPLifecycleEventSPI;
 import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
+import com.helger.phoss.ap.api.spi.IDocumentForwarderProviderSPI;
+import com.helger.phoss.ap.api.spi.IDocumentVerifier;
 import com.helger.phoss.ap.api.spi.IInboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
@@ -189,14 +194,39 @@ public final class APCoreMetaManager
     for (final IInboundDocumentVerifierSPI aVerifier : ServiceLoader.load (IInboundDocumentVerifierSPI.class))
     {
       s_aInboundVerifiers.add (aVerifier);
-      LOGGER.info ("Loaded inbound document verifier: " + aVerifier.getClass ().getName ());
+      LOGGER.info ("Loaded inbound document verifier '" +
+                   aVerifier.getID () +
+                   "': " +
+                   aVerifier.getClass ().getName ());
     }
 
     for (final IOutboundDocumentVerifierSPI aVerifier : ServiceLoader.load (IOutboundDocumentVerifierSPI.class))
     {
       s_aOutboundVerifiers.add (aVerifier);
-      LOGGER.info ("Loaded outbound document verifier: " + aVerifier.getClass ().getName ());
+      LOGGER.info ("Loaded outbound document verifier '" +
+                   aVerifier.getID () +
+                   "': " +
+                   aVerifier.getClass ().getName ());
     }
+
+    // The IDs must be unique over all verifiers, so that a verifier can be identified by its ID
+    final ICommonsList <IDocumentVerifier> aAllVerifiers = new CommonsArrayList <> ();
+    aAllVerifiers.addAll (s_aInboundVerifiers);
+    aAllVerifiers.addAll (s_aOutboundVerifiers);
+    checkVerifierIDsAreUnique (aAllVerifiers);
+
+    // The IDs of the forwarder providers must be unique as well, because the configuration selects
+    // a provider by its ID
+    final ICommonsList <IDocumentForwarderProviderSPI> aAllProviders = new CommonsArrayList <> ();
+    for (final IDocumentForwarderProviderSPI aProvider : ServiceLoader.load (IDocumentForwarderProviderSPI.class))
+    {
+      aAllProviders.add (aProvider);
+      LOGGER.info ("Loaded document forwarder provider '" +
+                   aProvider.getID () +
+                   "': " +
+                   aProvider.getClass ().getName ());
+    }
+    checkForwarderProviderIDsAreUnique (aAllProviders);
 
     for (final IPeppolReceiverCheckSPI aCheck : ServiceLoader.load (IPeppolReceiverCheckSPI.class))
     {
@@ -208,6 +238,81 @@ public final class APCoreMetaManager
     LifecycleEventManager.initSPI ();
 
     LOGGER.info ("APMetaManager initialized successfully");
+  }
+
+  /**
+   * Ensure that the IDs of all inbound and outbound verifiers are unique. A verifier class that
+   * implements both SPIs is loaded twice - once per SPI - and therefore contributes the same ID
+   * twice, which is not a duplicate.
+   *
+   * @param aAllVerifiers
+   *        All loaded inbound and outbound verifiers. May not be <code>null</code>.
+   * @throws InitializationException
+   *         If two different verifier classes use the same ID.
+   */
+  @VisibleForTesting
+  static void checkVerifierIDsAreUnique (@NonNull final Iterable <? extends IDocumentVerifier> aAllVerifiers)
+  {
+    // Maps the verifier ID to the implementation class that uses it
+    final ICommonsMap <String, Class <?>> aIDToClass = new CommonsHashMap <> ();
+
+    for (final IDocumentVerifier aVerifier : aAllVerifiers)
+    {
+      final String sID = aVerifier.getID ();
+      if (StringHelper.isEmpty (sID))
+        throw new InitializationException ("The document verifier " +
+                                           aVerifier.getClass ().getName () +
+                                           " provides an empty ID");
+
+      final Class <?> aExistingClass = aIDToClass.get (sID);
+      if (aExistingClass == null)
+        aIDToClass.put (sID, aVerifier.getClass ());
+      else
+        if (!aExistingClass.equals (aVerifier.getClass ()))
+        {
+          // The same ID is used by two different implementations
+          throw new InitializationException ("The document verifier ID '" +
+                                             sID +
+                                             "' is used by " +
+                                             aExistingClass.getName () +
+                                             " and by " +
+                                             aVerifier.getClass ().getName () +
+                                             ". Verifier IDs must be unique over all inbound and outbound verifiers.");
+        }
+    }
+  }
+
+  /**
+   * Ensure that the IDs of all document forwarder provider SPIs are unique, because the
+   * configuration property selecting a forwarder refers to exactly one of them.
+   *
+   * @param aAllProviders
+   *        All loaded forwarder providers. May not be <code>null</code>.
+   * @throws InitializationException
+   *         If two providers use the same ID.
+   */
+  @VisibleForTesting
+  static void checkForwarderProviderIDsAreUnique (@NonNull final Iterable <? extends IDocumentForwarderProviderSPI> aAllProviders)
+  {
+    final ICommonsMap <String, Class <?>> aIDToClass = new CommonsHashMap <> ();
+    for (final IDocumentForwarderProviderSPI aProvider : aAllProviders)
+    {
+      final String sID = aProvider.getID ();
+      if (StringHelper.isEmpty (sID))
+        throw new InitializationException ("The document forwarder provider " +
+                                           aProvider.getClass ().getName () +
+                                           " provides an empty ID");
+
+      final Class <?> aExistingClass = aIDToClass.put (sID, aProvider.getClass ());
+      if (aExistingClass != null)
+        throw new InitializationException ("The document forwarder provider ID '" +
+                                           sID +
+                                           "' is used by " +
+                                           aExistingClass.getName () +
+                                           " and by " +
+                                           aProvider.getClass ().getName () +
+                                           ". Forwarder provider IDs must be unique over all providers.");
+    }
   }
 
   /**

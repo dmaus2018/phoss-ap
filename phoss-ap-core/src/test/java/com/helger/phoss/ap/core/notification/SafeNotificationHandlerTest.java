@@ -30,9 +30,9 @@ import org.jspecify.annotations.Nullable;
 import org.junit.Test;
 
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
-import com.helger.phoss.ap.api.model.VerificationOutcome;
 import com.helger.phoss.ap.api.model.MlsOutcome;
 import com.helger.phoss.ap.api.model.MlsOutcomeIssue;
+import com.helger.phoss.ap.api.model.VerificationOutcome;
 import com.helger.phoss.ap.api.model.VerifierResult;
 import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
 
@@ -287,7 +287,7 @@ public final class SafeNotificationHandlerTest
     assertEquals (1, aInner.m_aInboundVerificationDeferredCount.get ());
 
     aSafe.onOutboundVerificationRejection ("sbdh-out",
-                                           new VerifierResult (VerificationOutcome.rejected ("error"), "V1"));
+                                           new VerifierResult (VerificationOutcome.rejected ("error"), "V1", "id1"));
     assertEquals (1, aInner.m_aOutboundVerificationRejectionCount.get ());
 
     aSafe.onInboundDuplicateRejected ("sender",
@@ -340,7 +340,7 @@ public final class SafeNotificationHandlerTest
     aSafe.onInboundVerificationRejection ("tx-1", "sbdh-1", "error", _rejectionOutcome ());
     aSafe.onInboundVerificationDeferred ("tx-1", "sbdh-1", "Verifier", OffsetDateTime.now (), "unavailable");
     aSafe.onOutboundVerificationRejection ("sbdh-out",
-                                           new VerifierResult (VerificationOutcome.rejected ("error"), "V1"));
+                                           new VerifierResult (VerificationOutcome.rejected ("error"), "V1", "id1"));
     aSafe.onInboundDuplicateRejected ("sender",
                                       "receiver",
                                       "doctype",

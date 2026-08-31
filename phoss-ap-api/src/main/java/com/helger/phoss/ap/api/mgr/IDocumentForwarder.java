@@ -18,6 +18,8 @@ package com.helger.phoss.ap.api.mgr;
 
 import org.jspecify.annotations.NonNull;
 
+import com.helger.annotation.Nonempty;
+import com.helger.base.id.IHasID;
 import com.helger.base.state.ESuccess;
 import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.phoss.ap.api.model.ForwardingResult;
@@ -30,8 +32,25 @@ import com.helger.phoss.ap.api.model.IForwardableDocument;
  *
  * @author Philip Helger
  */
-public interface IDocumentForwarder
+public interface IDocumentForwarder extends IHasID <String>
 {
+  /**
+   * The stable identifier of this forwarder. For the built-in forwarders this is the ID of the
+   * respective {@link com.helger.phoss.ap.api.codelist.EForwardingMode}, for a forwarder created by
+   * an {@link com.helger.phoss.ap.api.spi.IDocumentForwarderProviderSPI} it is the ID of that
+   * provider.<br>
+   * The ID must be unique over all forwarders - a duplicate provider ID aborts the startup. It is
+   * used as the value of the telemetry attribute <code>phoss.ap.forwarder.id</code>, so that a
+   * forwarding can be attributed to a specific forwarder, and it should therefore not change
+   * between releases.
+   *
+   * @return The ID of this forwarder. Neither <code>null</code> nor empty.
+   * @since 0.12.0
+   */
+  @NonNull
+  @Nonempty
+  String getID ();
+
   /**
    * The default configuration key prefix used for the primary forwarder.
    *

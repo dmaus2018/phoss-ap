@@ -25,6 +25,7 @@ import static org.junit.Assert.assertTrue;
 import org.jspecify.annotations.NonNull;
 import org.junit.Test;
 
+import com.helger.annotation.Nonempty;
 import com.helger.base.state.ESuccess;
 import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.phoss.ap.api.codelist.EForwardableKind;
@@ -52,6 +53,13 @@ public final class DocumentForwarderAdapterTest
   private static final class CapturingForwarder implements IDocumentForwarder
   {
     private IForwardableDocument m_aCaptured;
+
+    @NonNull
+    @Nonempty
+    public String getID ()
+    {
+      return "capturing";
+    }
 
     @NonNull
     public ESuccess initFromConfiguration (@NonNull final IConfigWithFallback aConfig, @NonNull final String sKeyPrefix)

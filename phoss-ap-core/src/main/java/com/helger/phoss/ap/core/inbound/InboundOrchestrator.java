@@ -288,6 +288,7 @@ public final class InboundOrchestrator
     for (final IInboundDocumentVerifierSPI aVerifier : aVerifiers)
     {
       final String sVerifierName = aVerifier.getVerifierName ();
+      final String sVerifierID = aVerifier.getID ();
       final VerificationOutcome aOutcome = aVerifier.verifyInboundDocument (sDocumentPath, aDocTypeID, aProcessID);
       if (aOutcome == null)
       {
@@ -312,13 +313,13 @@ public final class InboundOrchestrator
 
           // Remember the first unavailable verifier only, but evaluate the remaining ones as well
           if (aUnavailable == null)
-            aUnavailable = new VerifierResult (aOutcome, sVerifierName);
+            aUnavailable = new VerifierResult (aOutcome, sVerifierName, sVerifierID);
           break;
         }
         case REJECTION:
         {
           // An explicit rejection always wins
-          return new VerifierResult (aOutcome, sVerifierName);
+          return new VerifierResult (aOutcome, sVerifierName, sVerifierID);
         }
         case PASSED:
         {
@@ -799,6 +800,11 @@ public final class InboundOrchestrator
                                                       aInboundTx.getDocumentPath (),
                                                       aDocTypeID,
                                                       aProcessID);
+      // Attribute the outcome to the verifier that caused it - a passed verification has no
+      // single responsible verifier and therefore no ID
+      if (aVR.hasVerifierID ())
+        aVerifySpan.setAttribute (CPhossAPOtel.ATTR_VERIFIER_ID, aVR.verifierID ());
+
       if (aVR.outcome ().isRejected ())
         aVerifySpan.setStatusError ("Inbound verification failed");
       else

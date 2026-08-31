@@ -233,7 +233,7 @@ public final class OutboundOrchestrator
     {
       final VerificationOutcome aOutcome = aVerifier.verifyOutboundDocument (sDocumentPath, aDocTypeID, aProcessID);
       if (!aOutcome.isPassed ())
-        return new VerifierResult (aOutcome, aVerifier.getVerifierName ());
+        return new VerifierResult (aOutcome, aVerifier.getVerifierName (), aVerifier.getID ());
 
       // Keep the warnings of an accepting verifier - they are reported back on success
       aWarnings.addAll (aOutcome.getAllIssues ());
@@ -378,6 +378,9 @@ public final class OutboundOrchestrator
         aVerifierResult = _runOutboundVerifiers (sDocumentPath, aDocTypeID, aProcessID);
         if (!aVerifierResult.outcome ().isPassed ())
         {
+          // Attribute the rejection to the verifier that caused it
+          if (aVerifierResult.hasVerifierID ())
+            aVerifySpan.setAttribute (CPhossAPOtel.ATTR_VERIFIER_ID, aVerifierResult.verifierID ());
           aVerifySpan.setStatusError ("Outbound verification failed");
           LOGGER.warn (sLogPrefix +
                        "The outbound document verifier '" +
@@ -539,6 +542,9 @@ public final class OutboundOrchestrator
         aVerifierResult = _runOutboundVerifiers (sDocumentPath, aDocTypeID, aProcessID);
         if (!aVerifierResult.outcome ().isPassed ())
         {
+          // Attribute the rejection to the verifier that caused it
+          if (aVerifierResult.hasVerifierID ())
+            aVerifySpan.setAttribute (CPhossAPOtel.ATTR_VERIFIER_ID, aVerifierResult.verifierID ());
           aVerifySpan.setStatusError ("Outbound verification failed");
           LOGGER.warn (sLogPrefix +
                        "The outbound document verifier '" +

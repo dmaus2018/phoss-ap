@@ -26,6 +26,7 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.helger.annotation.Nonempty;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.io.stream.StreamHelper;
 import com.helger.base.state.ESuccess;
@@ -36,6 +37,7 @@ import com.helger.io.file.FileHelper;
 import com.helger.io.file.FileOperationManager;
 import com.helger.io.file.FilenameHelper;
 import com.helger.io.file.SimpleFileIO;
+import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.codelist.EForwardingFilesystemLayout;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
@@ -238,11 +240,20 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
   }
 
   /** {@inheritDoc} */
+
+  @NonNull
+  @Nonempty
+  public String getID ()
+  {
+    return EForwardingMode.FILESYSTEM.getID ();
+  }
+
   @NonNull
   public ForwardingResult forwardDocument (@NonNull final IForwardableDocument aDocument)
   {
     return Telemetry.withSpan (CPhossAPOtel.SPAN_FORWARDER_DISPATCH, ETelemetrySpanKind.CLIENT, aSpan -> {
       aSpan.setAttribute (CPhossAPOtel.ATTR_FORWARDER_TYPE, "filesystem")
+           .setAttribute (CPhossAPOtel.ATTR_FORWARDER_ID, getID ())
            .setAttribute (CPhossAPOtel.ATTR_TRANSACTION_ID, aDocument.id ());
       return _doForwardDocument (aDocument);
     });

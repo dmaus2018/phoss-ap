@@ -122,6 +122,23 @@ public final class CPhossAPOtel
   public static final String ATTR_SCHEDULER_NAME = "phoss.ap.scheduler.name";
   public static final String ATTR_SCHEDULER_ITEMS = "phoss.ap.scheduler.items";
   public static final String ATTR_FORWARDER_TYPE = "phoss.ap.forwarder.type";
+  /**
+   * The ID of the forwarder that handled a document - see
+   * {@link com.helger.phoss.ap.api.mgr.IDocumentForwarder#getID()}. Contrary to
+   * {@link #ATTR_FORWARDER_TYPE}, which names the kind of forwarder, this identifies the concrete
+   * one, so that e.g. two forwarders provided via SPI can be told apart.
+   *
+   * @since 0.12.0
+   */
+  public static final String ATTR_FORWARDER_ID = "phoss.ap.forwarder.id";
+  /**
+   * The ID of the verifier that rejected a document or that was unavailable - see
+   * {@link com.helger.phoss.ap.api.spi.IDocumentVerifier#getID()}. Not set if the verification
+   * passed, because then no single verifier is responsible for the outcome.
+   *
+   * @since 0.12.0
+   */
+  public static final String ATTR_VERIFIER_ID = "phoss.ap.verifier.id";
   /** @since 0.9.0 */
   public static final String ATTR_FORWARDER_INDEX = "phoss.ap.forwarder.index";
   public static final String ATTR_SMP_URL = "phoss.ap.smp.url";
