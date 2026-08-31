@@ -60,6 +60,7 @@
     <h2.version>2.4.240</h2.version>
     <jackson.version>3.2.1</jackson.version>
     <jaxb-impl.version>4.0.9</jaxb-impl.version>
+    <logback-ecs-encoder.version>1.6.0</logback-ecs-encoder.version>
     <log4j.version>2.26.1</log4j.version>
     <mysql.version>26.7.0</mysql.version>
     <okhttp.version>5.5.0</okhttp.version>
@@ -189,6 +190,11 @@
       </dependency>
       <dependency>
         <groupId>com.helger.phoss.ap</groupId>
+        <artifactId>phoss-ap-observability</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.helger.phoss.ap</groupId>
         <artifactId>phoss-ap-webapp</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -236,6 +242,11 @@
         <version>${jaxb-impl.version}</version>
       </dependency>
 
+      <dependency>
+        <groupId>co.elastic.logging</groupId>
+        <artifactId>logback-ecs-encoder</artifactId>
+        <version>${logback-ecs-encoder.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
         <artifactId>log4j-core</artifactId>
@@ -358,6 +369,7 @@
     <module>phoss-ap-core</module>
     <module>phoss-ap-sentry</module>
     <module>phoss-ap-otel</module>
+    <module>phoss-ap-observability</module>
     <module>phoss-ap-dirsender</module>
     <module>phoss-ap-validation</module>
     <module>phoss-ap-virusscan</module>
