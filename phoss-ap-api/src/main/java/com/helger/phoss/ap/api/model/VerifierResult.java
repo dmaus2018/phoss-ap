@@ -44,13 +44,12 @@ import com.helger.base.string.StringHelper;
  * @author Philip Helger
  * @since 0.12.0
  */
-public record VerifierResult (@NonNull VerificationOutcome outcome,
+public record VerifierResult (@Nullable String verifierID,
                               @Nullable String verifierName,
-                              @Nullable String verifierID)
+                              @NonNull VerificationOutcome outcome)
 {
   /**
    * @return <code>true</code> if a verifier ID is present.
-   * @since 0.12.0
    */
   public boolean hasVerifierID ()
   {
@@ -74,6 +73,6 @@ public record VerifierResult (@NonNull VerificationOutcome outcome,
   @NonNull
   public static VerifierResult passed (@NonNull final VerificationOutcome aOutcome)
   {
-    return new VerifierResult (aOutcome, null, null);
+    return new VerifierResult (null, null, aOutcome);
   }
 }

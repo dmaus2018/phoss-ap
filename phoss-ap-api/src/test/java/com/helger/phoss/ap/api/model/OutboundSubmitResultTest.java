@@ -42,7 +42,7 @@ public final class OutboundSubmitResultTest
                                                                        new CommonsArrayList <> (VerificationIssue.businessRuleViolation ("R-1",
                                                                                                                                          "/a",
                                                                                                                                          "d")));
-    final VerifierResult aVR = new VerifierResult (aOutcome, "Validator", "id1");
+    final VerifierResult aVR = new VerifierResult ("id1", "Validator", aOutcome);
     final OutboundSubmitResult a = OutboundSubmitResult.verificationRejected (aVR);
     assertFalse (a.isSuccess ());
     assertTrue (a.isFailure ());

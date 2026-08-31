@@ -233,7 +233,7 @@ public final class OutboundOrchestrator
     {
       final VerificationOutcome aOutcome = aVerifier.verifyOutboundDocument (sDocumentPath, aDocTypeID, aProcessID);
       if (!aOutcome.isPassed ())
-        return new VerifierResult (aOutcome, aVerifier.getVerifierName (), aVerifier.getID ());
+        return new VerifierResult (aVerifier.getID (), aVerifier.getVerifierName (), aOutcome);
 
       // Keep the warnings of an accepting verifier - they are reported back on success
       aWarnings.addAll (aOutcome.getAllIssues ());

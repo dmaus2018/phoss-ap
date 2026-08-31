@@ -287,7 +287,7 @@ public final class SafeNotificationHandlerTest
     assertEquals (1, aInner.m_aInboundVerificationDeferredCount.get ());
 
     aSafe.onOutboundVerificationRejection ("sbdh-out",
-                                           new VerifierResult (VerificationOutcome.rejected ("error"), "V1", "id1"));
+                                           new VerifierResult ("id1", "V1", VerificationOutcome.rejected ("error")));
     assertEquals (1, aInner.m_aOutboundVerificationRejectionCount.get ());
 
     aSafe.onInboundDuplicateRejected ("sender",
@@ -340,7 +340,7 @@ public final class SafeNotificationHandlerTest
     aSafe.onInboundVerificationRejection ("tx-1", "sbdh-1", "error", _rejectionOutcome ());
     aSafe.onInboundVerificationDeferred ("tx-1", "sbdh-1", "Verifier", OffsetDateTime.now (), "unavailable");
     aSafe.onOutboundVerificationRejection ("sbdh-out",
-                                           new VerifierResult (VerificationOutcome.rejected ("error"), "V1", "id1"));
+                                           new VerifierResult ("id1", "V1", VerificationOutcome.rejected ("error")));
     aSafe.onInboundDuplicateRejected ("sender",
                                       "receiver",
                                       "doctype",

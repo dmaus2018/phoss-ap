@@ -132,9 +132,9 @@ public final class InboundVerificationResultIntegrationTest
     final IInboundTransaction aTx = _createInboundTx ();
     assertNull (aTx.getVerificationResult ());
 
-    final VerifierResult aVR = new VerifierResult (VerificationOutcome.serviceUnavailable ("Connection refused"),
+    final VerifierResult aVR = new VerifierResult ("id1",
                                                    "Scanner",
-                                                   "id1");
+                                                   VerificationOutcome.serviceUnavailable ("Connection refused"));
     // Fail mode "open" forwards the document, so processing continues ...
     assertSame (EContinue.CONTINUE, InboundOrchestrator.handleVerifierResult (LOG_PREFIX, aTx, aVR));
 
@@ -154,9 +154,9 @@ public final class InboundVerificationResultIntegrationTest
     final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final IInboundTransaction aTx = _createInboundTx ();
 
-    final VerifierResult aVR = new VerifierResult (VerificationOutcome.serviceUnavailable ("Connection refused"),
+    final VerifierResult aVR = new VerifierResult ("id1",
                                                    "Scanner",
-                                                   "id1");
+                                                   VerificationOutcome.serviceUnavailable ("Connection refused"));
     assertSame (EContinue.BREAK, InboundOrchestrator.handleVerifierResult (LOG_PREFIX, aTx, aVR));
 
     final IInboundTransaction aUpdated = aMgr.getByID (aTx.getID ());
@@ -209,8 +209,10 @@ public final class InboundVerificationResultIntegrationTest
     final VerificationIssue aError = VerificationIssue.businessRuleViolation ("BR-1",
                                                                               "/Invoice",
                                                                               "The document is invalid");
-    return new VerifierResult (VerificationOutcome.rejected ("Document verification failed",
-                                                             new CommonsArrayList <> (aError)), "Scanner", "id1");
+    return new VerifierResult ("id1",
+                               "Scanner",
+                               VerificationOutcome.rejected ("Document verification failed",
+                                                             new CommonsArrayList <> (aError)));
   }
 
   /**

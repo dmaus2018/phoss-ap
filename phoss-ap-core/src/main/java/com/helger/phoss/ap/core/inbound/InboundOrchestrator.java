@@ -313,13 +313,13 @@ public final class InboundOrchestrator
 
           // Remember the first unavailable verifier only, but evaluate the remaining ones as well
           if (aUnavailable == null)
-            aUnavailable = new VerifierResult (aOutcome, sVerifierName, sVerifierID);
+            aUnavailable = new VerifierResult (sVerifierID, sVerifierName, aOutcome);
           break;
         }
         case REJECTION:
         {
           // An explicit rejection always wins
-          return new VerifierResult (aOutcome, sVerifierName, sVerifierID);
+          return new VerifierResult (sVerifierID, sVerifierName, aOutcome);
         }
         case PASSED:
         {
