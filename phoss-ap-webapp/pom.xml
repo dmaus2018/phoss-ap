@@ -184,6 +184,20 @@
                environment variable or -Dloader.path, without rebuilding this jar. -->
           <layout>ZIP</layout>
         </configuration>
+        <!-- Override the plugin's own jackson-databind 3.1.5 dependency
+             which is quarantined by Nexus Firewall -->
+        <dependencies>
+          <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>${jackson.version}</version>
+          </dependency>
+        </dependencies>
         <executions>
           <execution>
             <goals>
