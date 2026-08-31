@@ -337,7 +337,36 @@
         <version>${okhttp.version}</version>
       </dependency>
       
-      <!-- Jackson version is now managed by the jackson-bom import above -->
+      <!-- Exclude jackson-databind from Spring Boot starters to prevent
+           Nexus Firewall from quarantining the transitive 3.1.5 POM download.
+           Jackson is managed by the jackson-bom import above. -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+        <version>${spring-boot.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <version>${spring-boot.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>tools.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
 
       <!-- OpenAPI related dependencies -->
       <dependency>
