@@ -337,17 +337,18 @@
         <version>${okhttp.version}</version>
       </dependency>
       
-      <!-- Exclude jackson-databind from Spring Boot starters to prevent
-           Nexus Firewall from quarantining the transitive 3.1.5 POM download.
-           Jackson is managed by the jackson-bom import above. -->
+      <!-- Exclude the entire Spring Boot Jackson starter chain to prevent
+           Nexus Firewall from quarantining the transitive jackson-databind 3.1.5
+           POM download (declared inside spring-boot-jackson:4.1.1).
+           Jackson is added explicitly below, managed by the jackson-bom import. -->
       <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-web</artifactId>
         <version>${spring-boot.version}</version>
         <exclusions>
           <exclusion>
-            <groupId>tools.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -357,14 +358,36 @@
         <version>${spring-boot.version}</version>
         <exclusions>
           <exclusion>
-            <groupId>tools.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
+      <!-- Re-add spring-boot-jackson without its jackson-databind transitive -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-jackson</artifactId>
+        <version>${spring-boot.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <!-- Jackson artifacts at 3.2.1 from jackson-bom -->
       <dependency>
         <groupId>tools.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>tools.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
         <version>${jackson.version}</version>
       </dependency>
 
