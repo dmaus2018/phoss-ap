@@ -1091,7 +1091,8 @@ public final class OutboundOrchestrator
 
           PeppolReportingItem aReportingItem = null;
           // The C1 participant identifier is the End User of an outbound transaction
-          final String sEndUserID = APPeppolReportingHelper.getEffectiveEndUserID (aSenderID);
+          // Important: the same entity must be counted only once
+          final String sReportingEndUserID = APPeppolReportingHelper.getEffectiveEndUserID (aSenderID);
           try
           {
             // Actual sending using Phase4PeppolSender
@@ -1201,7 +1202,7 @@ public final class OutboundOrchestrator
                 // be created AFTER sending", which would mask the real transport exception
                 // captured in aCaughtSendingEx and handled below.
                 if (eResult.isSuccess () && aCaughtSendingEx.isNotSet ())
-                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sEndUserID);
+                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sReportingEndUserID);
                 break;
               }
               case PREBUILT_SBD:
@@ -1302,7 +1303,7 @@ public final class OutboundOrchestrator
                 // be created AFTER sending", which would mask the real transport exception
                 // captured in aCaughtSendingEx and handled below.
                 if (eResult.isSuccess () && aCaughtSendingEx.isNotSet ())
-                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sEndUserID);
+                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sReportingEndUserID);
                 break;
               }
               default:
@@ -1332,8 +1333,8 @@ public final class OutboundOrchestrator
               aSendingReport.setOverallSuccess (false);
 
               // Call after any Sending Report modifications
-              final String sErrorMsg = ex != null ? ex.getMessage ()
-                                                  : "Error in AS4 sending with result code " + eResult;
+              final String sErrorMsg = ex != null ? ex.getMessage () : "Error in AS4 sending with result code " +
+                                                                       eResult;
               if (nNewAttemptCount >= APCoreConfig.getRetrySendingMaxAttempts ())
                 onPermanentFailure.accept (sErrorMsg);
               else
