@@ -18,6 +18,7 @@ package com.helger.phoss.ap.api.model;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.time.OffsetDateTime;
@@ -26,6 +27,9 @@ import org.jspecify.annotations.NonNull;
 import org.junit.Test;
 
 import com.helger.base.state.ESuccess;
+import com.helger.base.string.StringHelper;
+import com.helger.collection.commons.CommonsHashSet;
+import com.helger.collection.commons.ICommonsSet;
 import com.helger.phoss.ap.api.codelist.EForwardableKind;
 
 /**
@@ -81,11 +85,15 @@ public final class ForwardingFilenamePatternTest
   }
 
   @Test
-  public void testBothPlaceholderSyntaxes ()
+  public void testDollarSyntaxIsNotSupported ()
   {
-    // "{name}" and "${name}" must resolve identically
-    assertEquals ("20260830101530_incoming-1", _resolveFilename ("${datetime}_${incoming-id}"));
-    assertEquals ("20260830101530-sbdh-1", _resolveFilename ("{datetime}-${sbdh-instance-id}"));
+    // "${name}" is the variable syntax of the configuration itself and is rejected at startup
+    assertEquals (ESuccess.FAILURE,
+                  ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "${datetime}_${incoming-id}", false));
+    assertEquals (ESuccess.FAILURE,
+                  ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "{datetime}-${sbdh-instance-id}", false));
+    // The '$' itself is an ordinary character of the literal part
+    assertEquals ("_20260830101530", _resolveFilename ("${datetime}"));
   }
 
   @Test
@@ -190,10 +198,37 @@ public final class ForwardingFilenamePatternTest
   }
 
   @Test
-  public void testAllPlaceholders ()
+  public void testAllPlaceholdersAreResolvable ()
   {
-    assertEquals (9, ForwardingFilenamePattern.getAllPlaceholders ().size ());
-    assertTrue (ForwardingFilenamePattern.getAllPlaceholders ()
-                                         .contains (ForwardingFilenamePattern.PLACEHOLDER_SBDH_INSTANCE_ID));
+    // Every placeholder must have a unique ID and must provide a value
+    final ICommonsSet <String> aIDs = new CommonsHashSet <> ();
+    for (final EForwardingFilenamePlaceholder ePlaceholder : EForwardingFilenamePlaceholder.values ())
+    {
+      assertTrue ("Duplicate ID " + ePlaceholder.getID (), aIDs.add (ePlaceholder.getID ()));
+      assertSame (ePlaceholder, EForwardingFilenamePlaceholder.getFromIDOrNull (ePlaceholder.getID ()));
+      assertTrue ("No value for " + ePlaceholder.getID (),
+                  StringHelper.isNotEmpty (ePlaceholder.getValue (_doc ())));
+    }
+    assertEquals (9, aIDs.size ());
+  }
+
+  @Test
+  public void testOnlyTheIDsAreUniquePerDocument ()
+  {
+    // These two are what makes a resolved name unique - the warning at startup depends on it
+    assertTrue (EForwardingFilenamePlaceholder.INCOMING_ID.isUniquePerDocument ());
+    assertTrue (EForwardingFilenamePlaceholder.SBDH_INSTANCE_ID.isUniquePerDocument ());
+    assertFalse (EForwardingFilenamePlaceholder.DATETIME.isUniquePerDocument ());
+    assertFalse (EForwardingFilenamePlaceholder.RECEIVER_ID.isUniquePerDocument ());
+  }
+
+  @Test
+  public void testPlaceholderValuesAreUnsanitized ()
+  {
+    // The sanitization happens in ForwardingFilenamePattern, not in the value provider
+    assertEquals (RECEIVER_ID, EForwardingFilenamePlaceholder.RECEIVER_ID.getValue (_doc ()));
+    assertEquals ("0151:35747532810", EForwardingFilenamePlaceholder.RECEIVER_VALUE.getValue (_doc ()));
+    assertEquals ("9915:sender", EForwardingFilenamePlaceholder.SENDER_VALUE.getValue (_doc ()));
+    assertEquals ("20260830101530", EForwardingFilenamePlaceholder.DATETIME.getValue (_doc ()));
   }
 }

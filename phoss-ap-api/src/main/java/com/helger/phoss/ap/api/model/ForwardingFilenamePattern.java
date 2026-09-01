@@ -16,7 +16,7 @@
  */
 package com.helger.phoss.ap.api.model;
 
-import java.time.format.DateTimeFormatter;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 import org.jspecify.annotations.NonNull;
@@ -26,16 +26,16 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonempty;
 import com.helger.annotation.Nonnegative;
-import com.helger.annotation.style.ReturnsMutableCopy;
+import com.helger.annotation.style.VisibleForTesting;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
 import com.helger.base.string.StringImplode;
 import com.helger.base.tostring.ToStringGenerator;
-import com.helger.collection.commons.CommonsHashMap;
+import com.helger.collection.commons.CommonsHashSet;
 import com.helger.collection.commons.CommonsLinkedHashSet;
-import com.helger.collection.commons.ICommonsMap;
 import com.helger.collection.commons.ICommonsOrderedSet;
+import com.helger.collection.commons.ICommonsSet;
 import com.helger.config.IConfig;
 import com.helger.io.file.FilenameHelper;
 
@@ -47,8 +47,10 @@ import com.helger.io.file.FilenameHelper;
  * A downstream routing service that picks the documents up from a shared directory usually routes
  * them by the receiver participant ID. A fixed layout forces it to open every payload or to read
  * the metadata sidecar for that, which is why the layout is configurable per forwarder since
- * v0.12.0. The supported placeholders are usable in the <code>{name}</code> as well as in the
- * <code>${name}</code> syntax.
+ * v0.12.0. The supported placeholders are the IDs of {@link EForwardingFilenamePlaceholder},
+ * written as <code>{name}</code>. The <code>${name}</code> syntax is deliberately <b>not</b>
+ * supported: the configuration replaces variables of that form in every value itself, so such a
+ * pattern never reaches this class intact.
  * </p>
  * <p>
  * Every placeholder value comes from the received document and is therefore sanitized: everything
@@ -65,27 +67,6 @@ import com.helger.io.file.FilenameHelper;
  */
 public class ForwardingFilenamePattern
 {
-  /** Reception timestamp, formatted according to {@link #DATETIME_PATTERN} */
-  public static final String PLACEHOLDER_DATETIME = "datetime";
-  /** The phase4 Incoming ID; the transaction ID for a self-generated document */
-  public static final String PLACEHOLDER_INCOMING_ID = "incoming-id";
-  /** The SBDH Instance Identifier */
-  public static final String PLACEHOLDER_SBDH_INSTANCE_ID = "sbdh-instance-id";
-  /** The receiver participant ID including the identifier scheme */
-  public static final String PLACEHOLDER_RECEIVER_ID = "receiver-id";
-  /** The receiver participant ID without the identifier scheme */
-  public static final String PLACEHOLDER_RECEIVER_VALUE = "receiver-value";
-  /** The sender participant ID including the identifier scheme */
-  public static final String PLACEHOLDER_SENDER_ID = "sender-id";
-  /** The sender participant ID without the identifier scheme */
-  public static final String PLACEHOLDER_SENDER_VALUE = "sender-value";
-  /** The Document Type ID */
-  public static final String PLACEHOLDER_DOCTYPE_ID = "doctype-id";
-  /** The Process ID */
-  public static final String PLACEHOLDER_PROCESS_ID = "process-id";
-
-  /** The format of the {@link #PLACEHOLDER_DATETIME} value */
-  public static final String DATETIME_PATTERN = "yyyyMMddHHmmss";
   /**
    * Maximum length of a resolved filename, leaving room for the extension and for the ".tmp" of an
    * atomic write within the usual limit of 255 bytes per filename
@@ -95,16 +76,6 @@ public class ForwardingFilenamePattern
   public static final int MAX_LENGTH_OBJECT_KEY = 900;
 
   private static final Logger LOGGER = LoggerFactory.getLogger (ForwardingFilenamePattern.class);
-  private static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern (DATETIME_PATTERN);
-  private static final ICommonsOrderedSet <String> ALL_PLACEHOLDERS = new CommonsLinkedHashSet <> (PLACEHOLDER_DATETIME,
-                                                                                                   PLACEHOLDER_INCOMING_ID,
-                                                                                                   PLACEHOLDER_SBDH_INSTANCE_ID,
-                                                                                                   PLACEHOLDER_RECEIVER_ID,
-                                                                                                   PLACEHOLDER_RECEIVER_VALUE,
-                                                                                                   PLACEHOLDER_SENDER_ID,
-                                                                                                   PLACEHOLDER_SENDER_VALUE,
-                                                                                                   PLACEHOLDER_DOCTYPE_ID,
-                                                                                                   PLACEHOLDER_PROCESS_ID);
 
   private final String m_sPattern;
   private final boolean m_bAllowPathSeparator;
@@ -125,9 +96,10 @@ public class ForwardingFilenamePattern
    * @param nMaxLength
    *        The maximum length of the resolved name. Must be &gt; 0.
    */
-  public ForwardingFilenamePattern (@NonNull @Nonempty final String sPattern,
-                                    final boolean bAllowPathSeparator,
-                                    @Nonnegative final int nMaxLength)
+  @VisibleForTesting
+  ForwardingFilenamePattern (@NonNull @Nonempty final String sPattern,
+                             final boolean bAllowPathSeparator,
+                             @Nonnegative final int nMaxLength)
   {
     ValueEnforcer.notEmpty (sPattern, "Pattern");
     ValueEnforcer.isGT0 (nMaxLength, "MaxLength");
@@ -167,27 +139,9 @@ public class ForwardingFilenamePattern
   }
 
   /**
-   * Get the value part of a URI encoded Peppol identifier, meaning everything after the "::" that
-   * separates the identifier scheme from the identifier value. So
-   * "iso6523-actorid-upis::0088:123456" becomes "0088:123456" - the ICD stays part of the value,
-   * because the same number in a different ICD is a different participant.
-   *
-   * @param sURIEncodedID
-   *        The URI encoded identifier. May not be <code>null</code>.
-   * @return The identifier value, or the unchanged input if it contains no scheme separator. Never
-   *         <code>null</code>.
-   */
-  @NonNull
-  private static String _getValueWithoutScheme (@NonNull final String sURIEncodedID)
-  {
-    final int nIndex = sURIEncodedID.indexOf ("::");
-    return nIndex < 0 ? sURIEncodedID : sURIEncodedID.substring (nIndex + 2);
-  }
-
-  /**
-   * Walk the pattern and replace every placeholder with the value the resolver returns for it. Both
-   * the "{name}" and the "${name}" syntax are supported. An opening brace that has no matching
-   * closing one - or that contains another opening brace - is taken literally.
+   * Walk the pattern and replace every placeholder with the value the resolver returns for it. An
+   * opening brace that has no matching closing one - or that contains another opening brace - is
+   * taken literally.
    *
    * @param sPattern
    *        The pattern to be resolved. May not be <code>null</code>.
@@ -211,18 +165,16 @@ public class ForwardingFilenamePattern
     while (nIndex < nMax)
     {
       final char c = sPattern.charAt (nIndex);
-      final boolean bDollar = c == '$' && nIndex + 1 < nMax && sPattern.charAt (nIndex + 1) == '{';
-      if (bDollar || c == '{')
+      if (c == '{')
       {
-        final int nStart = bDollar ? nIndex + 1 : nIndex;
-        final int nEnd = sPattern.indexOf ('}', nStart + 1);
+        final int nEnd = sPattern.indexOf ('}', nIndex + 1);
         // A nested opening brace means that this one is not a placeholder start
-        final int nNested = sPattern.indexOf ('{', nStart + 1);
+        final int nNested = sPattern.indexOf ('{', nIndex + 1);
         if (nEnd >= 0 && (nNested < 0 || nNested > nEnd))
         {
           aResolved.append (aLiteralResolver.apply (aLiteral.toString ()));
           aLiteral.setLength (0);
-          aResolved.append (aPlaceholderResolver.apply (sPattern.substring (nStart + 1, nEnd)));
+          aResolved.append (aPlaceholderResolver.apply (sPattern.substring (nIndex + 1, nEnd)));
           nIndex = nEnd + 1;
           continue;
         }
@@ -234,37 +186,20 @@ public class ForwardingFilenamePattern
   }
 
   /**
-   * Collect the unsanitized values of all supported placeholders of a single document.
+   * Collect the IDs of the supported placeholders, for a log message.
    *
-   * @param aDocument
-   *        The document to take the values from. May not be <code>null</code>.
-   * @return The map from placeholder name to value. Never <code>null</code>.
+   * @param aFilter
+   *        The filter to apply. May be <code>null</code> to get the IDs of all placeholders.
+   * @return The matching IDs, in declaration order. Never <code>null</code>.
    */
   @NonNull
-  private static ICommonsMap <String, String> _getPlaceholderValues (@NonNull final IForwardableDocument aDocument)
+  private static ICommonsOrderedSet <String> _getAllPlaceholderIDs (@Nullable final Predicate <EForwardingFilenamePlaceholder> aFilter)
   {
-    final ICommonsMap <String, String> ret = new CommonsHashMap <> ();
-    ret.put (PLACEHOLDER_DATETIME, DATETIME_FORMATTER.format (aDocument.timestamp ()));
-    ret.put (PLACEHOLDER_INCOMING_ID, aDocument.localID ());
-    ret.put (PLACEHOLDER_SBDH_INSTANCE_ID, aDocument.sbdhInstanceID ());
-    ret.put (PLACEHOLDER_RECEIVER_ID, aDocument.receiverID ());
-    ret.put (PLACEHOLDER_RECEIVER_VALUE, _getValueWithoutScheme (aDocument.receiverID ()));
-    ret.put (PLACEHOLDER_SENDER_ID, aDocument.senderID ());
-    ret.put (PLACEHOLDER_SENDER_VALUE, _getValueWithoutScheme (aDocument.senderID ()));
-    ret.put (PLACEHOLDER_DOCTYPE_ID, aDocument.docTypeID ());
-    ret.put (PLACEHOLDER_PROCESS_ID, aDocument.processID ());
+    final ICommonsOrderedSet <String> ret = new CommonsLinkedHashSet <> ();
+    for (final EForwardingFilenamePlaceholder e : EForwardingFilenamePlaceholder.values ())
+      if (aFilter == null || aFilter.test (e))
+        ret.add (e.getID ());
     return ret;
-  }
-
-  /**
-   * @return The names of all supported placeholders, without the surrounding braces. Never
-   *         <code>null</code>.
-   */
-  @NonNull
-  @ReturnsMutableCopy
-  public static ICommonsOrderedSet <String> getAllPlaceholders ()
-  {
-    return ALL_PLACEHOLDERS.getClone ();
   }
 
   /**
@@ -291,28 +226,42 @@ public class ForwardingFilenamePattern
 
     if (StringHelper.isEmpty (sPattern))
     {
-      LOGGER.error ("The forwarding filename pattern in '" + sConfigKey + "' may not be empty");
+      LOGGER.error ("The forwarding filename pattern in '" + sConfigKey + "' must not be empty");
       return ESuccess.FAILURE;
     }
 
-    final ICommonsOrderedSet <String> aUsed = new CommonsLinkedHashSet <> ();
+    if (sPattern.contains ("${"))
+    {
+      // "${...}" is the variable syntax of the configuration itself - a pattern using it is
+      // replaced before it ever reaches this class, so it must not silently look supported
+      LOGGER.error ("The forwarding filename pattern in '" +
+                    sConfigKey +
+                    "' uses the '${...}' syntax, which is reserved for the variable replacement of the configuration itself. Use the '{name}' syntax instead");
+      return ESuccess.FAILURE;
+    }
+
+    final ICommonsSet <EForwardingFilenamePlaceholder> aUsed = new CommonsHashSet <> ();
     final ICommonsOrderedSet <String> aUnknown = new CommonsLinkedHashSet <> ();
-    // The result is the literal part of the pattern only - all placeholders resolve to nothing
+    // The result is the literal part of the pattern only - all placeholders resolve to nothing. But
+    // we remember all unknown configuration patterns
     final String sLiteralPart = _resolve (sPattern, sName -> {
-      aUsed.add (sName);
-      if (!ALL_PLACEHOLDERS.contains (sName))
+      final EForwardingFilenamePlaceholder ePlaceholder = EForwardingFilenamePlaceholder.getFromIDOrNull (sName);
+      if (ePlaceholder == null)
         aUnknown.add (sName);
+      else
+        aUsed.add (ePlaceholder);
       return "";
     }, UnaryOperator.identity ());
 
     if (aUnknown.isNotEmpty ())
     {
+      // At least one unknown pattern was used
       LOGGER.error ("The forwarding filename pattern in '" +
                     sConfigKey +
                     "' uses the unknown placeholder(s) " +
                     StringImplode.getImploded (", ", aUnknown) +
                     ". Supported are only " +
-                    StringImplode.getImploded (", ", ALL_PLACEHOLDERS));
+                    StringImplode.getImploded (", ", _getAllPlaceholderIDs (null)));
       return ESuccess.FAILURE;
     }
 
@@ -330,75 +279,18 @@ public class ForwardingFilenamePattern
       return ESuccess.FAILURE;
     }
 
-    if (!aUsed.contains (PLACEHOLDER_INCOMING_ID) && !aUsed.contains (PLACEHOLDER_SBDH_INSTANCE_ID))
+    if (!aUsed.containsAny (EForwardingFilenamePlaceholder::isUniquePerDocument))
+    {
+      // From a practical perspective...
       LOGGER.warn ("The forwarding filename pattern in '" +
                    sConfigKey +
-                   "' contains neither the '{" +
-                   PLACEHOLDER_INCOMING_ID +
-                   "}' nor the '{" +
-                   PLACEHOLDER_SBDH_INSTANCE_ID +
-                   "}' placeholder, so two documents may resolve to the same name and overwrite each other");
+                   "' contains none of the placeholders that are unique per document (" +
+                   StringImplode.getImploded (", ",
+                                              _getAllPlaceholderIDs (EForwardingFilenamePlaceholder::isUniquePerDocument)) +
+                   "), so two documents may resolve to the same name and overwrite each other");
+    }
 
     return ESuccess.SUCCESS;
-  }
-
-  /**
-   * Read a pattern that results in a filename from the configuration. Path separators are not
-   * allowed and the resolved name is limited to {@link #MAX_LENGTH_FILENAME} characters.
-   *
-   * @param aConfig
-   *        The configuration to read from. May not be <code>null</code>.
-   * @param sConfigKey
-   *        The configuration key to read. May neither be <code>null</code> nor empty.
-   * @param sDefaultPattern
-   *        The pattern to be used if the configuration key is not set. May neither be
-   *        <code>null</code> nor empty.
-   * @return <code>null</code> if the configured pattern is unusable - in that case the reason was
-   *         logged as an error.
-   */
-  @Nullable
-  public static ForwardingFilenamePattern createFilenameFromConfig (@NonNull final IConfig aConfig,
-                                                                    @NonNull @Nonempty final String sConfigKey,
-                                                                    @NonNull @Nonempty final String sDefaultPattern)
-  {
-    ValueEnforcer.notNull (aConfig, "Config");
-    ValueEnforcer.notEmpty (sConfigKey, "ConfigKey");
-    ValueEnforcer.notEmpty (sDefaultPattern, "DefaultPattern");
-
-    final String sPattern = aConfig.getAsString (sConfigKey, sDefaultPattern);
-    if (checkPattern (sConfigKey, sPattern, false).isFailure ())
-      return null;
-    return new ForwardingFilenamePattern (sPattern, false, MAX_LENGTH_FILENAME);
-  }
-
-  /**
-   * Read a pattern that results in the object key of a blob store from the configuration. Contrary
-   * to a filename, the literal part may contain path separators - so that the key can span
-   * "directories" - and the resolved key is limited to {@link #MAX_LENGTH_OBJECT_KEY} characters.
-   *
-   * @param aConfig
-   *        The configuration to read from. May not be <code>null</code>.
-   * @param sConfigKey
-   *        The configuration key to read. May neither be <code>null</code> nor empty.
-   * @param sDefaultPattern
-   *        The pattern to be used if the configuration key is not set. May neither be
-   *        <code>null</code> nor empty.
-   * @return <code>null</code> if the configured pattern is unusable - in that case the reason was
-   *         logged as an error.
-   */
-  @Nullable
-  public static ForwardingFilenamePattern createObjectKeyFromConfig (@NonNull final IConfig aConfig,
-                                                                     @NonNull @Nonempty final String sConfigKey,
-                                                                     @NonNull @Nonempty final String sDefaultPattern)
-  {
-    ValueEnforcer.notNull (aConfig, "Config");
-    ValueEnforcer.notEmpty (sConfigKey, "ConfigKey");
-    ValueEnforcer.notEmpty (sDefaultPattern, "DefaultPattern");
-
-    final String sPattern = aConfig.getAsString (sConfigKey, sDefaultPattern);
-    if (checkPattern (sConfigKey, sPattern, true).isFailure ())
-      return null;
-    return new ForwardingFilenamePattern (sPattern, true, MAX_LENGTH_OBJECT_KEY);
   }
 
   /**
@@ -443,10 +335,10 @@ public class ForwardingFilenamePattern
     ValueEnforcer.notNull (aDocument, "Document");
 
     // An unknown placeholder is rejected by checkPattern already
-    final ICommonsMap <String, String> aValues = _getPlaceholderValues (aDocument);
-    final String sResolved = _resolve (m_sPattern,
-                                       x -> _getSanitized (aValues.get (x), false),
-                                       x -> _getSanitized (x, m_bAllowPathSeparator));
+    final String sResolved = _resolve (m_sPattern, x -> {
+      final EForwardingFilenamePlaceholder ePlaceholder = EForwardingFilenamePlaceholder.getFromIDOrNull (x);
+      return ePlaceholder == null ? "" : _getSanitized (ePlaceholder.getValue (aDocument), false);
+    }, x -> _getSanitized (x, m_bAllowPathSeparator));
     // The leading dots are removed, so that no value can turn the result into a hidden file that a
     // downstream poller never picks up
     String sBaseName = StringHelper.trimStartRepeatedly (sResolved, '.');
@@ -471,7 +363,9 @@ public class ForwardingFilenamePattern
       LOGGER.warn ("The forwarding filename pattern resolved to an unusable name for transaction '" +
                    aDocument.id () +
                    "' - using the default layout instead");
-      return DATETIME_FORMATTER.format (aDocument.timestamp ()) + "_" + _getSanitized (aDocument.localID (), false);
+      return EForwardingFilenamePlaceholder.DATETIME.getValue (aDocument) +
+             "_" +
+             _getSanitized (EForwardingFilenamePlaceholder.INCOMING_ID.getValue (aDocument), false);
     }
 
     return sSecureBaseName;
@@ -484,5 +378,66 @@ public class ForwardingFilenamePattern
                                        .append ("AllowPathSeparator", m_bAllowPathSeparator)
                                        .append ("MaxLength", m_nMaxLength)
                                        .getToString ();
+  }
+
+  /**
+   * Read a pattern that results in a filename from the configuration. Path separators are not
+   * allowed and the resolved name is limited to {@link #MAX_LENGTH_FILENAME} characters.
+   *
+   * @param aConfig
+   *        The configuration to read from. May not be <code>null</code>.
+   * @param sConfigKey
+   *        The configuration key to read. May neither be <code>null</code> nor empty.
+   * @param sDefaultPattern
+   *        The pattern to be used if the configuration key is not set. May neither be
+   *        <code>null</code> nor empty.
+   * @return <code>null</code> if the configured pattern is unusable - in that case the reason was
+   *         logged as an error.
+   */
+  @Nullable
+  public static ForwardingFilenamePattern createFilenameFromConfig (@NonNull final IConfig aConfig,
+                                                                    @NonNull @Nonempty final String sConfigKey,
+                                                                    @NonNull @Nonempty final String sDefaultPattern)
+  {
+    ValueEnforcer.notNull (aConfig, "Config");
+    ValueEnforcer.notEmpty (sConfigKey, "ConfigKey");
+    ValueEnforcer.notEmpty (sDefaultPattern, "DefaultPattern");
+
+    final String sPattern = aConfig.getAsString (sConfigKey, sDefaultPattern);
+    if (checkPattern (sConfigKey, sPattern, false).isFailure ())
+      return null;
+
+    return new ForwardingFilenamePattern (sPattern, false, MAX_LENGTH_FILENAME);
+  }
+
+  /**
+   * Read a pattern that results in the object key of a blob store from the configuration. Contrary
+   * to a filename, the literal part may contain path separators - so that the key can span
+   * "directories" - and the resolved key is limited to {@link #MAX_LENGTH_OBJECT_KEY} characters.
+   *
+   * @param aConfig
+   *        The configuration to read from. May not be <code>null</code>.
+   * @param sConfigKey
+   *        The configuration key to read. May neither be <code>null</code> nor empty.
+   * @param sDefaultPattern
+   *        The pattern to be used if the configuration key is not set. May neither be
+   *        <code>null</code> nor empty.
+   * @return <code>null</code> if the configured pattern is unusable - in that case the reason was
+   *         logged as an error.
+   */
+  @Nullable
+  public static ForwardingFilenamePattern createObjectKeyFromConfig (@NonNull final IConfig aConfig,
+                                                                     @NonNull @Nonempty final String sConfigKey,
+                                                                     @NonNull @Nonempty final String sDefaultPattern)
+  {
+    ValueEnforcer.notNull (aConfig, "Config");
+    ValueEnforcer.notEmpty (sConfigKey, "ConfigKey");
+    ValueEnforcer.notEmpty (sDefaultPattern, "DefaultPattern");
+
+    final String sPattern = aConfig.getAsString (sConfigKey, sDefaultPattern);
+    if (checkPattern (sConfigKey, sPattern, true).isFailure ())
+      return null;
+
+    return new ForwardingFilenamePattern (sPattern, true, MAX_LENGTH_OBJECT_KEY);
   }
 }
