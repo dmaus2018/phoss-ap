@@ -35,6 +35,7 @@ import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
+import com.helger.phoss.ap.api.model.ForwardingFilenamePattern;
 import com.helger.phoss.ap.api.model.ForwardingResult;
 import com.helger.phoss.ap.api.model.IForwardableDocument;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
@@ -67,6 +68,7 @@ public class S3DocumentForwarder implements IDocumentForwarder
   private static final String SUFFIX_S3_PATH_STYLE_ACCESS = "s3.path-style-access";
   private static final String SUFFIX_S3_KEY_PREFIX = "s3.key-prefix";
   private static final String SUFFIX_S3_WRITE_METADATA = "s3.write-metadata";
+  private static final String SUFFIX_S3_FILENAME_PATTERN = "s3.filename-pattern";
 
   private Region m_aRegion;
   private String m_sBucket;
@@ -76,6 +78,7 @@ public class S3DocumentForwarder implements IDocumentForwarder
   private String m_sEndpoint;
   private boolean m_bPathStyleAccess;
   private boolean m_bWriteMetadata;
+  private ForwardingFilenamePattern m_aFilenamePattern;
 
   /** {@inheritDoc} */
   @NonNull
@@ -115,6 +118,15 @@ public class S3DocumentForwarder implements IDocumentForwarder
     }
     else
       m_sKeyPrefix = "";
+
+    // Contrary to a filename, an object key may span "directories"
+    m_aFilenamePattern = ForwardingFilenamePattern.createObjectKeyFromConfig (aConfig,
+                                                                             sKeyPrefix +
+                                                                                      SUFFIX_S3_FILENAME_PATTERN,
+                                                                             APConfigurationProperties.FORWARDING_S3_FILENAME_PATTERN_DEFAULT);
+    if (m_aFilenamePattern == null)
+      return ESuccess.FAILURE;
+
     return ESuccess.SUCCESS;
   }
 
@@ -175,7 +187,7 @@ public class S3DocumentForwarder implements IDocumentForwarder
       try (final S3Client aS3Client = aBuilder.build ();
            final InputStream aDocumentIS = aDocPayloadMgr.openDocumentStreamForRead (aDocument.documentPath ()))
       {
-        final String sBaseKey = m_sKeyPrefix + aDocument.sbdhInstanceID ();
+        final String sBaseKey = m_sKeyPrefix + m_aFilenamePattern.getResolvedBaseName (aDocument);
         final String sKey = sBaseKey + ".xml";
 
         final PutObjectRequest aPutReq = PutObjectRequest.builder ()
@@ -259,6 +271,7 @@ public class S3DocumentForwarder implements IDocumentForwarder
                                        .append ("Bucket", m_sBucket)
                                        .append ("PathStyleAccess", m_bPathStyleAccess)
                                        .append ("WriteMetadata", m_bWriteMetadata)
+                                       .append ("FilenamePattern", m_aFilenamePattern)
                                        .getToString ();
   }
 }

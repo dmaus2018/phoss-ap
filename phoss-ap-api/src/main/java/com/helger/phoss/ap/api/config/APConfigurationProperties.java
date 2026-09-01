@@ -204,6 +204,8 @@ public final class APConfigurationProperties
   public static final boolean FORWARDING_S3_PATH_STYLE_ACCESS_DEFAULT = false;
   /** @since 0.10.2 */
   public static final boolean FORWARDING_S3_WRITE_METADATA_DEFAULT = false;
+  /** @since 0.12.0 */
+  public static final String FORWARDING_S3_FILENAME_PATTERN_DEFAULT = "{sbdh-instance-id}";
 
   // Forwarding - Filesystem (since 0.2.0)
   @Deprecated (forRemoval = true, since = "0.9.0")
@@ -211,6 +213,8 @@ public final class APConfigurationProperties
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_FILESYSTEM_LAYOUT = "forwarding.filesystem.layout";
   public static final String FORWARDING_FILESYSTEM_LAYOUT_DEFAULT = "flat";
+  /** @since 0.12.0 */
+  public static final String FORWARDING_FILESYSTEM_FILENAME_PATTERN_DEFAULT = "{sbdh-instance-id}";
 
   // Forwarding - SFTP
   /** @since 0.10.2 */

@@ -35,13 +35,13 @@ import com.helger.base.tostring.ToStringGenerator;
 import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.io.file.FileHelper;
 import com.helger.io.file.FileOperationManager;
-import com.helger.io.file.FilenameHelper;
 import com.helger.io.file.SimpleFileIO;
 import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.codelist.EForwardingFilesystemLayout;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
+import com.helger.phoss.ap.api.model.ForwardingFilenamePattern;
 import com.helger.phoss.ap.api.model.ForwardingResult;
 import com.helger.phoss.ap.api.model.IForwardableDocument;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
@@ -65,9 +65,11 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
   // Configuration key suffixes (relative to the configured base prefix)
   private static final String SUFFIX_FILESYSTEM_DIRECTORY = "filesystem.directory";
   private static final String SUFFIX_FILESYSTEM_LAYOUT = "filesystem.layout";
+  private static final String SUFFIX_FILESYSTEM_FILENAME_PATTERN = "filesystem.filename-pattern";
 
   private File m_aBaseDirectory;
   private EForwardingFilesystemLayout m_eLayout;
+  private ForwardingFilenamePattern m_aFilenamePattern;
 
   /** {@inheritDoc} */
   @NonNull
@@ -95,26 +97,31 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
                                                 APConfigurationProperties.FORWARDING_FILESYSTEM_LAYOUT_DEFAULT);
     m_eLayout = EForwardingFilesystemLayout.getFromIDOrDefault (sLayout);
 
+    m_aFilenamePattern = ForwardingFilenamePattern.createFilenameFromConfig (aConfig,
+                                                                            sKeyPrefix +
+                                                                                     SUFFIX_FILESYSTEM_FILENAME_PATTERN,
+                                                                            APConfigurationProperties.FORWARDING_FILESYSTEM_FILENAME_PATTERN_DEFAULT);
+    if (m_aFilenamePattern == null)
+      return ESuccess.FAILURE;
+
     return ESuccess.SUCCESS;
   }
 
   /**
-   * Generate a unique base name from the SBDH Instance ID. If a file with that name already exists,
-   * append a numeric suffix.
+   * Make the resolved base name unique. If a file with that name already exists, append a numeric
+   * suffix. The name is sanitized by {@link ForwardingFilenamePattern} already.
    */
   @NonNull
-  private static String _getUniqueBaseName (@NonNull final File aTargetDir, @NonNull final String sSbdhInstanceID)
+  private static String _getUniqueBaseName (@NonNull final File aTargetDir, @NonNull final String sBaseName)
   {
-    final String sSafeID = FilenameHelper.getAsSecureValidASCIIFilename (sSbdhInstanceID);
-
     // Check if the base name is already in use
-    if (!new File (aTargetDir, sSafeID + ".xml").exists () && !new File (aTargetDir, sSafeID).exists ())
-      return sSafeID;
+    if (!new File (aTargetDir, sBaseName + ".xml").exists () && !new File (aTargetDir, sBaseName).exists ())
+      return sBaseName;
 
     // Append numeric suffix until unique
     for (int nSuffix = 1;; nSuffix++)
     {
-      final String sCandidate = sSafeID + "-" + nSuffix;
+      final String sCandidate = sBaseName + "-" + nSuffix;
       if (!new File (aTargetDir, sCandidate + ".xml").exists () && !new File (aTargetDir, sCandidate).exists ())
         return sCandidate;
 
@@ -122,7 +129,7 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
       {
         // Avoid endless loop
         throw new IllegalStateException ("The filename '" +
-                                         sSafeID +
+                                         sBaseName +
                                          "' exists alreay with too many suffixes (" +
                                          nSuffix +
                                          ")");
@@ -216,7 +223,7 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
   private ForwardingResult _doForwardDocument (@NonNull final IForwardableDocument aDocument)
   {
     final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
-    final String sBaseName = _getUniqueBaseName (m_aBaseDirectory, aDocument.sbdhInstanceID ());
+    final String sBaseName = _getUniqueBaseName (m_aBaseDirectory, m_aFilenamePattern.getResolvedBaseName (aDocument));
 
     try
     {
@@ -270,6 +277,7 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
   {
     return new ToStringGenerator (this).append ("BaseDirectory", m_aBaseDirectory)
                                        .append ("Layout", m_eLayout)
+                                       .append ("FilenamePattern", m_aFilenamePattern)
                                        .getToString ();
   }
 }

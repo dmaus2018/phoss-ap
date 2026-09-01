@@ -17,7 +17,6 @@
 package com.helger.phoss.ap.forwarding.sftp;
 
 import java.nio.charset.StandardCharsets;
-import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jspecify.annotations.NonNull;
@@ -32,13 +31,13 @@ import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
 import com.helger.base.tostring.ToStringGenerator;
 import com.helger.config.fallback.IConfigWithFallback;
-import com.helger.io.file.FilenameHelper;
 import com.helger.jsch.sftp.ChannelSftpHelper;
 import com.helger.network.WebExceptionHelper;
 import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
+import com.helger.phoss.ap.api.model.ForwardingFilenamePattern;
 import com.helger.phoss.ap.api.model.ForwardingResult;
 import com.helger.phoss.ap.api.model.IForwardableDocument;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
@@ -62,7 +61,6 @@ import com.jcraft.jsch.SftpException;
 public class SftpDocumentForwarder implements IDocumentForwarder
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (SftpDocumentForwarder.class);
-  private static final String SFTP_DATETIME_PATTERN = "yyyyMMddHHmmss";
   private static final AtomicInteger WRITE_FILE_COUNT = new AtomicInteger (0);
   // Configuration key suffix (relative to the configured base prefix) - no trailing dot, used as
   // the base path for SftpSettings.createFromConfig
@@ -72,7 +70,7 @@ public class SftpDocumentForwarder implements IDocumentForwarder
 
   private ISftpSettings m_aSftpSettings;
   private boolean m_bWriteMetadata;
-  private String m_sFilenamePattern;
+  private ForwardingFilenamePattern m_aFilenamePattern;
 
   /** {@inheritDoc} */
   @NonNull
@@ -90,8 +88,12 @@ public class SftpDocumentForwarder implements IDocumentForwarder
 
     m_bWriteMetadata = aConfig.getAsBoolean (sKeyPrefix + SUFFIX_SFTP_WRITE_METADATA,
                                              APConfigurationProperties.FORWARDING_SFTP_WRITE_METADATA_DEFAULT);
-    m_sFilenamePattern = aConfig.getAsString (sKeyPrefix + SUFFIX_SFTP_FILENAME_PATTERN,
-                                              APConfigurationProperties.FORWARDING_SFTP_FILENAME_PATTERN_DEFAULT);
+    m_aFilenamePattern = ForwardingFilenamePattern.createFilenameFromConfig (aConfig,
+                                                                             sKeyPrefix +
+                                                                                      SUFFIX_SFTP_FILENAME_PATTERN,
+                                                                             APConfigurationProperties.FORWARDING_SFTP_FILENAME_PATTERN_DEFAULT);
+    if (m_aFilenamePattern == null)
+      return ESuccess.FAILURE;
 
     return ESuccess.SUCCESS;
   }
@@ -101,9 +103,9 @@ public class SftpDocumentForwarder implements IDocumentForwarder
    * @since 0.12.0
    */
   @NonNull
-  public final String getFilenamePattern ()
+  public final ForwardingFilenamePattern getFilenamePattern ()
   {
-    return m_sFilenamePattern;
+    return m_aFilenamePattern;
   }
 
   /**
@@ -245,49 +247,14 @@ public class SftpDocumentForwarder implements IDocumentForwarder
   }
 
   @NonNull
-  static String getResolvedBaseName (@NonNull final String sPattern,
-                                     @NonNull final IInboundTransaction aTransaction)
-  {
-    final String sDT = DateTimeFormatter.ofPattern (SFTP_DATETIME_PATTERN).format (aTransaction.getReceivedDT ());
-    final String sIncomingID = FilenameHelper.getAsSecureValidASCIIFilename (aTransaction.getIncomingID ());
-    final String sSbdhInstanceID = FilenameHelper.getAsSecureValidASCIIFilename (aTransaction.getSbdhInstanceID ());
-
-    final String sReceiverID = aTransaction.getReceiverID ();
-    final int nReceiverColon = sReceiverID.lastIndexOf (':');
-    final String sReceiverValue = nReceiverColon >= 0 ? sReceiverID.substring (nReceiverColon + 1) : sReceiverID;
-
-    final String sSenderID = aTransaction.getSenderID ();
-    final int nSenderColon = sSenderID.lastIndexOf (':');
-    final String sSenderValue = nSenderColon >= 0 ? sSenderID.substring (nSenderColon + 1) : sSenderID;
-
-    String sResult = sPattern;
-    sResult = sResult.replace ("${datetime}", sDT).replace ("{datetime}", sDT);
-    sResult = sResult.replace ("${incoming-id}", sIncomingID).replace ("{incoming-id}", sIncomingID);
-    sResult = sResult.replace ("${sbdh-instance-id}", sSbdhInstanceID).replace ("{sbdh-instance-id}", sSbdhInstanceID);
-    sResult = sResult.replace ("${receiver-id}", FilenameHelper.getAsSecureValidASCIIFilename (sReceiverID))
-                     .replace ("{receiver-id}", FilenameHelper.getAsSecureValidASCIIFilename (sReceiverID));
-    sResult = sResult.replace ("${receiver-value}", FilenameHelper.getAsSecureValidASCIIFilename (sReceiverValue))
-                     .replace ("{receiver-value}", FilenameHelper.getAsSecureValidASCIIFilename (sReceiverValue));
-    sResult = sResult.replace ("${sender-id}", FilenameHelper.getAsSecureValidASCIIFilename (sSenderID))
-                     .replace ("{sender-id}", FilenameHelper.getAsSecureValidASCIIFilename (sSenderID));
-    sResult = sResult.replace ("${sender-value}", FilenameHelper.getAsSecureValidASCIIFilename (sSenderValue))
-                     .replace ("{sender-value}", FilenameHelper.getAsSecureValidASCIIFilename (sSenderValue));
-    sResult = sResult.replace ("${doctype-id}", FilenameHelper.getAsSecureValidASCIIFilename (aTransaction.getDocTypeID ()))
-                     .replace ("{doctype-id}", FilenameHelper.getAsSecureValidASCIIFilename (aTransaction.getDocTypeID ()));
-    sResult = sResult.replace ("${process-id}", FilenameHelper.getAsSecureValidASCIIFilename (aTransaction.getProcessID ()))
-                     .replace ("{process-id}", FilenameHelper.getAsSecureValidASCIIFilename (aTransaction.getProcessID ()));
-
-    return FilenameHelper.getAsSecureValidASCIIFilename (sResult);
-  }
-
-  @NonNull
   private ForwardingResult _doForwardDocument (@NonNull final IForwardableDocument aDocument)
   {
     try
     {
       final IDocumentPayloadManager aDocPayloadMgr = APBasicMetaManager.getDocPayloadMgr ();
 
-      final String sBaseName = getResolvedBaseName (m_sFilenamePattern, aTransaction);
+      // Layout: as configured, by default yyyyMMddHHmmss_(local ID)
+      final String sBaseName = m_aFilenamePattern.getResolvedBaseName (aDocument);
 
       final ForwardingResult aResult = writeUploadedFile (m_aSftpSettings,
                                                           "",
@@ -337,7 +304,7 @@ public class SftpDocumentForwarder implements IDocumentForwarder
   public String toString ()
   {
     return new ToStringGenerator (this).append ("SftpSettings", m_aSftpSettings)
-                                       .append ("FilenamePattern", m_sFilenamePattern)
+                                       .append ("FilenamePattern", m_aFilenamePattern)
                                        .append ("WriteMetadata", m_bWriteMetadata)
                                        .getToString ();
   }
