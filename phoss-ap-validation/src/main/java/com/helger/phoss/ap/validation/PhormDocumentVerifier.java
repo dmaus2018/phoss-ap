@@ -70,6 +70,9 @@ import com.helger.phoss.ap.basic.APBasicMetaManager;
 @IsSPIImplementation
 public class PhormDocumentVerifier implements IInboundDocumentVerifierSPI, IOutboundDocumentVerifierSPI
 {
+  /** The ID of this verifier, as used in the telemetry and for the uniqueness check */
+  public static final String VERIFIER_ID = "phorm";
+
   private static final String HTTP_HEADER_X_TOKEN = "X-Token";
   private static final Logger LOGGER = LoggerFactory.getLogger (PhormDocumentVerifier.class);
 
@@ -278,6 +281,14 @@ public class PhormDocumentVerifier implements IInboundDocumentVerifierSPI, IOutb
   }
 
   /** {@inheritDoc} */
+
+  @NonNull
+  @Nonempty
+  public String getID ()
+  {
+    return VERIFIER_ID;
+  }
+
   @NonNull
   public VerificationOutcome verifyInboundDocument (@NonNull @Nonempty final String sDocumentPath,
                                                     @NonNull final IDocumentTypeIdentifier aDocTypeID,

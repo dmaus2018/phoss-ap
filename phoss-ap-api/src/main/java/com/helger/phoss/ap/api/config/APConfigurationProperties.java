@@ -152,6 +152,27 @@ public final class APConfigurationProperties
    */
   public static final String FORWARDING_SECONDARY_MODE_SUFFIX = "mode";
 
+  // Forwarding - MLS copy (since 0.12.0)
+  /**
+   * Prefix for the sink that receives a copy of every MLS this AP generates and sends itself. It is
+   * deliberately a separate sink and not the primary forwarder, because a reporting integration is
+   * normally not the same endpoint as the invoice inbox.
+   *
+   * @since 0.12.0
+   */
+  public static final String FORWARDING_MLS_COPY_PREFIX = "forwarding.mls-copy.";
+  /** @since 0.12.0 */
+  public static final String FORWARDING_MLS_COPY_ENABLED = "forwarding.mls-copy.enabled";
+  /** @since 0.12.0 */
+  public static final boolean FORWARDING_MLS_COPY_ENABLED_DEFAULT = false;
+  /**
+   * The forwarding mode of the MLS copy sink. If it is not set, the whole primary forwarder
+   * configuration is reused.
+   *
+   * @since 0.12.0
+   */
+  public static final String FORWARDING_MLS_COPY_MODE = "forwarding.mls-copy.mode";
+
   // Forwarding - C4 country code determination
   public static final String FORWARDING_C4_COUNTRYCODE_MODES = "forwarding.c4countrycode.modes";
 
@@ -162,6 +183,8 @@ public final class APConfigurationProperties
   public static final String FORWARDING_HTTP_ENDPOINT = "forwarding.http.endpoint";
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_HTTP_HEADERS_PREFIX = "forwarding.http.headers.";
+  /** @since 0.12.0 */
+  public static final boolean FORWARDING_HTTP_VERIFICATION_DETAILS_DEFAULT = false;
 
   // Forwarding - S3
   @Deprecated (forRemoval = true, since = "0.9.0")
@@ -301,6 +324,8 @@ public final class APConfigurationProperties
   public static final String VERIFICATION_INBOUND_ENABLED = "verification.inbound.enabled";
   public static final boolean VERIFICATION_INBOUND_ENABLED_DEFAULT = false;
   public static final String VERIFICATION_FAIL_MODE = "verification.verifier-fail-mode";
+  /** @since 0.12.0 */
+  public static final String VERIFICATION_INBOUND_REJECTION_FORWARDING = "verification.inbound.rejection-forwarding";
   public static final String VERIFICATION_DEFERRED_RETRY_INTERVAL = "verification.deferred.retry-interval";
   public static final Duration VERIFICATION_DEFERRED_RETRY_INTERVAL_DEFAULT = Duration.ofMinutes (5);
   public static final String VERIFICATION_DEFERRED_MAX_DURATION = "verification.deferred.max-duration";

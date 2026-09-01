@@ -233,7 +233,7 @@ public final class OutboundOrchestrator
     {
       final VerificationOutcome aOutcome = aVerifier.verifyOutboundDocument (sDocumentPath, aDocTypeID, aProcessID);
       if (!aOutcome.isPassed ())
-        return new VerifierResult (aOutcome, aVerifier.getVerifierName ());
+        return new VerifierResult (aVerifier.getID (), aVerifier.getVerifierName (), aOutcome);
 
       // Keep the warnings of an accepting verifier - they are reported back on success
       aWarnings.addAll (aOutcome.getAllIssues ());
@@ -378,6 +378,9 @@ public final class OutboundOrchestrator
         aVerifierResult = _runOutboundVerifiers (sDocumentPath, aDocTypeID, aProcessID);
         if (!aVerifierResult.outcome ().isPassed ())
         {
+          // Attribute the rejection to the verifier that caused it
+          if (aVerifierResult.hasVerifierID ())
+            aVerifySpan.setAttribute (CPhossAPOtel.ATTR_VERIFIER_ID, aVerifierResult.verifierID ());
           aVerifySpan.setStatusError ("Outbound verification failed");
           LOGGER.warn (sLogPrefix +
                        "The outbound document verifier '" +
@@ -539,6 +542,9 @@ public final class OutboundOrchestrator
         aVerifierResult = _runOutboundVerifiers (sDocumentPath, aDocTypeID, aProcessID);
         if (!aVerifierResult.outcome ().isPassed ())
         {
+          // Attribute the rejection to the verifier that caused it
+          if (aVerifierResult.hasVerifierID ())
+            aVerifySpan.setAttribute (CPhossAPOtel.ATTR_VERIFIER_ID, aVerifierResult.verifierID ());
           aVerifySpan.setStatusError ("Outbound verification failed");
           LOGGER.warn (sLogPrefix +
                        "The outbound document verifier '" +
@@ -1085,7 +1091,8 @@ public final class OutboundOrchestrator
 
           PeppolReportingItem aReportingItem = null;
           // The C1 participant identifier is the End User of an outbound transaction
-          final String sEndUserID = APPeppolReportingHelper.getEffectiveEndUserID (aSenderID);
+          // Important: the same entity must be counted only once
+          final String sReportingEndUserID = APPeppolReportingHelper.getEffectiveEndUserID (aSenderID);
           try
           {
             // Actual sending using Phase4PeppolSender
@@ -1195,7 +1202,7 @@ public final class OutboundOrchestrator
                 // be created AFTER sending", which would mask the real transport exception
                 // captured in aCaughtSendingEx and handled below.
                 if (eResult.isSuccess () && aCaughtSendingEx.isNotSet ())
-                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sEndUserID);
+                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sReportingEndUserID);
                 break;
               }
               case PREBUILT_SBD:
@@ -1296,7 +1303,7 @@ public final class OutboundOrchestrator
                 // be created AFTER sending", which would mask the real transport exception
                 // captured in aCaughtSendingEx and handled below.
                 if (eResult.isSuccess () && aCaughtSendingEx.isNotSet ())
-                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sEndUserID);
+                  aReportingItem = aBuilder.createPeppolReportingItemAfterSending (sReportingEndUserID);
                 break;
               }
               default:

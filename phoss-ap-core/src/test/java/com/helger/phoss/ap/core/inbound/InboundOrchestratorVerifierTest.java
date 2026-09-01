@@ -69,6 +69,13 @@ public final class InboundOrchestratorVerifierTest
       m_aOutcome = aOutcome;
     }
 
+    @NonNull
+    @Nonempty
+    public String getID ()
+    {
+      return m_sName;
+    }
+
     @Override
     @NonNull
     @Nonempty
@@ -106,9 +113,25 @@ public final class InboundOrchestratorVerifierTest
   @Test
   public void testDefaultVerifierName ()
   {
-    // The default name of a verifier is its local class name
-    final IInboundDocumentVerifierSPI aVerifier = (sDocumentPath, aDocTypeID, aProcessID) -> VerificationOutcome
-                                                                                                                .serviceUnavailable ("down");
+    // The default name of a verifier is its local class name. Note that the SPI is deliberately no
+    // functional interface any more, because every verifier must provide its own ID
+    final IInboundDocumentVerifierSPI aVerifier = new IInboundDocumentVerifierSPI ()
+    {
+      @NonNull
+      @Nonempty
+      public String getID ()
+      {
+        return "unavailable";
+      }
+
+      @NonNull
+      public VerificationOutcome verifyInboundDocument (@NonNull @Nonempty final String sDocumentPath,
+                                                        @NonNull final IDocumentTypeIdentifier aDocTypeID,
+                                                        @NonNull final IProcessIdentifier aProcessID)
+      {
+        return VerificationOutcome.serviceUnavailable ("down");
+      }
+    };
     final VerifierResult aVR = InboundOrchestrator.runInboundVerifiers (LOG_PREFIX,
                                                                         new CommonsArrayList <> (aVerifier),
                                                                         DOC_PATH,
@@ -171,12 +194,10 @@ public final class InboundOrchestratorVerifierTest
     assertEquals (2, aMls.getIssues ().size ());
     assertTrue (aMls.getIssues ()
                     .stream ()
-                    .anyMatch (x -> x.getStatusReasonCode () ==
-                                    EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_FATAL));
+                    .anyMatch (x -> x.getStatusReasonCode () == EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_FATAL));
     assertTrue (aMls.getIssues ()
                     .stream ()
-                    .anyMatch (x -> x.getStatusReasonCode () ==
-                                    EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_WARNING));
+                    .anyMatch (x -> x.getStatusReasonCode () == EPeppolMLSStatusReasonCode.BUSINESS_RULE_VIOLATION_WARNING));
   }
 
   @Test
@@ -234,7 +255,23 @@ public final class InboundOrchestratorVerifierTest
   {
     // The SPI contract demands a non-null outcome, but it is not enforced at runtime - such a
     // verifier may not abort the processing of the document
-    final IInboundDocumentVerifierSPI aBroken = (sDocumentPath, aDocTypeID, aProcessID) -> null;
+    final IInboundDocumentVerifierSPI aBroken = new IInboundDocumentVerifierSPI ()
+    {
+      @NonNull
+      @Nonempty
+      public String getID ()
+      {
+        return "broken";
+      }
+
+      @NonNull
+      public VerificationOutcome verifyInboundDocument (@NonNull @Nonempty final String sDocumentPath,
+                                                        @NonNull final IDocumentTypeIdentifier aDocTypeID,
+                                                        @NonNull final IProcessIdentifier aProcessID)
+      {
+        return null;
+      }
+    };
     final MockVerifier aVerifier2 = new MockVerifier ("Validator", VerificationOutcome.passed ());
     final ICommonsList <IInboundDocumentVerifierSPI> aVerifiers = new CommonsArrayList <> (aBroken, aVerifier2);
     final VerifierResult aVR = InboundOrchestrator.runInboundVerifiers (LOG_PREFIX,

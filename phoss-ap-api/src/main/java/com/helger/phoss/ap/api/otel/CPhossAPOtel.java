@@ -62,6 +62,8 @@ public final class CPhossAPOtel
   public static final String METRIC_INBOUND_VERIFICATION_ACCEPTED = "phoss.ap.inbound.verification.accepted";
   public static final String METRIC_INBOUND_MLS_CORRELATED = "phoss.ap.inbound.mls.correlated";
   public static final String METRIC_INBOUND_FORWARDED = "phoss.ap.inbound.forwarded";
+  /** @since 0.12.0 */
+  public static final String METRIC_INBOUND_VERIFICATION_REJECTIONS_FORWARDED = "phoss.ap.inbound.verification.rejections.forwarded";
   public static final String METRIC_OUTBOUND_ACCEPTED = "phoss.ap.outbound.accepted";
   public static final String METRIC_OUTBOUND_VERIFICATION_ACCEPTED = "phoss.ap.outbound.verification.accepted";
   public static final String METRIC_OUTBOUND_SENT = "phoss.ap.outbound.sent";
@@ -80,6 +82,8 @@ public final class CPhossAPOtel
   public static final String SPAN_INBOUND_DUPLICATE_CHECK = "phoss.ap.inbound.duplicate_check";
   public static final String SPAN_INBOUND_FORWARD = "phoss.ap.inbound.forward";
   public static final String SPAN_INBOUND_FORWARD_SECONDARY = "phoss.ap.inbound.forward.secondary";
+  /** @since 0.12.0 */
+  public static final String SPAN_INBOUND_FORWARD_REJECTED = "phoss.ap.inbound.forward.rejected";
   public static final String SPAN_INBOUND_C4_RESOLVE = "phoss.ap.inbound.c4_resolve";
   public static final String SPAN_OUTBOUND_SEND = "phoss.ap.outbound.send";
   public static final String SPAN_OUTBOUND_AS4_SEND = "phoss.ap.outbound.as4_send";
@@ -87,6 +91,8 @@ public final class CPhossAPOtel
   public static final String SPAN_SMP_LOOKUP = "phoss.ap.smp.lookup";
   public static final String SPAN_MLS_CORRELATE = "phoss.ap.mls.correlate";
   public static final String SPAN_MLS_SEND = "phoss.ap.mls.send";
+  /** @since 0.12.0 */
+  public static final String SPAN_MLS_FORWARD_COPY = "phoss.ap.mls.forward.copy";
   public static final String SPAN_VERIFICATION = "phoss.ap.verification";
   public static final String SPAN_REPORTING_TSR = "phoss.ap.reporting.tsr";
   public static final String SPAN_REPORTING_EUSR = "phoss.ap.reporting.eusr";
@@ -116,6 +122,23 @@ public final class CPhossAPOtel
   public static final String ATTR_SCHEDULER_NAME = "phoss.ap.scheduler.name";
   public static final String ATTR_SCHEDULER_ITEMS = "phoss.ap.scheduler.items";
   public static final String ATTR_FORWARDER_TYPE = "phoss.ap.forwarder.type";
+  /**
+   * The ID of the forwarder that handled a document - see
+   * {@link com.helger.phoss.ap.api.mgr.IDocumentForwarder#getID()}. Contrary to
+   * {@link #ATTR_FORWARDER_TYPE}, which names the kind of forwarder, this identifies the concrete
+   * one, so that e.g. two forwarders provided via SPI can be told apart.
+   *
+   * @since 0.12.0
+   */
+  public static final String ATTR_FORWARDER_ID = "phoss.ap.forwarder.id";
+  /**
+   * The ID of the verifier that rejected a document or that was unavailable - see
+   * {@link com.helger.phoss.ap.api.spi.IDocumentVerifier#getID()}. Not set if the verification
+   * passed, because then no single verifier is responsible for the outcome.
+   *
+   * @since 0.12.0
+   */
+  public static final String ATTR_VERIFIER_ID = "phoss.ap.verifier.id";
   /** @since 0.9.0 */
   public static final String ATTR_FORWARDER_INDEX = "phoss.ap.forwarder.index";
   public static final String ATTR_SMP_URL = "phoss.ap.smp.url";

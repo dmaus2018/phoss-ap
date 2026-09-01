@@ -19,6 +19,7 @@ package com.helger.phoss.ap.api.spi;
 import org.jspecify.annotations.NonNull;
 
 import com.helger.annotation.Nonempty;
+import com.helger.base.id.IHasID;
 import com.helger.base.lang.clazz.ClassHelper;
 
 /**
@@ -40,8 +41,27 @@ import com.helger.base.lang.clazz.ClassHelper;
  * @author Philip Helger
  * @since 0.12.0
  */
-public interface IDocumentVerifier
+public interface IDocumentVerifier extends IHasID <String>
 {
+  /**
+   * The stable identifier of this verifier. Contrary to {@link #getVerifierName()} it is not meant
+   * to be read by a human but to identify the verifier in a machine readable way - it is e.g. used
+   * as the value of the telemetry attribute
+   * <code>phoss.ap.verifier.id</code>, so that a rejection can be attributed to a specific
+   * verifier.<br>
+   * The ID must be unique over all inbound and all outbound verifiers - a duplicate ID aborts the
+   * startup. A verifier that implements both {@link IInboundDocumentVerifierSPI} and
+   * {@link IOutboundDocumentVerifierSPI} uses the same ID for both directions.<br>
+   * Use a short, lower case, stable string like <code>phorm</code> - it should not change between
+   * releases, because it ends up in dashboards and alerting rules.
+   *
+   * @return The ID of this verifier. Neither <code>null</code> nor empty.
+   * @since 0.12.0
+   */
+  @NonNull
+  @Nonempty
+  String getID ();
+
   /**
    * @return The name of this verifier, as used in log messages, in the transaction error details,
    *         in the MLS response and in the rejection reported back to an outbound submitter.

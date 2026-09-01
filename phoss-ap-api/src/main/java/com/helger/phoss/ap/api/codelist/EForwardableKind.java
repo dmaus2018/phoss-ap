@@ -24,27 +24,26 @@ import com.helger.base.id.IHasID;
 import com.helger.base.lang.EnumHelper;
 
 /**
- * The severity of a single {@link com.helger.phoss.ap.api.model.VerificationIssue}.
- * <p>
- * This is deliberately separate from {@link EVerificationIssueType}: the severity states whether an
- * issue prevents the document from being accepted, whereas the type states what kind of rule was
- * violated. The Peppol MLS status reason codes conflate the two, which is why the mapping to MLS
- * happens only when the MLS response is created.
- * </p>
+ * The nature of a document that is handed to a document forwarder. This is the piece of information
+ * that the document itself cannot provide: C4 can tell an MLS <em>received</em> from the Peppol
+ * network apart from an MLS this AP <em>sent</em> itself, which matters as soon as both end up on
+ * the same endpoint.
  *
  * @author Philip Helger
  * @since 0.12.0
  */
-public enum EVerificationIssueLevel implements IHasID <String>
+public enum EForwardableKind implements IHasID <String>
 {
-  /** The issue prevents the document from being accepted. */
-  ERROR ("error"),
-  /** The issue is worth reporting, but does not prevent the document from being accepted. */
-  WARNING ("warning");
+  /** A business document received from the Peppol network. */
+  INBOUND_DOCUMENT ("inbound-document"),
+  /** A Message Level Status received from the Peppol network. */
+  INBOUND_MLS ("inbound-mls"),
+  /** A copy of a Message Level Status that this AP generated and sent itself. */
+  OUTBOUND_MLS_COPY ("outbound-mls-copy");
 
   private final String m_sID;
 
-  EVerificationIssueLevel (@NonNull @Nonempty final String sID)
+  EForwardableKind (@NonNull @Nonempty final String sID)
   {
     m_sID = sID;
   }
@@ -58,11 +57,12 @@ public enum EVerificationIssueLevel implements IHasID <String>
   }
 
   /**
-   * @return <code>true</code> if this level prevents the document from being accepted.
+   * @return <code>true</code> if the document was received from the Peppol network, and
+   *         <code>false</code> if this AP created it itself.
    */
-  public boolean isError ()
+  public boolean isInbound ()
   {
-    return this == ERROR;
+    return this == INBOUND_DOCUMENT || this == INBOUND_MLS;
   }
 
   /**
@@ -73,8 +73,8 @@ public enum EVerificationIssueLevel implements IHasID <String>
    * @return The matching enum constant, or <code>null</code> if not found.
    */
   @Nullable
-  public static EVerificationIssueLevel getFromIDOrNull (@Nullable final String sID)
+  public static EForwardableKind getFromIDOrNull (@Nullable final String sID)
   {
-    return EnumHelper.getFromIDOrNull (EVerificationIssueLevel.class, sID);
+    return EnumHelper.getFromIDOrNull (EForwardableKind.class, sID);
   }
 }
