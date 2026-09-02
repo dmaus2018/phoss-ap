@@ -371,8 +371,8 @@ public final class APCoreMetaManager
   /**
    * @return The forwarder that receives a copy of every MLS this AP generates itself, or
    *         <code>null</code> if <code>forwarding.mls-copy.enabled</code> is not set. It is
-   *         dispatched on a fire-and-forget basis; it has no retries and its failure affects neither
-   *         the MLS sending to C2 nor the inbound transaction status.
+   *         dispatched on a fire-and-forget basis; it has no retries and its failure affects
+   *         neither the MLS sending to C2 nor the inbound transaction status.
    * @since 0.12.0
    */
   @Nullable

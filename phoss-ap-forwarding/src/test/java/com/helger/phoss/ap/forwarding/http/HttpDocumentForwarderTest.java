@@ -130,8 +130,7 @@ public final class HttpDocumentForwarderTest
     final HttpDocumentForwarder aForwarder = _createForwarder (false);
     final HttpPost aPost = new HttpPost (ENDPOINT_URL);
 
-    aForwarder.applyVerificationHeaders (aPost,
-                                         _doc (EVerificationResult.REJECTED, _createIssuesJson (1, 10)));
+    aForwarder.applyVerificationHeaders (aPost, _doc (EVerificationResult.REJECTED, _createIssuesJson (1, 10)));
     assertEquals ("rejected", aPost.getFirstHeader (HEADER_RESULT).getValue ());
     // The details are opt-in
     assertFalse (aPost.containsHeader (HEADER_DETAILS));
@@ -183,8 +182,7 @@ public final class HttpDocumentForwarderTest
     final HttpDocumentForwarder aForwarder = _createForwarder (true);
     final HttpPost aPost = new HttpPost (ENDPOINT_URL);
 
-    aForwarder.applyVerificationHeaders (aPost,
-                                         _doc (EVerificationResult.REJECTED, "this is no JSON"));
+    aForwarder.applyVerificationHeaders (aPost, _doc (EVerificationResult.REJECTED, "this is no JSON"));
     // The verdict is unaffected by unparsable details
     assertEquals ("rejected", aPost.getFirstHeader (HEADER_RESULT).getValue ());
     assertFalse (aPost.containsHeader (HEADER_DETAILS));

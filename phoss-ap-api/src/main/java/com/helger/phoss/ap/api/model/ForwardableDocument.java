@@ -92,8 +92,8 @@ public record ForwardableDocument (@NonNull @Nonempty String id,
   public static ForwardableDocument fromInbound (@NonNull final IInboundTransaction aTransaction)
   {
     final EForwardableKind eKind = CPhossAP.isMLS (aTransaction.getDocTypeID (), aTransaction.getProcessID ())
-                                                                                                              ? EForwardableKind.INBOUND_MLS
-                                                                                                              : EForwardableKind.INBOUND_DOCUMENT;
+                                                                                                               ? EForwardableKind.INBOUND_MLS
+                                                                                                               : EForwardableKind.INBOUND_DOCUMENT;
     return new ForwardableDocument (aTransaction.getID (),
                                     eKind,
                                     aTransaction.getSbdhInstanceID (),
@@ -114,9 +114,10 @@ public record ForwardableDocument (@NonNull @Nonempty String id,
 
   /**
    * Create a forwardable document from an outbound MLS transaction, to hand C4 a copy of an MLS
-   * that this AP generated and sent itself. The payload is the bare <code>ApplicationResponse</code>
-   * XML as it was stored - the AP never materializes the SBDH envelope, phase4 adds it during the
-   * AS4 transmission - so C4 tells this apart from a received MLS by {@link #kind()}.
+   * that this AP generated and sent itself. The payload is the bare
+   * <code>ApplicationResponse</code> XML as it was stored - the AP never materializes the SBDH
+   * envelope, phase4 adds it during the AS4 transmission - so C4 tells this apart from a received
+   * MLS by {@link #kind()}.
    * <p>
    * No metadata sidecar is offered: the MLS <code>ApplicationResponse</code> already references the
    * document it responds to, which is the correlation key a downstream reporter needs.

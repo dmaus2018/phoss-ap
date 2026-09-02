@@ -201,9 +201,9 @@ public class OutboundController
    * neither an XML root element namespace URI nor an XML root element local name, so phase4 can
    * derive neither the SBDH <code>Standard</code>, <code>TypeVersion</code> nor <code>Type</code>
    * from them, and it must be told explicitly that the payload is not XML. Without these parameters
-   * the transmission fails deep inside phase4 - either with
-   * "Failed to parse payload InputStream to a DOM node" or with an unspecific
-   * <code>INVALID_PARAMETERS</code> sending result that has no exception attached at all.
+   * the transmission fails deep inside phase4 - either with "Failed to parse payload InputStream to
+   * a DOM node" or with an unspecific <code>INVALID_PARAMETERS</code> sending result that has no
+   * exception attached at all.
    *
    * @param aDocTypeID
    *        The parsed document type identifier. May not be <code>null</code>.
@@ -336,7 +336,8 @@ public class OutboundController
                    @ApiResponse (responseCode = "404",
                                  description = "Sending is disabled in the configuration",
                                  content = @Content),
-                   @ApiResponse (responseCode = "422", description = "Sending failed — see the report body for details") })
+                   @ApiResponse (responseCode = "422",
+                                 description = "Sending failed — see the report body for details") })
   public ResponseEntity <String> submitRawDocument (@Parameter (description = "Peppol Participant ID of the sender (C1)",
                                                                 required = true,
                                                                 example = "iso6523-actorid-upis::0088:senderbackend") @PathVariable ("senderID") final String sSenderID,
@@ -354,23 +355,23 @@ public class OutboundController
                                                                 example = "AT") @PathVariable ("c1CountryCode") final String sC1CountryCode,
                                                     @Parameter (hidden = true) @NonNull final HttpServletRequest aServletRequest,
                                                     @Parameter (description = "Custom SBDH Instance Identifier. A random UUID-based identifier is generated when omitted.") @RequestParam (value = "sbdhInstanceID",
-                                                                                                                                                                                            required = false) final String sSbdhInstanceID,
+                                                                                                                                                                                           required = false) final String sSbdhInstanceID,
                                                     @Parameter (description = "Alternative Peppol Participant ID to receive MLS responses") @RequestParam (value = "mlsTo",
-                                                                                                                                                            required = false) final String sMlsTo,
+                                                                                                                                                           required = false) final String sMlsTo,
                                                     @Parameter (description = "SBDH Standard override for non-XML payloads (e.g., urn:peppol:doctype:pdf+xml). Auto-derived from the document type when omitted, but mandatory for document types with a non-XML syntax specific ID.") @RequestParam (value = "sbdhStandard",
-                                                                                                                                                                                                                                                                                              required = false) final String sSbdhStandard,
+                                                                                                                                                                                                                                                                                                      required = false) final String sSbdhStandard,
                                                     @Parameter (description = "SBDH TypeVersion override (e.g., 0). Auto-derived from the document type when omitted, but mandatory for document types with a non-XML syntax specific ID.") @RequestParam (value = "sbdhTypeVersion",
                                                                                                                                                                                                                                                            required = false) final String sSbdhTypeVersion,
                                                     @Parameter (description = "SBDH Type override (e.g., factur-x). Auto-derived from the document type when omitted, but mandatory for document types with a non-XML syntax specific ID.") @RequestParam (value = "sbdhType",
                                                                                                                                                                                                                                                            required = false) final String sSbdhType,
                                                     @Parameter (description = "MIME type for binary payloads (e.g., application/pdf). When set, the payload is wrapped in <BinaryContent>; otherwise treated as XML. Mandatory for document types with a non-XML syntax specific ID.") @RequestParam (value = "payloadMimeType",
-                                                                                                                                                                                                                                                                                                     required = false) final String sPayloadMimeType,
+                                                                                                                                                                                                                                                                                                      required = false) final String sPayloadMimeType,
                                                     @Parameter (description = "Optional custom field 1 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom1",
-                                                                                                                                                                                                          required = false) final String sCustom1,
+                                                                                                                                                                                                           required = false) final String sCustom1,
                                                     @Parameter (description = "Optional custom field 2 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom2",
-                                                                                                                                                                                                          required = false) final String sCustom2,
+                                                                                                                                                                                                           required = false) final String sCustom2,
                                                     @Parameter (description = "Optional custom field 3 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom3",
-                                                                                                                                                                                                          required = false) final String sCustom3) throws Exception
+                                                                                                                                                                                                           required = false) final String sCustom3) throws Exception
   {
     if (!APCoreConfig.isSendingEnabled ())
     {
@@ -455,21 +456,21 @@ public class OutboundController
     {
       // Store in DB
       final OutboundSubmitResult aSubmitResult = OutboundOrchestrator.submitRawDocument ("[SubmitRaw] ",
-                                                                               aSenderID,
-                                                                               aReceiverID,
-                                                                               aDocTypeID,
-                                                                               aProcessID,
-                                                                               sEffectiveSbdhInstanceID,
-                                                                               sC1CountryCode,
-                                                                               aIS,
-                                                                               sMlsTo,
-                                                                               sSbdhStandard,
-                                                                               sSbdhTypeVersion,
-                                                                               sSbdhType,
-                                                                               sPayloadMimeType,
-                                                                               sCustom1,
-                                                                               sCustom2,
-                                                                               sCustom3);
+                                                                                         aSenderID,
+                                                                                         aReceiverID,
+                                                                                         aDocTypeID,
+                                                                                         aProcessID,
+                                                                                         sEffectiveSbdhInstanceID,
+                                                                                         sC1CountryCode,
+                                                                                         aIS,
+                                                                                         sMlsTo,
+                                                                                         sSbdhStandard,
+                                                                                         sSbdhTypeVersion,
+                                                                                         sSbdhType,
+                                                                                         sPayloadMimeType,
+                                                                                         sCustom1,
+                                                                                         sCustom2,
+                                                                                         sCustom3);
       if (aSubmitResult.isFailure ())
       {
         return ResponseEntity.unprocessableContent ().body (_submitErrorJson (aSubmitResult));
@@ -519,16 +520,17 @@ public class OutboundController
                    @ApiResponse (responseCode = "404",
                                  description = "Sending is disabled in the configuration",
                                  content = @Content),
-                   @ApiResponse (responseCode = "422", description = "Sending failed — see the report body for details") })
+                   @ApiResponse (responseCode = "422",
+                                 description = "Sending failed — see the report body for details") })
   public ResponseEntity <String> submitPrebuiltSBD (@Parameter (hidden = true) @NonNull final HttpServletRequest aServletRequest,
                                                     @Parameter (description = "Alternative Peppol Participant ID to receive MLS responses") @RequestParam (value = "mlsTo",
-                                                                                                                                                            required = false) final String sMlsTo,
+                                                                                                                                                           required = false) final String sMlsTo,
                                                     @Parameter (description = "Optional custom field 1 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom1",
-                                                                                                                                                                                                          required = false) final String sCustom1,
+                                                                                                                                                                                                           required = false) final String sCustom1,
                                                     @Parameter (description = "Optional custom field 2 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom2",
-                                                                                                                                                                                                          required = false) final String sCustom2,
+                                                                                                                                                                                                           required = false) final String sCustom2,
                                                     @Parameter (description = "Optional custom field 3 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom3",
-                                                                                                                                                                                                          required = false) final String sCustom3) throws Exception
+                                                                                                                                                                                                           required = false) final String sCustom3) throws Exception
   {
     if (!APCoreConfig.isSendingEnabled ())
     {
@@ -545,11 +547,11 @@ public class OutboundController
     {
       // Store in DB
       final OutboundSubmitResult aSubmitResult = OutboundOrchestrator.submitPrebuiltSBD ("[SubmitPrebuiltSBD] ",
-                                                                               aIS,
-                                                                               sMlsTo,
-                                                                               sCustom1,
-                                                                               sCustom2,
-                                                                               sCustom3);
+                                                                                         aIS,
+                                                                                         sMlsTo,
+                                                                                         sCustom1,
+                                                                                         sCustom2,
+                                                                                         sCustom3);
       if (aSubmitResult.isFailure ())
       {
         // Deliberately kept at 400 - this endpoint answered 400 before the structured error body
@@ -613,7 +615,8 @@ public class OutboundController
                    @ApiResponse (responseCode = "404",
                                  description = "Sending is disabled in the configuration",
                                  content = @Content),
-                   @ApiResponse (responseCode = "422", description = "Sending failed — see the report body for details") })
+                   @ApiResponse (responseCode = "422",
+                                 description = "Sending failed — see the report body for details") })
   public ResponseEntity <String> submitAutoDetect (@Parameter (description = "Peppol Participant ID of the sender (C1)",
                                                                required = true,
                                                                example = "iso6523-actorid-upis::0088:senderbackend") @PathVariable ("senderID") final String sSenderID,
@@ -625,15 +628,15 @@ public class OutboundController
                                                                example = "AT") @PathVariable ("c1CountryCode") final String sC1CountryCode,
                                                    @Parameter (hidden = true) @NonNull final HttpServletRequest aServletRequest,
                                                    @Parameter (description = "Custom SBDH Instance Identifier. A random UUID-based identifier is generated when omitted.") @RequestParam (value = "sbdhInstanceID",
-                                                                                                                                                                                           required = false) final String sSbdhInstanceID,
+                                                                                                                                                                                          required = false) final String sSbdhInstanceID,
                                                    @Parameter (description = "Alternative Peppol Participant ID to receive MLS responses") @RequestParam (value = "mlsTo",
-                                                                                                                                                           required = false) final String sMlsTo,
+                                                                                                                                                          required = false) final String sMlsTo,
                                                    @Parameter (description = "Optional custom field 1 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom1",
-                                                                                                                                                                                                         required = false) final String sCustom1,
+                                                                                                                                                                                                          required = false) final String sCustom1,
                                                    @Parameter (description = "Optional custom field 2 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom2",
-                                                                                                                                                                                                         required = false) final String sCustom2,
+                                                                                                                                                                                                          required = false) final String sCustom2,
                                                    @Parameter (description = "Optional custom field 3 (max 255 characters). Stored with the transaction and returned by the status APIs.") @RequestParam (value = "custom3",
-                                                                                                                                                                                                         required = false) final String sCustom3) throws Exception
+                                                                                                                                                                                                          required = false) final String sCustom3) throws Exception
   {
     if (!APCoreConfig.isSendingEnabled ())
     {
@@ -726,21 +729,21 @@ public class OutboundController
     try (final InputStream aPayloadIS = new java.io.ByteArrayInputStream (aPayloadBytes))
     {
       final OutboundSubmitResult aSubmitResult = OutboundOrchestrator.submitRawDocument (sLogPrefix,
-                                                                               aSenderID,
-                                                                               aReceiverID,
-                                                                               aDocTypeID,
-                                                                               aProcessID,
-                                                                               sEffectiveSbdhInstanceID,
-                                                                               sC1CountryCode,
-                                                                               aPayloadIS,
-                                                                               sMlsTo,
-                                                                               null,
-                                                                               null,
-                                                                               null,
-                                                                               null,
-                                                                               sCustom1,
-                                                                               sCustom2,
-                                                                               sCustom3);
+                                                                                         aSenderID,
+                                                                                         aReceiverID,
+                                                                                         aDocTypeID,
+                                                                                         aProcessID,
+                                                                                         sEffectiveSbdhInstanceID,
+                                                                                         sC1CountryCode,
+                                                                                         aPayloadIS,
+                                                                                         sMlsTo,
+                                                                                         null,
+                                                                                         null,
+                                                                                         null,
+                                                                                         null,
+                                                                                         sCustom1,
+                                                                                         sCustom2,
+                                                                                         sCustom3);
       if (aSubmitResult.isFailure ())
       {
         // Deliberately kept at 400 - this endpoint answered 400 before the structured error body
@@ -775,7 +778,8 @@ public class OutboundController
               description = "Submits a document for outbound sending by referencing an S3 object instead of inlining the payload. " +
                             "The Sender Backend uploads the document to S3 first, then calls this endpoint. " +
                             "Requires 'outbound.s3.enabled=true'. Since v0.1.1.")
-  @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Document fetched, accepted and sent successfully"),
+  @ApiResponses ({ @ApiResponse (responseCode = "200",
+                                 description = "Document fetched, accepted and sent successfully"),
                    @ApiResponse (responseCode = "400",
                                  description = "Outbound S3 disabled, missing required fields, invalid identifiers, missing SBDH parameters for a non-XML document type, or S3 fetch failed"),
                    @ApiResponse (responseCode = "401",
@@ -784,7 +788,8 @@ public class OutboundController
                    @ApiResponse (responseCode = "404",
                                  description = "Sending is disabled in the configuration",
                                  content = @Content),
-                   @ApiResponse (responseCode = "422", description = "Sending failed — see the report body for details") })
+                   @ApiResponse (responseCode = "422",
+                                 description = "Sending failed — see the report body for details") })
   public ResponseEntity <String> submitFromS3 (@RequestBody final OutboundS3SubmitRequest aRequest)
   {
     if (!APCoreConfig.isSendingEnabled ())
@@ -802,11 +807,11 @@ public class OutboundController
 
     // Validate required fields
     if (StringHelper.isEmpty (aRequest.getSenderID ()) ||
-      StringHelper.isEmpty (aRequest.getReceiverID ()) ||
-      StringHelper.isEmpty (aRequest.getDocTypeID ()) ||
-      StringHelper.isEmpty (aRequest.getProcessID ()) ||
-      StringHelper.isEmpty (aRequest.getC1CountryCode ()) ||
-      StringHelper.isEmpty (aRequest.getS3Key ()))
+        StringHelper.isEmpty (aRequest.getReceiverID ()) ||
+        StringHelper.isEmpty (aRequest.getDocTypeID ()) ||
+        StringHelper.isEmpty (aRequest.getProcessID ()) ||
+        StringHelper.isEmpty (aRequest.getC1CountryCode ()) ||
+        StringHelper.isEmpty (aRequest.getS3Key ()))
     {
       return ResponseEntity.badRequest ()
                            .body (JsonValue.create ("Missing required fields: senderID, receiverID, docTypeID, processID, c1CountryCode, s3Key")
@@ -927,21 +932,21 @@ public class OutboundController
     {
       // Store in DB
       final OutboundSubmitResult aSubmitResult = OutboundOrchestrator.submitRawDocument ("[SubmitS3] ",
-                                                                               aSenderID,
-                                                                               aReceiverID,
-                                                                               aDocTypeID,
-                                                                               aProcessID,
-                                                                               sEffectiveSbdhInstanceID,
-                                                                               aRequest.getC1CountryCode (),
-                                                                               aIS,
-                                                                               aRequest.getMlsTo (),
-                                                                               aRequest.getSbdhStandard (),
-                                                                               aRequest.getSbdhTypeVersion (),
-                                                                               aRequest.getSbdhType (),
-                                                                               aRequest.getPayloadMimeType (),
-                                                                               aRequest.getCustom1 (),
-                                                                               aRequest.getCustom2 (),
-                                                                               aRequest.getCustom3 ());
+                                                                                         aSenderID,
+                                                                                         aReceiverID,
+                                                                                         aDocTypeID,
+                                                                                         aProcessID,
+                                                                                         sEffectiveSbdhInstanceID,
+                                                                                         aRequest.getC1CountryCode (),
+                                                                                         aIS,
+                                                                                         aRequest.getMlsTo (),
+                                                                                         aRequest.getSbdhStandard (),
+                                                                                         aRequest.getSbdhTypeVersion (),
+                                                                                         aRequest.getSbdhType (),
+                                                                                         aRequest.getPayloadMimeType (),
+                                                                                         aRequest.getCustom1 (),
+                                                                                         aRequest.getCustom2 (),
+                                                                                         aRequest.getCustom3 ());
       if (aSubmitResult.isFailure ())
       {
         return ResponseEntity.unprocessableContent ().body (_submitErrorJson (aSubmitResult));
@@ -993,7 +998,7 @@ public class OutboundController
                                                                              required = true,
                                                                              example = "550e8400-e29b-41d4-a716-446655440000") @PathVariable ("sbdhInstanceID") final String sSbdhInstanceID,
                                                                  @Parameter (description = "When true, the archive table is consulted if the transaction is not in the active table. Since 0.9.0.") @RequestParam (name = "includeArchive",
-                                                                                                                                                                                                                    defaultValue = "false") final boolean bIncludeArchive)
+                                                                                                                                                                                                                   defaultValue = "false") final boolean bIncludeArchive)
   {
     LOGGER.info ("Checking for status of transmission with ID '" +
                  sSbdhInstanceID +

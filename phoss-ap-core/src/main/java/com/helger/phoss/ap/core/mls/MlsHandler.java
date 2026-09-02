@@ -139,7 +139,8 @@ public final class MlsHandler
           // Be resilient - this must never influence the MLS sending
           LOGGER.error ("Internal error forwarding the copy of the MLS of outbound transaction '" +
                         aMlsTx.getID () +
-                        "'", ex);
+                        "'",
+                        ex);
           aSpan.recordException (ex);
         }
       }

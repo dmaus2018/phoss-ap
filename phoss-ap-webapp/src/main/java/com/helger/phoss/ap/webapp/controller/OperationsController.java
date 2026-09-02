@@ -53,14 +53,15 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
- * REST controller for operational tasks including transaction history querying,
- * payload retrieval, and manual inbound transaction replaying.
+ * REST controller for operational tasks including transaction history querying, payload retrieval,
+ * and manual inbound transaction replaying.
  *
  * @author Philip Helger
  */
 @RestController
 @RequestMapping ("/api/ops")
-@Tag (name = "Operations", description = "Operational APIs for transaction history auditing, payload inspection, and manual re-forwarding.")
+@Tag (name = "Operations",
+      description = "Operational APIs for transaction history auditing, payload inspection, and manual re-forwarding.")
 @SecurityRequirement (name = OpenApiConfig.SECURITY_SCHEME_NAME)
 public class OperationsController
 {
@@ -76,10 +77,13 @@ public class OperationsController
    * @return A paginated list of historical inbound transactions.
    */
   @GetMapping ("/inbound/history")
-  @Operation (summary = "Get historical inbound transactions", description = "Returns a paginated list of historical inbound transactions.")
+  @Operation (summary = "Get historical inbound transactions",
+              description = "Returns a paginated list of historical inbound transactions.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "List of transactions") })
-  public ResponseEntity <List <InboundTransactionResponse>> getInboundHistory (@RequestParam (name = "offset", defaultValue = "0") final int offset,
-                                                                               @RequestParam (name = "limit", defaultValue = "50") final int limit)
+  public ResponseEntity <List <InboundTransactionResponse>> getInboundHistory (@RequestParam (name = "offset",
+                                                                                              defaultValue = "0") final int offset,
+                                                                               @RequestParam (name = "limit",
+                                                                                              defaultValue = "50") final int limit)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final var aTxs = aTxMgr.getAllTransactions (offset, limit);
@@ -92,7 +96,8 @@ public class OperationsController
    * @return The count of active (non-archived) inbound transactions.
    */
   @GetMapping ("/inbound/size")
-  @Operation (summary = "Get total count of active inbound transactions", description = "Returns the count of active (non-archived) inbound transactions.")
+  @Operation (summary = "Get total count of active inbound transactions",
+              description = "Returns the count of active (non-archived) inbound transactions.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Transaction count") })
   public ResponseEntity <Long> getInboundSize ()
   {
@@ -108,10 +113,14 @@ public class OperationsController
    * @return The raw byte content of the document.
    */
   @GetMapping (value = "/inbound/{sbdhInstanceID}/payload", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-  @Operation (summary = "Get the payload of an inbound transaction", description = "Returns the raw byte content of the document.")
+  @Operation (summary = "Get the payload of an inbound transaction",
+              description = "Returns the raw byte content of the document.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Payload content"),
-                   @ApiResponse (responseCode = "404", description = "Transaction or payload not found", content = @Content) })
-  public ResponseEntity <byte []> getInboundPayload (@Parameter (description = "SBDH Instance ID", required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
+                   @ApiResponse (responseCode = "404",
+                                 description = "Transaction or payload not found",
+                                 content = @Content) })
+  public ResponseEntity <byte []> getInboundPayload (@Parameter (description = "SBDH Instance ID",
+                                                                 required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final IInboundTransaction aTx = aTxMgr.getBySbdhInstanceIDIncludingArchive (sbdhInstanceID);
@@ -142,7 +151,8 @@ public class OperationsController
               description = "Forces a re-forwarding of an existing inbound transaction.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Transaction replay initiated"),
                    @ApiResponse (responseCode = "404", description = "Transaction not found", content = @Content) })
-  public ResponseEntity <InboundTransactionResponse> replayInbound (@Parameter (description = "SBDH Instance ID", required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
+  public ResponseEntity <InboundTransactionResponse> replayInbound (@Parameter (description = "SBDH Instance ID",
+                                                                                required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final IInboundTransaction aTx = aTxMgr.getBySbdhInstanceIDIncludingArchive (sbdhInstanceID);
@@ -178,7 +188,8 @@ public class OperationsController
                    @ApiResponse (responseCode = "500",
                                  description = "Re-verification or forwarding failed",
                                  content = @Content) })
-  public ResponseEntity <InboundTransactionResponse> reverifyAndForwardInbound (@Parameter (description = "SBDH Instance ID", required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
+  public ResponseEntity <InboundTransactionResponse> reverifyAndForwardInbound (@Parameter (description = "SBDH Instance ID",
+                                                                                            required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
   {
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     // Deliberately not looking into the archive - an archived transaction is done
@@ -220,10 +231,13 @@ public class OperationsController
    * @return A paginated list of historical outbound transactions.
    */
   @GetMapping ("/outbound/history")
-  @Operation (summary = "Get historical outbound transactions", description = "Returns a paginated list of historical outbound transactions.")
+  @Operation (summary = "Get historical outbound transactions",
+              description = "Returns a paginated list of historical outbound transactions.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "List of transactions") })
-  public ResponseEntity <List <OutboundTransactionResponse>> getOutboundHistory (@RequestParam (name = "offset", defaultValue = "0") final int offset,
-                                                                                 @RequestParam (name = "limit", defaultValue = "50") final int limit)
+  public ResponseEntity <List <OutboundTransactionResponse>> getOutboundHistory (@RequestParam (name = "offset",
+                                                                                                defaultValue = "0") final int offset,
+                                                                                 @RequestParam (name = "limit",
+                                                                                                defaultValue = "50") final int limit)
   {
     final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
     final var aTxs = aTxMgr.getAllTransactions (offset, limit);
@@ -236,7 +250,8 @@ public class OperationsController
    * @return The count of active (non-archived) outbound transactions.
    */
   @GetMapping ("/outbound/size")
-  @Operation (summary = "Get total count of active outbound transactions", description = "Returns the count of active (non-archived) outbound transactions.")
+  @Operation (summary = "Get total count of active outbound transactions",
+              description = "Returns the count of active (non-archived) outbound transactions.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Transaction count") })
   public ResponseEntity <Long> getOutboundSize ()
   {
@@ -252,10 +267,14 @@ public class OperationsController
    * @return The raw byte content of the document.
    */
   @GetMapping (value = "/outbound/{sbdhInstanceID}/payload", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-  @Operation (summary = "Get the payload of an outbound transaction", description = "Returns the raw byte content of the document.")
+  @Operation (summary = "Get the payload of an outbound transaction",
+              description = "Returns the raw byte content of the document.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "Payload content"),
-                   @ApiResponse (responseCode = "404", description = "Transaction or payload not found", content = @Content) })
-  public ResponseEntity <byte []> getOutboundPayload (@Parameter (description = "SBDH Instance ID", required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
+                   @ApiResponse (responseCode = "404",
+                                 description = "Transaction or payload not found",
+                                 content = @Content) })
+  public ResponseEntity <byte []> getOutboundPayload (@Parameter (description = "SBDH Instance ID",
+                                                                  required = true) @PathVariable ("sbdhInstanceID") final String sbdhInstanceID)
   {
     final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
     final IOutboundTransaction aTx = aTxMgr.getBySbdhInstanceIDIncludingArchive (sbdhInstanceID);

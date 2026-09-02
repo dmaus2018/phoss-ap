@@ -78,8 +78,8 @@ public class HttpDocumentForwarder implements IDocumentForwarder
    * deliberately far below the 8 KB that most HTTP servers accept for all headers together, because
    * the remaining headers need their share as well.
    * <p>
-   * Replace this with <code>CHttpHeader.MAX_HEADER_VALUE_LENGTH</code>, as soon as ph-commons 12.4.1
-   * is released and referenced here.
+   * Replace this with <code>CHttpHeader.MAX_HEADER_VALUE_LENGTH</code>, as soon as ph-commons
+   * 12.4.1 is released and referenced here.
    * </p>
    *
    * @since 0.12.0
