@@ -176,7 +176,7 @@ public final class APCoreMetaManagerIDUniquenessTest
   public void testUniqueForwarderProviderIDsAreAccepted ()
   {
     APCoreMetaManager.checkForwarderProviderIDsAreUnique (new CommonsArrayList <> (new MockForwarderProvider ("a"),
-                                                                                    new OtherForwarderProvider ("b")));
+                                                                                   new OtherForwarderProvider ("b")));
     APCoreMetaManager.checkForwarderProviderIDsAreUnique (new CommonsArrayList <> ());
   }
 
@@ -186,7 +186,7 @@ public final class APCoreMetaManagerIDUniquenessTest
     try
     {
       APCoreMetaManager.checkForwarderProviderIDsAreUnique (new CommonsArrayList <> (new MockForwarderProvider ("dup"),
-                                                                                      new OtherForwarderProvider ("dup")));
+                                                                                     new OtherForwarderProvider ("dup")));
       fail ("Two forwarder providers with the same ID must be rejected");
     }
     catch (final InitializationException ex)

@@ -98,9 +98,9 @@ public class FilesystemDocumentForwarder implements IDocumentForwarder
     m_eLayout = EForwardingFilesystemLayout.getFromIDOrDefault (sLayout);
 
     m_aFilenamePattern = ForwardingFilenamePattern.createFilenameFromConfig (aConfig,
-                                                                            sKeyPrefix +
-                                                                                     SUFFIX_FILESYSTEM_FILENAME_PATTERN,
-                                                                            APConfigurationProperties.FORWARDING_FILESYSTEM_FILENAME_PATTERN_DEFAULT);
+                                                                             sKeyPrefix +
+                                                                                      SUFFIX_FILESYSTEM_FILENAME_PATTERN,
+                                                                             APConfigurationProperties.FORWARDING_FILESYSTEM_FILENAME_PATTERN_DEFAULT);
     if (m_aFilenamePattern == null)
       return ESuccess.FAILURE;
 

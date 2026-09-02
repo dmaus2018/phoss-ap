@@ -112,8 +112,8 @@ public interface IForwardableDocument
   OffsetDateTime timestamp ();
 
   /**
-   * @return An AP local unique identifier of this document, suitable as a file name component -
-   *         the phase4 Incoming ID for a received document, the transaction ID for a self-generated
+   * @return An AP local unique identifier of this document, suitable as a file name component - the
+   *         phase4 Incoming ID for a received document, the transaction ID for a self-generated
    *         one. Never <code>null</code>.
    */
   @NonNull

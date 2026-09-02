@@ -75,7 +75,7 @@ public final class ForwardingFilenamePatternTest
   private static String _resolveFilename (@NonNull final String sPattern)
   {
     return new ForwardingFilenamePattern (sPattern, false, ForwardingFilenamePattern.MAX_LENGTH_FILENAME)
-                                                                                                        .getResolvedBaseName (_doc ());
+                                                                                                         .getResolvedBaseName (_doc ());
   }
 
   @Test
@@ -173,7 +173,9 @@ public final class ForwardingFilenamePatternTest
   public void testCheckPatternSuccess ()
   {
     assertEquals (ESuccess.SUCCESS,
-                  ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "{receiver-value}_{datetime}_{incoming-id}", false));
+                  ForwardingFilenamePattern.checkPattern (CONFIG_KEY,
+                                                          "{receiver-value}_{datetime}_{incoming-id}",
+                                                          false));
     // No unique part - a warning is logged, but the pattern is accepted
     assertEquals (ESuccess.SUCCESS, ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "{receiver-value}", false));
     // A path separator is allowed in an object key only
@@ -185,12 +187,14 @@ public final class ForwardingFilenamePatternTest
   public void testCheckPatternFailure ()
   {
     // Typo in a placeholder name
-    assertEquals (ESuccess.FAILURE, ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "{datetime}_{reciever-id}", false));
+    assertEquals (ESuccess.FAILURE,
+                  ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "{datetime}_{reciever-id}", false));
     // Empty pattern
     assertEquals (ESuccess.FAILURE, ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "", false));
     assertEquals (ESuccess.FAILURE, ForwardingFilenamePattern.checkPattern (CONFIG_KEY, null, false));
     // Unbalanced braces
-    assertEquals (ESuccess.FAILURE, ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "{datetime_{incoming-id}", false));
+    assertEquals (ESuccess.FAILURE,
+                  ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "{datetime_{incoming-id}", false));
     // Subdirectories are not supported in a filename
     assertEquals (ESuccess.FAILURE,
                   ForwardingFilenamePattern.checkPattern (CONFIG_KEY, "{receiver-value}/{datetime}", false));
@@ -206,8 +210,7 @@ public final class ForwardingFilenamePatternTest
     {
       assertTrue ("Duplicate ID " + ePlaceholder.getID (), aIDs.add (ePlaceholder.getID ()));
       assertSame (ePlaceholder, EForwardingFilenamePlaceholder.getFromIDOrNull (ePlaceholder.getID ()));
-      assertTrue ("No value for " + ePlaceholder.getID (),
-                  StringHelper.isNotEmpty (ePlaceholder.getValue (_doc ())));
+      assertTrue ("No value for " + ePlaceholder.getID (), StringHelper.isNotEmpty (ePlaceholder.getValue (_doc ())));
     }
     assertEquals (9, aIDs.size ());
   }

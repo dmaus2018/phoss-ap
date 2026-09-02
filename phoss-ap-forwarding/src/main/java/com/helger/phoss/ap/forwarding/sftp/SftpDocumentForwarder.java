@@ -89,8 +89,7 @@ public class SftpDocumentForwarder implements IDocumentForwarder
     m_bWriteMetadata = aConfig.getAsBoolean (sKeyPrefix + SUFFIX_SFTP_WRITE_METADATA,
                                              APConfigurationProperties.FORWARDING_SFTP_WRITE_METADATA_DEFAULT);
     m_aFilenamePattern = ForwardingFilenamePattern.createFilenameFromConfig (aConfig,
-                                                                             sKeyPrefix +
-                                                                                      SUFFIX_SFTP_FILENAME_PATTERN,
+                                                                             sKeyPrefix + SUFFIX_SFTP_FILENAME_PATTERN,
                                                                              APConfigurationProperties.FORWARDING_SFTP_FILENAME_PATTERN_DEFAULT);
     if (m_aFilenamePattern == null)
       return ESuccess.FAILURE;

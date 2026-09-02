@@ -121,9 +121,8 @@ public class S3DocumentForwarder implements IDocumentForwarder
 
     // Contrary to a filename, an object key may span "directories"
     m_aFilenamePattern = ForwardingFilenamePattern.createObjectKeyFromConfig (aConfig,
-                                                                             sKeyPrefix +
-                                                                                      SUFFIX_S3_FILENAME_PATTERN,
-                                                                             APConfigurationProperties.FORWARDING_S3_FILENAME_PATTERN_DEFAULT);
+                                                                              sKeyPrefix + SUFFIX_S3_FILENAME_PATTERN,
+                                                                              APConfigurationProperties.FORWARDING_S3_FILENAME_PATTERN_DEFAULT);
     if (m_aFilenamePattern == null)
       return ESuccess.FAILURE;
 
@@ -197,8 +196,7 @@ public class S3DocumentForwarder implements IDocumentForwarder
                                                          .build ();
 
         final var aResult = aS3Client.putObject (aPutReq,
-                                                 RequestBody.fromInputStream (aDocumentIS,
-                                                                              aDocument.documentSize ()));
+                                                 RequestBody.fromInputStream (aDocumentIS, aDocument.documentSize ()));
         if (!aResult.sdkHttpResponse ().isSuccessful ())
         {
           LOGGER.error ("Failed to uploaded transaction '" +
@@ -228,12 +226,7 @@ public class S3DocumentForwarder implements IDocumentForwarder
     }
     catch (final Exception ex)
     {
-      LOGGER.error ("S3 forwarding failed for transaction '" +
-                    aDocument.id () +
-                    "' to bucket '" +
-                    m_sBucket +
-                    "'",
-                    ex);
+      LOGGER.error ("S3 forwarding failed for transaction '" + aDocument.id () + "' to bucket '" + m_sBucket + "'", ex);
       return ForwardingResult.failure ("s3_error", ex.getMessage () + " (" + ex.getClass ().getName () + ")");
     }
   }

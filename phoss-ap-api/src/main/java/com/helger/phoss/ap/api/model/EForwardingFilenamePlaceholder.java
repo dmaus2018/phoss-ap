@@ -28,13 +28,13 @@ import com.helger.base.id.IHasID;
 import com.helger.base.lang.EnumHelper;
 
 /**
- * A single placeholder of a {@link ForwardingFilenamePattern}, together with the value it takes from
- * the document to be forwarded. The ID is the name as it is written in the pattern, without the
- * surrounding braces - so the ID of <code>{datetime}</code> is <code>datetime</code>.
+ * A single placeholder of a {@link ForwardingFilenamePattern}, together with the value it takes
+ * from the document to be forwarded. The ID is the name as it is written in the pattern, without
+ * the surrounding braces - so the ID of <code>{datetime}</code> is <code>datetime</code>.
  * <p>
- * This enum is deliberately in the <code>model</code> package and not in the
- * <code>codelist</code> package: its value provider operates on an {@link IForwardableDocument},
- * and the code lists must not depend on the model.
+ * This enum is deliberately in the <code>model</code> package and not in the <code>codelist</code>
+ * package: its value provider operates on an {@link IForwardableDocument}, and the code lists must
+ * not depend on the model.
  * </p>
  *
  * @author Philip Helger
