@@ -1424,6 +1424,15 @@ public final class InboundOrchestrator
                               "'");
               }
             }
+            else
+              if (APPeppolReportingHelper.isExcludedFromReporting (aInboundTx.getSenderID (),
+                                                                   aInboundTx.getReceiverID ()))
+              {
+                // A transaction that is not counted anyway needs no C4 country code - close the
+                // reporting status, so that it is neither queried via the API nor blocks the
+                // archival
+                APPeppolReportingHelper.createInboundPeppolReportingItem (aInboundTx.getID ());
+              }
 
             // Fire-and-forget dispatch to all configured secondary forwarders. Failures are logged
             // only - no retry, no SLA, no effect on the inbound transaction status.

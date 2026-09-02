@@ -35,6 +35,7 @@ import com.helger.collection.commons.ICommonsOrderedSet;
 import com.helger.config.fallback.IConfigWithFallback;
 import com.helger.peppol.apsupport.BusinessCardCache;
 import com.helger.peppol.servicedomain.EPeppolNetwork;
+import com.helger.peppolid.IParticipantIdentifier;
 import com.helger.phoss.ap.api.codelist.EC4CountryCodeMode;
 import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.config.APConfigProvider;
@@ -50,6 +51,7 @@ import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
 import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.core.forwarding.DocumentForwarderFactory;
 import com.helger.phoss.ap.core.notification.LifecycleEventManager;
+import com.helger.phoss.ap.core.reporting.APPeppolReportingHelper;
 import com.helger.phoss.ap.core.notification.NotificationHandlerManager;
 import com.helger.smpclient.httpclient.SMPHttpClientSettings;
 
@@ -189,6 +191,17 @@ public final class APCoreMetaManager
       }
       if (aModes.isNotEmpty ())
         LOGGER.info ("C4 country code determination modes: " + aModes);
+    }
+
+    // Log the effective Peppol Reporting exclusions, so that configuration errors are visible on
+    // startup and not only when the first matching transaction is handled
+    {
+      final ICommonsList <IParticipantIdentifier> aExcludedPIDs = APPeppolReportingHelper.getAllExcludedParticipantIDs ();
+      if (aExcludedPIDs.isNotEmpty ())
+        LOGGER.info ("Excluding " +
+                     aExcludedPIDs.size () +
+                     " participant ID(s) from Peppol Reporting: " +
+                     aExcludedPIDs.getAllMapped (IParticipantIdentifier::getURIEncoded));
     }
 
     for (final IInboundDocumentVerifierSPI aVerifier : ServiceLoader.load (IInboundDocumentVerifierSPI.class))

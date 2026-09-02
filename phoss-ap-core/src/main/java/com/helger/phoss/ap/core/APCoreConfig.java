@@ -973,4 +973,27 @@ public final class APCoreConfig
     return _getConfig ().getAsInt (APConfigurationProperties.PEPPOL_REPORTING_SCHEDULE_MINUTE,
                                    APConfigurationProperties.PEPPOL_REPORTING_SCHEDULE_MINUTE_DEFAULT);
   }
+
+  /**
+   * @return The configured participant identifiers that are excluded from Peppol Reporting, in the
+   *         notation used in the configuration file. The values are neither parsed nor validated
+   *         here. May be empty but never <code>null</code>.
+   * @since 0.13.0
+   */
+  @NonNull
+  public static ICommonsOrderedSet <String> getPeppolReportingExcludedParticipantIDs ()
+  {
+    final String sVal = _getConfig ().getAsString (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS);
+    final ICommonsOrderedSet <String> ret = new CommonsLinkedHashSet <> ();
+    if (StringHelper.isNotEmpty (sVal))
+    {
+      for (final String sPart : StringHelper.getExploded (',', sVal))
+      {
+        final String sTrimmed = sPart.trim ();
+        if (StringHelper.isNotEmpty (sTrimmed))
+          ret.add (sTrimmed);
+      }
+    }
+    return ret;
+  }
 }

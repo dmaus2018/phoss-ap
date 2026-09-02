@@ -475,7 +475,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
-                                                                      " WHERE status IN (?,?,?) AND reporting_status=?" +
+                                                                      " WHERE status IN (?,?,?) AND reporting_status IN (?,?)" +
                                                                       " ORDER BY completed_dt" +
                                                                       " LIMIT " +
                                                                       nBatchSize +
@@ -483,7 +483,8 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       new ConstantPreparedStatementDataProvider (EInboundStatus.REJECTED.getID (),
                                                                                                                  EInboundStatus.FORWARDED.getID (),
                                                                                                                  EInboundStatus.PERMANENTLY_FAILED.getID (),
-                                                                                                                 EReportingStatus.REPORTED.getID ()));
+                                                                                                                 EReportingStatus.REPORTED.getID (),
+                                                                                                                 EReportingStatus.EXCLUDED.getID ()));
     final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)

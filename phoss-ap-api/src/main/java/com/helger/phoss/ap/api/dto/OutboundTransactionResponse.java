@@ -69,7 +69,8 @@ public class OutboundTransactionResponse
            nullable = true)
   private String completedDT;
 
-  @Schema (description = "Whether Peppol Reporting has been triggered", allowableValues = { "pending", "reported" })
+  @Schema (description = "Whether Peppol Reporting has been triggered",
+           allowableValues = { "pending", "reported", "excluded" })
   private String reportingStatus;
 
   @Schema (description = "Planned date/time of the next sending retry; null unless status is failed", nullable = true)
