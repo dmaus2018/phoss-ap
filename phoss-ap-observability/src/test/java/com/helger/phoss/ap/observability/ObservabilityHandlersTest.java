@@ -29,6 +29,9 @@ import org.junit.Test;
 
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
 import com.helger.phoss.ap.api.codelist.EMlsReceptionStatus;
+import com.helger.phoss.ap.api.codelist.EVerificationResult;
+import com.helger.phoss.ap.api.model.MlsOutcome;
+import com.helger.phoss.ap.api.model.MlsOutcomeIssue;
 import com.helger.phoss.ap.api.model.VerificationIssue;
 import com.helger.phoss.ap.api.model.VerificationOutcome;
 import com.helger.phoss.ap.api.model.VerifierResult;
@@ -65,14 +68,16 @@ public final class ObservabilityHandlersTest
     final APNotificationHandlerObservability aHandler = new APNotificationHandlerObservability ();
 
     aHandler.onInboundReceiverNotServiced ("sender-1", "receiver-1", "doc-1", "proc-1", "sbdh-1");
-    aHandler.onInboundVerificationRejection ("tx-1", "sbdh-1", "Schematron rule failed");
-    aHandler.onInboundVerificationRejection ("tx-1", "sbdh-1", null);
+    final MlsOutcome aOutcome = MlsOutcome.rejection ("Schematron rule failed",
+                                                     MlsOutcomeIssue.businessRuleViolation ("XPath", "Schematron rule failed"));
+    aHandler.onInboundVerificationRejection ("tx-1", "sbdh-1", "Schematron rule failed", aOutcome);
+    aHandler.onInboundVerificationRejection ("tx-1", "sbdh-1", null, aOutcome);
 
     aHandler.onInboundVerificationDeferred ("tx-1", "sbdh-1", "phorm", OffsetDateTime.now (), "timeout");
     aHandler.onInboundVerificationDeferred ("tx-1", "sbdh-1", "phorm", OffsetDateTime.now (), null);
 
     final VerificationIssue aIssue = VerificationIssue.businessRuleViolation ("ERR-01", "/Invoice/cbc:ID", "Rule failed");
-    final VerifierResult aVR = new VerifierResult (VerificationOutcome.rejected ("Failed rule", List.of (aIssue)), "phorm");
+    final VerifierResult aVR = new VerifierResult ("phorm", "phorm", VerificationOutcome.rejected ("Failed rule", List.of (aIssue)));
     aHandler.onOutboundVerificationRejection ("sbdh-1", aVR);
 
     aHandler.onInboundDuplicateRejected ("sender-1", "receiver-1", "doc-1", "proc-1", "POP000306", "as4-1", "sbdh-1", true, false, "Duplicate AS4");
@@ -108,8 +113,8 @@ public final class ObservabilityHandlersTest
     aHandler.onInboundMLSCorrelated ("tx-mls-1", "sbdh-ref-1", "tx-orig-1", EPeppolMLSResponseCode.ACCEPTANCE, EMlsReceptionStatus.RECEIVED_AP, "doc-id-1", OffsetDateTime.now (), Duration.ofSeconds (5));
     aHandler.onInboundMLSCorrelated ("tx-mls-1", "sbdh-ref-1", "tx-orig-1", EPeppolMLSResponseCode.ACCEPTANCE, EMlsReceptionStatus.RECEIVED_AP, null, OffsetDateTime.now (), null);
 
-    aHandler.onInboundDocumentForwarded ("tx-1", "sbdh-1", Duration.ofMillis (1200), false);
-    aHandler.onInboundDocumentForwarded ("tx-1", "sbdh-1", null, true);
+    aHandler.onInboundDocumentForwarded ("tx-1", "sbdh-1", Duration.ofMillis (1200), false, EVerificationResult.PASSED);
+    aHandler.onInboundDocumentForwarded ("tx-1", "sbdh-1", null, true, null);
 
     aHandler.onOutboundDocumentAccepted ("tx-1", "sender-1", "receiver-1", "doc-1", "proc-1", "sbdh-1");
 

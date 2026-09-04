@@ -27,6 +27,7 @@ import com.helger.base.enforce.ValueEnforcer;
 import com.helger.collection.commons.CommonsLinkedHashMap;
 import com.helger.collection.commons.ICommonsOrderedMap;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
+import com.helger.phoss.ap.api.model.MlsOutcome;
 import com.helger.phoss.ap.api.model.VerifierResult;
 import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
 
@@ -79,15 +80,20 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   /** {@inheritDoc} */
   public void onInboundVerificationRejection (@NonNull final String sTransactionID,
                                               @NonNull final String sSbdhInstanceID,
-                                              @Nullable final String sErrorDetails)
+                                              @Nullable final String sErrorDetails,
+                                              @NonNull final MlsOutcome aMlsOutcome)
   {
     _logError ("onInboundVerificationRejection",
                _params ("transactionID",
-                       sTransactionID,
-                       "sbdhInstanceID",
-                       sSbdhInstanceID,
-                       "errorDetails",
-                       sErrorDetails));
+                        sTransactionID,
+                        "sbdhInstanceID",
+                        sSbdhInstanceID,
+                        "errorDetails",
+                        sErrorDetails,
+                        "mlsResponseCode",
+                        aMlsOutcome.getResponseCodeID (),
+                        "issueCount",
+                        Integer.toString (aMlsOutcome.getIssues ().size ())));
   }
 
   /** {@inheritDoc} */
@@ -100,15 +106,15 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
     // Deliberately a warning - the document is not lost, but the verifier needs attention
     _logWarn ("onInboundVerificationDeferred",
               _params ("transactionID",
-                      sTransactionID,
-                      "sbdhInstanceID",
-                      sSbdhInstanceID,
-                      "verifierName",
-                      sVerifierName,
-                      "nextRetryDT",
-                      aNextRetryDT,
-                      "errorDetails",
-                      sErrorDetails));
+                       sTransactionID,
+                       "sbdhInstanceID",
+                       sSbdhInstanceID,
+                       "verifierName",
+                       sVerifierName,
+                       "nextRetryDT",
+                       aNextRetryDT,
+                       "errorDetails",
+                       sErrorDetails));
   }
 
   /** {@inheritDoc} */
@@ -117,13 +123,13 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   {
     _logError ("onOutboundVerificationRejection",
                _params ("sbdhInstanceID",
-                       sSbdhInstanceID,
-                       "verifierName",
-                       aVerifierResult.verifierName (),
-                       "errorDetails",
-                       aVerifierResult.outcome ().getMessage (),
-                       "issueCount",
-                       Integer.toString (aVerifierResult.outcome ().getAllIssues ().size ())));
+                        sSbdhInstanceID,
+                        "verifierName",
+                        aVerifierResult.verifierName (),
+                        "errorDetails",
+                        aVerifierResult.outcome ().getMessage (),
+                        "issueCount",
+                        Integer.toString (aVerifierResult.outcome ().getAllIssues ().size ())));
   }
 
   /** {@inheritDoc} */
@@ -133,11 +139,11 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   {
     _logError ("onPermanentSendingFailure",
                _params ("transactionID",
-                       sTransactionID,
-                       "sbdhInstanceID",
-                       sSbdhInstanceID,
-                       "errorDetails",
-                       sErrorDetails));
+                        sTransactionID,
+                        "sbdhInstanceID",
+                        sSbdhInstanceID,
+                        "errorDetails",
+                        sErrorDetails));
   }
 
   /** {@inheritDoc} */
@@ -149,15 +155,15 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   {
     _logError ("onInboundReceiverNotServiced",
                _params ("senderID",
-                       sSenderID,
-                       "receiverID",
-                       sReceiverID,
-                       "docTypeID",
-                       sDocTypeID,
-                       "processID",
-                       sProcessID,
-                       "sbdhInstanceID",
-                       sSbdhInstanceID));
+                        sSenderID,
+                        "receiverID",
+                        sReceiverID,
+                        "docTypeID",
+                        sDocTypeID,
+                        "processID",
+                        sProcessID,
+                        "sbdhInstanceID",
+                        sSbdhInstanceID));
   }
 
   /** {@inheritDoc} */
@@ -167,11 +173,11 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   {
     _logError ("onPermanentForwardingFailure",
                _params ("transactionID",
-                       sTransactionID,
-                       "sbdhInstanceID",
-                       sSbdhInstanceID,
-                       "errorDetails",
-                       sErrorDetails));
+                        sTransactionID,
+                        "sbdhInstanceID",
+                        sSbdhInstanceID,
+                        "errorDetails",
+                        sErrorDetails));
   }
 
   /** {@inheritDoc} */
@@ -188,25 +194,25 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   {
     _logError ("onInboundDuplicateRejected",
                _params ("senderID",
-                       sSenderID,
-                       "receiverID",
-                       sReceiverID,
-                       "docTypeID",
-                       sDocTypeID,
-                       "processID",
-                       sProcessID,
-                       "senderProviderID",
-                       sSenderProviderID,
-                       "AS4MessageID",
-                       sAS4MessageID,
-                       "sbdhInstanceID",
-                       sSbdhInstanceID,
-                       "isDuplicateAS4",
-                       Boolean.valueOf (bIsDuplicateAS4),
-                       "isDuplicateSBDH",
-                       Boolean.valueOf (bIsDuplicateSBDH),
-                       "errorDetails",
-                       sErrorDetails));
+                        sSenderID,
+                        "receiverID",
+                        sReceiverID,
+                        "docTypeID",
+                        sDocTypeID,
+                        "processID",
+                        sProcessID,
+                        "senderProviderID",
+                        sSenderProviderID,
+                        "AS4MessageID",
+                        sAS4MessageID,
+                        "sbdhInstanceID",
+                        sSbdhInstanceID,
+                        "isDuplicateAS4",
+                        Boolean.valueOf (bIsDuplicateAS4),
+                        "isDuplicateSBDH",
+                        Boolean.valueOf (bIsDuplicateSBDH),
+                        "errorDetails",
+                        sErrorDetails));
   }
 
   /** {@inheritDoc} */
@@ -216,11 +222,11 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   {
     _logError ("onInboundMLSCorrelationError",
                _params ("transactionID",
-                       sTransactionID,
-                       "referencedSbdhInstanceID",
-                       sReferencedSbdhInstanceID,
-                       "mlsResponseCode",
-                       eMlsResponseCode.getID ()));
+                        sTransactionID,
+                        "referencedSbdhInstanceID",
+                        sReferencedSbdhInstanceID,
+                        "mlsResponseCode",
+                        eMlsResponseCode.getID ()));
   }
 
   /** {@inheritDoc} */
@@ -231,13 +237,13 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   {
     _logError ("onSpecialMlsToNotReachable",
                _params ("outboundTransactionID",
-                       sOutboundTransactionID,
-                       "referencedSbdhInstanceID",
-                       sReferencedSbdhInstanceID,
-                       "attemptedMlsToParticipantID",
-                       sAttemptedMlsToParticipantID,
-                       "fallbackDefaultSpidParticipantID",
-                       sFallbackDefaultSpidParticipantID));
+                        sOutboundTransactionID,
+                        "referencedSbdhInstanceID",
+                        sReferencedSbdhInstanceID,
+                        "attemptedMlsToParticipantID",
+                        sAttemptedMlsToParticipantID,
+                        "fallbackDefaultSpidParticipantID",
+                        sFallbackDefaultSpidParticipantID));
   }
 
   /** {@inheritDoc} */
@@ -252,9 +258,9 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   {
     _logError ("onPeppolReportingTSRFailure",
                _params ("year",
-                       Integer.valueOf (aYearMonth.getYear ()),
-                       "month",
-                       Integer.valueOf (aYearMonth.getMonthValue ())));
+                        Integer.valueOf (aYearMonth.getYear ()),
+                        "month",
+                        Integer.valueOf (aYearMonth.getMonthValue ())));
   }
 
   /** {@inheritDoc} */
@@ -262,9 +268,9 @@ public class APNotificationHandlerSentry implements IAPNotificationHandlerSPI
   {
     _logError ("onPeppolReportingEUSRFailure",
                _params ("year",
-                       Integer.valueOf (aYearMonth.getYear ()),
-                       "month",
-                       Integer.valueOf (aYearMonth.getMonthValue ())));
+                        Integer.valueOf (aYearMonth.getYear ()),
+                        "month",
+                        Integer.valueOf (aYearMonth.getMonthValue ())));
   }
 
   /** {@inheritDoc} */

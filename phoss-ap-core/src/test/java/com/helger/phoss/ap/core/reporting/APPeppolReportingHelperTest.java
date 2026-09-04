@@ -17,11 +17,22 @@
 package com.helger.phoss.ap.core.reporting;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
+import org.junit.Rule;
 import org.junit.Test;
 
+import com.helger.collection.commons.CommonsArrayList;
+import com.helger.config.ConfigFactory;
+import com.helger.config.fallback.ConfigWithFallback;
+import com.helger.config.fallback.IConfigWithFallback;
+import com.helger.peppolid.IParticipantIdentifier;
 import com.helger.peppolid.factory.IIdentifierFactory;
 import com.helger.peppolid.factory.PeppolIdentifierFactory;
+import com.helger.phoss.ap.api.config.APConfigProvider;
+import com.helger.phoss.ap.api.config.APConfigurationProperties;
+import com.helger.scope.mock.ScopeTestRule;
 
 /**
  * Test class for {@link APPeppolReportingHelper}.
@@ -31,6 +42,18 @@ import com.helger.peppolid.factory.PeppolIdentifierFactory;
 public final class APPeppolReportingHelperTest
 {
   private static final IIdentifierFactory IF = PeppolIdentifierFactory.INSTANCE;
+
+  @Rule
+  public final ScopeTestRule m_aRule = new ScopeTestRule ();
+
+  private static void _setExcludedParticipantIDs (final String sValue)
+  {
+    if (sValue == null)
+      System.clearProperty (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS);
+    else
+      System.setProperty (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS, sValue);
+    APConfigProvider.setConfig (new ConfigWithFallback (ConfigFactory.createDefaultValueProvider ()));
+  }
 
   @Test
   public void testGetEffectiveEndUserIDUnified ()
@@ -57,5 +80,68 @@ public final class APPeppolReportingHelperTest
     // Finnish OVT identifier is mapped to the Finnish OVT code
     assertEquals ("iso6523-actorid-upis::0216:00371234567800001",
                   APPeppolReportingHelper.getEffectiveEndUserID (IF.createParticipantIdentifierWithDefaultScheme ("0037:1234567800001")));
+  }
+
+  @Test
+  public void testGetAllExcludedParticipantIDs ()
+  {
+    final IConfigWithFallback aOldConfig = APConfigProvider.getConfig ();
+    final String sOldValue = System.getProperty (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS);
+    try
+    {
+      // Nothing configured
+      _setExcludedParticipantIDs (null);
+      assertTrue (APPeppolReportingHelper.getAllExcludedParticipantIDs ().isEmpty ());
+
+      // Both the URI encoded and the default scheme notation are supported, invalid values are
+      // silently ignored
+      _setExcludedParticipantIDs ("iso6523-actorid-upis::9915:test,0088:1234567890128,not-a-participant-id");
+      assertEquals (new CommonsArrayList <> (IF.createParticipantIdentifierWithDefaultScheme ("9915:test"),
+                                             IF.createParticipantIdentifierWithDefaultScheme ("0088:1234567890128")),
+                    APPeppolReportingHelper.getAllExcludedParticipantIDs ());
+    }
+    finally
+    {
+      _setExcludedParticipantIDs (sOldValue);
+      APConfigProvider.setConfig (aOldConfig);
+    }
+  }
+
+  @Test
+  public void testIsExcludedFromReporting ()
+  {
+    final IConfigWithFallback aOldConfig = APConfigProvider.getConfig ();
+    final String sOldValue = System.getProperty (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS);
+    try
+    {
+      final IParticipantIdentifier aOther = IF.createParticipantIdentifierWithDefaultScheme ("0088:1234567890128");
+
+      // Nothing configured - nothing is excluded
+      _setExcludedParticipantIDs (null);
+      assertFalse (APPeppolReportingHelper.isExcludedFromReporting ("iso6523-actorid-upis::9915:test",
+                                                                    aOther.getURIEncoded ()));
+
+      _setExcludedParticipantIDs ("9915:test");
+      // Excluded as the sender as well as as the receiver
+      assertTrue (APPeppolReportingHelper.isExcludedFromReporting ("iso6523-actorid-upis::9915:test",
+                                                                   aOther.getURIEncoded ()));
+      assertTrue (APPeppolReportingHelper.isExcludedFromReporting (aOther.getURIEncoded (),
+                                                                   "iso6523-actorid-upis::9915:test"));
+      // Participant identifier values are case insensitive
+      assertTrue (APPeppolReportingHelper.isExcludedFromReporting ("iso6523-actorid-upis::9915:TEST",
+                                                                   aOther.getURIEncoded ()));
+      // Neither side matches
+      assertFalse (APPeppolReportingHelper.isExcludedFromReporting (aOther.getURIEncoded (),
+                                                                    aOther.getURIEncoded ()));
+      assertFalse (APPeppolReportingHelper.isExcludedFromReporting (null, null));
+      // Different scheme, same value
+      assertFalse (APPeppolReportingHelper.isExcludedFromReporting ("iso6523-actorid-upis::9916:test",
+                                                                    aOther.getURIEncoded ()));
+    }
+    finally
+    {
+      _setExcludedParticipantIDs (sOldValue);
+      APConfigProvider.setConfig (aOldConfig);
+    }
   }
 }

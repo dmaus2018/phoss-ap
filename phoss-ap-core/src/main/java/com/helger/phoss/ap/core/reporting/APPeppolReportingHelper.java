@@ -16,14 +16,21 @@
  */
 package com.helger.phoss.ap.core.reporting;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonempty;
+import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.base.enforce.ValueEnforcer;
 import com.helger.base.state.ESuccess;
 import com.helger.base.string.StringHelper;
+import com.helger.collection.commons.CommonsArrayList;
+import com.helger.collection.commons.ICommonsList;
 import com.helger.peppol.reporting.api.PeppolReportingItem;
 import com.helger.peppol.reporting.api.backend.PeppolReportingBackend;
 import com.helger.peppolid.IDocumentTypeIdentifier;
@@ -35,7 +42,9 @@ import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EReportingStatus;
 import com.helger.phoss.ap.api.config.APConfigProvider;
+import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.basic.APBasicMetaManager;
+import com.helger.phoss.ap.core.APCoreConfig;
 import com.helger.phoss.ap.core.APCoreMetaManager;
 import com.helger.phoss.ap.db.APJdbcMetaManager;
 
@@ -47,9 +56,42 @@ import com.helger.phoss.ap.db.APJdbcMetaManager;
 public final class APPeppolReportingHelper
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (APPeppolReportingHelper.class);
+  // Remember the invalid configured participant IDs for which a warning was already logged, so it
+  // is emitted only once per value
+  private static final Set <String> WARNED_INVALID_PARTICIPANT_IDS = ConcurrentHashMap.newKeySet ();
 
   private APPeppolReportingHelper ()
   {}
+
+  /**
+   * Check if a transaction with the provided sender and receiver participant identifier is excluded
+   * from Peppol Reporting or not. Both sides are checked, independent of the direction, so that
+   * e.g. synthetic monitoring transactions are consistently ignored for sending and receiving.
+   *
+   * @param sSenderID
+   *        The URI encoded sender (C1) participant identifier of the transaction. May be
+   *        <code>null</code>.
+   * @param sReceiverID
+   *        The URI encoded receiver (C4) participant identifier of the transaction. May be
+   *        <code>null</code>.
+   * @return <code>true</code> if the transaction must not be counted for Peppol Reporting.
+   * @since 0.13.0
+   */
+  public static boolean isExcludedFromReporting (@Nullable final String sSenderID,
+                                                 @Nullable final String sReceiverID)
+  {
+    final ICommonsList <IParticipantIdentifier> aExcludedPIDs = getAllExcludedParticipantIDs ();
+    if (aExcludedPIDs.isEmpty ())
+    {
+      // Avoid the identifier parsing overhead in the default case
+      return false;
+    }
+
+    final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
+    final IParticipantIdentifier aSenderID = aIF.parseParticipantIdentifier (sSenderID);
+    final IParticipantIdentifier aReceiverID = aIF.parseParticipantIdentifier (sReceiverID);
+    return aExcludedPIDs.containsAny (x -> x.hasSameContent (aSenderID) || x.hasSameContent (aReceiverID));
+  }
 
   /**
    * Determine the End User ID to be used for Peppol Reporting from the provided participant
@@ -86,6 +128,44 @@ public final class APPeppolReportingHelper
   }
 
   /**
+   * Get all participant identifiers that are excluded from Peppol Reporting, based on the
+   * configuration property
+   * {@link APConfigurationProperties#PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS}. Configured values
+   * that cannot be parsed are logged once and ignored.
+   *
+   * @return The list of excluded participant identifiers. May be empty but never <code>null</code>.
+   * @since 0.13.0
+   */
+  @NonNull
+  @ReturnsMutableCopy
+  public static ICommonsList <IParticipantIdentifier> getAllExcludedParticipantIDs ()
+  {
+    final IIdentifierFactory aIF = APBasicMetaManager.getIdentifierFactory ();
+    final ICommonsList <IParticipantIdentifier> ret = new CommonsArrayList <> ();
+    for (final String sConfiguredPID : APCoreConfig.getPeppolReportingExcludedParticipantIDs ())
+    {
+      // Accept both the URI encoded notation "iso6523-actorid-upis::9915:test" and the notation
+      // using the default participant identifier scheme only - "9915:test"
+      IParticipantIdentifier aPID = aIF.parseParticipantIdentifier (sConfiguredPID);
+      if (aPID == null)
+        aPID = aIF.createParticipantIdentifierWithDefaultScheme (sConfiguredPID);
+
+      if (aPID == null)
+      {
+        if (WARNED_INVALID_PARTICIPANT_IDS.add (sConfiguredPID))
+          LOGGER.error ("The configuration key '" +
+                        APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS +
+                        "' contains the invalid participant identifier '" +
+                        sConfiguredPID +
+                        "' - it is ignored, so matching transactions are counted for Peppol Reporting");
+      }
+      else
+        ret.add (aPID);
+    }
+    return ret;
+  }
+
+  /**
    * Store a Peppol Reporting item for the given outbound transaction and update its reporting
    * status.
    *
@@ -109,10 +189,19 @@ public final class APPeppolReportingHelper
     try
     {
       // Re-read the transaction to get the latest data
-      if (!aTxMgr.containsTransactionWithID (sTransactionID))
+      final var aTx = aTxMgr.getByID (sTransactionID);
+      if (aTx == null)
         throw new IllegalArgumentException ("The provided outbound transaction ID '" +
                                             sTransactionID +
                                             "' does not exist");
+
+      if (isExcludedFromReporting (aTx.getSenderID (), aTx.getReceiverID ()))
+      {
+        LOGGER.info ("Skipping Peppol Reporting for outbound transaction '" +
+                     sTransactionID +
+                     "' (matches an excluded participant ID)");
+        return aTxMgr.updateReportingStatus (sTransactionID, EReportingStatus.EXCLUDED);
+      }
 
       PeppolReportingBackend.withBackendDo (APConfigProvider.getConfig (),
                                             aBackend -> aBackend.storeReportingItem (aReportingItem));
@@ -168,6 +257,14 @@ public final class APPeppolReportingHelper
                      sTransactionID +
                      "' was already counted for Peppol Reporting - not counting it again");
         return ESuccess.SUCCESS;
+      }
+
+      if (isExcludedFromReporting (aTx.getSenderID (), aTx.getReceiverID ()))
+      {
+        LOGGER.info ("Skipping Peppol Reporting for inbound transaction '" +
+                     sTransactionID +
+                     "' (matches an excluded participant ID)");
+        return aTxMgr.updateReportingStatus (sTransactionID, EReportingStatus.EXCLUDED);
       }
 
       if (StringHelper.isEmpty (aTx.getC4CountryCode ()))

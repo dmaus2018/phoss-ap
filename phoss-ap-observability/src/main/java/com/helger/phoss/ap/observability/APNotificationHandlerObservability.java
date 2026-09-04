@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.style.IsSPIImplementation;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
+import com.helger.phoss.ap.api.model.MlsOutcome;
 import com.helger.phoss.ap.api.model.VerifierResult;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
 import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
@@ -112,7 +113,8 @@ public class APNotificationHandlerObservability implements IAPNotificationHandle
 
   public void onInboundVerificationRejection (@NonNull final String sTransactionID,
                                               @NonNull final String sSbdhInstanceID,
-                                              @Nullable final String sErrorDetails)
+                                              @Nullable final String sErrorDetails,
+                                              @NonNull final MlsOutcome aMlsOutcome)
   {
     final String sMsg = "Inbound verification rejected" + (sErrorDetails != null ? ": " + sErrorDetails : "");
     final Attributes aAttrs = Attributes.of (AttributeKey.stringKey (CPhossAPOtel.ATTR_TRANSACTION_ID), sTransactionID,
@@ -123,6 +125,7 @@ public class APNotificationHandlerObservability implements IAPNotificationHandle
                                  .peppol ("direction", "INBOUND")
                                  .peppol ("transaction_id", sTransactionID)
                                  .peppol ("sbdh_instance_id", sSbdhInstanceID)
+                                 .peppol ("mls_response_code", aMlsOutcome.getResponseCodeID ())
                                  .error (sErrorDetails != null ? sErrorDetails : "Inbound verification rejected"));
   }
 

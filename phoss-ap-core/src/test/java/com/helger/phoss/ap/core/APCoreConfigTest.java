@@ -16,11 +16,13 @@
  */
 package com.helger.phoss.ap.core;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.helger.collection.commons.CommonsLinkedHashSet;
 import com.helger.config.ConfigFactory;
 import com.helger.config.fallback.ConfigWithFallback;
 import com.helger.config.fallback.IConfigWithFallback;
@@ -71,6 +73,37 @@ public final class APCoreConfigTest
         System.clearProperty (APConfigurationProperties.OUTBOUND_DEV_LOOPBACK_ENABLED);
       else
         System.setProperty (APConfigurationProperties.OUTBOUND_DEV_LOOPBACK_ENABLED, sOldFlag);
+
+      APConfigProvider.setConfig (aOldConfig);
+    }
+  }
+
+  @Test
+  public void testPeppolReportingExcludedParticipantIDs ()
+  {
+    final IConfigWithFallback aOldConfig = APConfigProvider.getConfig ();
+    final String sOldValue = System.getProperty (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS);
+
+    try
+    {
+      // Nothing configured
+      System.clearProperty (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS);
+      APConfigProvider.setConfig (new ConfigWithFallback (ConfigFactory.createDefaultValueProvider ()));
+      assertTrue (APCoreConfig.getPeppolReportingExcludedParticipantIDs ().isEmpty ());
+
+      // Surrounding whitespaces and empty parts are ignored
+      System.setProperty (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS,
+                          " iso6523-actorid-upis::9915:test , ,0088:1234567890128,");
+      APConfigProvider.setConfig (new ConfigWithFallback (ConfigFactory.createDefaultValueProvider ()));
+      assertEquals (new CommonsLinkedHashSet <> ("iso6523-actorid-upis::9915:test", "0088:1234567890128"),
+                    APCoreConfig.getPeppolReportingExcludedParticipantIDs ());
+    }
+    finally
+    {
+      if (sOldValue == null)
+        System.clearProperty (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS);
+      else
+        System.setProperty (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS, sOldValue);
 
       APConfigProvider.setConfig (aOldConfig);
     }

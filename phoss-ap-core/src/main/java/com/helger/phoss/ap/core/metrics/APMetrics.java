@@ -51,8 +51,8 @@ public final class APMetrics
                                                                                                   "Inbound documents that passed verification",
                                                                                                   "{document}");
   public static final ITelemetryCounter INBOUND_VERIFICATION_DEFERRED = TelemetryMetrics.counter (CPhossAPOtel.METRIC_INBOUND_VERIFICATION_DEFERRED,
-                                                                                                 "Inbound documents whose verification was deferred, because a verifier made no verdict",
-                                                                                                 "{document}");
+                                                                                                  "Inbound documents whose verification was deferred, because a verifier made no verdict",
+                                                                                                  "{document}");
   public static final ITelemetryCounter INBOUND_VERIFICATION_REJECTIONS = TelemetryMetrics.counter (CPhossAPOtel.METRIC_INBOUND_VERIFICATION_REJECTIONS,
                                                                                                     "Inbound transactions rejected by verification",
                                                                                                     "{transaction}");
@@ -68,6 +68,9 @@ public final class APMetrics
   public static final ITelemetryCounter INBOUND_FORWARDED = TelemetryMetrics.counter (CPhossAPOtel.METRIC_INBOUND_FORWARDED,
                                                                                       "Inbound documents successfully forwarded to the Receiver Backend",
                                                                                       "{transaction}");
+  public static final ITelemetryCounter INBOUND_VERIFICATION_REJECTIONS_FORWARDED = TelemetryMetrics.counter (CPhossAPOtel.METRIC_INBOUND_VERIFICATION_REJECTIONS_FORWARDED,
+                                                                                                              "Inbound documents that were forwarded to the Receiver Backend despite having been rejected by verification",
+                                                                                                              "{transaction}");
   public static final ITelemetryHistogram INBOUND_FORWARDING_DURATION = TelemetryMetrics.histogram (CPhossAPOtel.METRIC_INBOUND_FORWARDING_DURATION,
                                                                                                     "Wall-clock duration from inbound AS4 reception to successful forwarding",
                                                                                                     "s");
@@ -75,8 +78,8 @@ public final class APMetrics
                                                                                               "Inbound forwarding attempts that failed (transient or permanent)",
                                                                                               "{attempt}");
   public static final ITelemetryCounter INBOUND_FORWARDING_PERMANENT_FAILURES = TelemetryMetrics.counter (CPhossAPOtel.METRIC_INBOUND_FORWARDING_PERMANENT_FAILURES,
-                                                                                                         "Inbound transactions that exhausted all forwarding retries",
-                                                                                                         "{transaction}");
+                                                                                                          "Inbound transactions that exhausted all forwarding retries",
+                                                                                                          "{transaction}");
 
   // === Outbound ===
 
@@ -99,11 +102,11 @@ public final class APMetrics
                                                                                                   "Number of AS4 sending attempts before confirmed receipt",
                                                                                                   "{attempt}");
   public static final ITelemetryCounter OUTBOUND_SENDING_PERMANENT_FAILURES = TelemetryMetrics.counter (CPhossAPOtel.METRIC_OUTBOUND_SENDING_PERMANENT_FAILURES,
-                                                                                                       "Outbound transactions that exhausted all sending retries",
-                                                                                                       "{transaction}");
+                                                                                                        "Outbound transactions that exhausted all sending retries",
+                                                                                                        "{transaction}");
   public static final ITelemetryCounter OUTBOUND_MLS_SPECIAL_TO_NOT_REACHABLE = TelemetryMetrics.counter (CPhossAPOtel.METRIC_OUTBOUND_MLS_SPECIAL_TO_NOT_REACHABLE,
-                                                                                                         "Outbound MLS messages whose custom MLS_TO receiver was not reachable, triggering fallback to the default SPID",
-                                                                                                         "{message}");
+                                                                                                          "Outbound MLS messages whose custom MLS_TO receiver was not reachable, triggering fallback to the default SPID",
+                                                                                                          "{message}");
 
   // === Reporting ===
 

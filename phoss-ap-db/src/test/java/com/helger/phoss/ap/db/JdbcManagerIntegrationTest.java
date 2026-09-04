@@ -502,6 +502,22 @@ public final class JdbcManagerIntegrationTest
     assertTrue (aList.containsAny (x -> x.getID ().equals (sID)));
   }
 
+  @Test
+  public void testOutboundGetAllForArchivalExcludedFromReporting ()
+  {
+    final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final String sID = _createOutboundTx ();
+    assertNotNull (sID);
+
+    aMgr.updateStatusCompleted (sID, EOutboundStatus.SENT);
+    aMgr.updateReportingStatus (sID, EReportingStatus.EXCLUDED);
+
+    // Transactions excluded from Peppol Reporting must be archived as well
+    final ICommonsList <IOutboundTransaction> aList = aMgr.getAllForArchival (100);
+    assertNotNull (aList);
+    assertTrue (aList.containsAny (x -> x.getID ().equals (sID)));
+  }
+
   // --- InboundTransactionManager ---
 
   private static String _createInboundTx ()
@@ -947,6 +963,22 @@ public final class JdbcManagerIntegrationTest
     aMgr.updateStatusCompleted (sID, EInboundStatus.FORWARDED);
     aMgr.updateReportingStatus (sID, EReportingStatus.REPORTED);
 
+    final ICommonsList <IInboundTransaction> aList = aMgr.getAllForArchival (100);
+    assertNotNull (aList);
+    assertTrue (aList.containsAny (x -> x.getID ().equals (sID)));
+  }
+
+  @Test
+  public void testInboundGetAllForArchivalExcludedFromReporting ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+    assertNotNull (sID);
+
+    aMgr.updateStatusCompleted (sID, EInboundStatus.FORWARDED);
+    aMgr.updateReportingStatus (sID, EReportingStatus.EXCLUDED);
+
+    // Transactions excluded from Peppol Reporting must be archived as well
     final ICommonsList <IInboundTransaction> aList = aMgr.getAllForArchival (100);
     assertNotNull (aList);
     assertTrue (aList.containsAny (x -> x.getID ().equals (sID)));

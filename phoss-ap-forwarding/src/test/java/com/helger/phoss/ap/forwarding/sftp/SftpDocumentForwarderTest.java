@@ -17,191 +17,91 @@
 package com.helger.phoss.ap.forwarding.sftp;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import static org.junit.Assert.assertFalse;
 
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.junit.Test;
 
+import com.helger.base.state.ESuccess;
+import com.helger.collection.commons.CommonsHashMap;
+import com.helger.collection.commons.ICommonsMap;
 import com.helger.config.ConfigFactory;
 import com.helger.config.fallback.ConfigWithFallback;
-import com.helger.peppol.mls.EPeppolMLSResponseCode;
-import com.helger.peppol.sbdh.EPeppolMLSType;
-import com.helger.phoss.ap.api.codelist.EInboundStatus;
-import com.helger.phoss.ap.api.codelist.EReportingStatus;
-import com.helger.phoss.ap.api.codelist.EVerificationResult;
+import com.helger.config.fallback.IConfigWithFallback;
+import com.helger.config.source.MultiConfigurationValueProvider;
+import com.helger.config.source.appl.ConfigurationSourceFunction;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
-import com.helger.phoss.ap.api.model.IInboundTransaction;
 
 /**
- * Test class for {@link SftpDocumentForwarder}.
+ * Test class for class {@link SftpDocumentForwarder}, focusing on the configuration of the filename
+ * pattern. The resolution itself is tested in <code>ForwardingFilenamePatternTest</code>.
  *
  * @author Philip Helger
  */
 public final class SftpDocumentForwarderTest
 {
-  private static final class MockInboundTransaction implements IInboundTransaction
+  @NonNull
+  private static SftpDocumentForwarder _createForwarder ()
   {
-    private final OffsetDateTime m_aReceivedDT;
-    private final String m_sIncomingID;
-    private final String m_sSbdhInstanceID;
-    private final String m_sReceiverID;
-    private final String m_sSenderID;
-    private final String m_sDocTypeID;
-    private final String m_sProcessID;
+    return new SftpDocumentForwarder ();
+  }
 
-    public MockInboundTransaction (final OffsetDateTime aReceivedDT,
-                                   final String sIncomingID,
-                                   final String sSbdhInstanceID,
-                                   final String sReceiverID,
-                                   final String sSenderID,
-                                   final String sDocTypeID,
-                                   final String sProcessID)
-    {
-      m_aReceivedDT = aReceivedDT;
-      m_sIncomingID = sIncomingID;
-      m_sSbdhInstanceID = sSbdhInstanceID;
-      m_sReceiverID = sReceiverID;
-      m_sSenderID = sSenderID;
-      m_sDocTypeID = sDocTypeID;
-      m_sProcessID = sProcessID;
-    }
+  @NonNull
+  private static ESuccess _init (@NonNull final SftpDocumentForwarder aForwarder,
+                                 @NonNull final String sFilenamePattern)
+  {
+    final ICommonsMap <String, String> aValues = new CommonsHashMap <> ();
+    aValues.put ("forwarding.sftp.host", "localhost");
+    aValues.put ("forwarding.sftp.user", "user");
+    aValues.put ("forwarding.sftp.password", "password");
+    aValues.put ("forwarding.sftp.uploaddir", "/upload");
+    aValues.put ("forwarding.sftp.filename-pattern", sFilenamePattern);
 
-    @NonNull public String getID () { return "tx-123"; }
-    @NonNull public String getIncomingID () { return m_sIncomingID; }
-    @NonNull public String getC2SeatID () { return "POP000001"; }
-    @NonNull public String getC3SeatID () { return "PAU000345"; }
-    @NonNull public String getSigningCertCN () { return "Test"; }
-    @NonNull public String getSenderID () { return m_sSenderID; }
-    @NonNull public String getReceiverID () { return m_sReceiverID; }
-    @NonNull public String getDocTypeID () { return m_sDocTypeID; }
-    @NonNull public String getProcessID () { return m_sProcessID; }
-    @NonNull public String getDocumentPath () { return "/tmp/doc.xml"; }
-    public long getDocumentSize () { return 1024; }
-    @NonNull public String getDocumentHash () { return "hash"; }
-    @NonNull public String getAS4MessageID () { return "as4-1"; }
-    @NonNull public OffsetDateTime getAS4Timestamp () { return m_aReceivedDT; }
-    @NonNull public String getSbdhInstanceID () { return m_sSbdhInstanceID; }
-    @Nullable public String getC1CountryCode () { return "AU"; }
-    @Nullable public String getC4CountryCode () { return "AU"; }
-    public boolean isDuplicateAS4 () { return false; }
-    public boolean isDuplicateSBDH () { return false; }
-    @NonNull public EInboundStatus getStatus () { return EInboundStatus.RECEIVED; }
-    public int getAttemptCount () { return 0; }
-    @NonNull public OffsetDateTime getReceivedDT () { return m_aReceivedDT; }
-    @Nullable public OffsetDateTime getCompletedDT () { return null; }
-    @NonNull public EReportingStatus getReportingStatus () { return EReportingStatus.PENDING; }
-    @Nullable public OffsetDateTime getNextRetryDT () { return null; }
-    @Nullable public String getErrorDetails () { return null; }
-    @Nullable public String getMlsTo () { return null; }
-    @NonNull public EPeppolMLSType getMlsType () { return EPeppolMLSType.ALWAYS_SEND; }
-    @Nullable public EPeppolMLSResponseCode getMlsResponseCode () { return null; }
-    @Nullable public String getMlsOutboundTransactionID () { return null; }
-    @Nullable public EVerificationResult getVerificationResult () { return null; }
-    @Nullable public String getVerificationDetails () { return null; }
+    final MultiConfigurationValueProvider aVP = ConfigFactory.createDefaultValueProvider ();
+    // Highest priority wins over the values from application.properties
+    aVP.addConfigurationSource (new ConfigurationSourceFunction (aValues::get), Integer.MAX_VALUE);
+    final IConfigWithFallback aConfig = new ConfigWithFallback (aVP);
+
+    return aForwarder.initFromConfiguration (aConfig, "forwarding.");
   }
 
   @Test
-  public void testInitFromConfigDefault () throws Exception
+  public void testDefaultPattern ()
   {
-    System.setProperty ("forwarding.mode", "sftp");
-    System.setProperty ("forwarding.sftp.host", "localhost");
-    System.setProperty ("forwarding.sftp.port", "2222");
-    System.setProperty ("forwarding.sftp.user", "dm");
-    System.setProperty ("forwarding.sftp.password", "m@nage");
-    System.setProperty ("forwarding.sftp.uploaddir", "/inbound/");
+    final SftpDocumentForwarder aForwarder = _createForwarder ();
+    final ICommonsMap <String, String> aValues = new CommonsHashMap <> ();
+    aValues.put ("forwarding.sftp.host", "localhost");
 
-    try
-    {
-      final var aConfigWithFallback = new ConfigWithFallback (ConfigFactory.createDefaultValueProvider ());
-      final SftpDocumentForwarder aForwarder = new SftpDocumentForwarder ();
-      final var eSuccess = aForwarder.initFromConfiguration (aConfigWithFallback, "forwarding.");
-      assertTrue (eSuccess.isSuccess ());
-      assertEquals (APConfigurationProperties.FORWARDING_SFTP_FILENAME_PATTERN_DEFAULT, aForwarder.getFilenamePattern ());
-    }
-    finally
-    {
-      System.clearProperty ("forwarding.mode");
-      System.clearProperty ("forwarding.sftp.host");
-      System.clearProperty ("forwarding.sftp.port");
-      System.clearProperty ("forwarding.sftp.user");
-      System.clearProperty ("forwarding.sftp.password");
-      System.clearProperty ("forwarding.sftp.uploaddir");
-    }
+    final MultiConfigurationValueProvider aVP = ConfigFactory.createDefaultValueProvider ();
+    aVP.addConfigurationSource (new ConfigurationSourceFunction (aValues::get), Integer.MAX_VALUE);
+    assertEquals (ESuccess.SUCCESS, aForwarder.initFromConfiguration (new ConfigWithFallback (aVP), "forwarding."));
+    assertEquals (APConfigurationProperties.FORWARDING_SFTP_FILENAME_PATTERN_DEFAULT,
+                  aForwarder.getFilenamePattern ().getPattern ());
+    // A filename may not span directories
+    assertFalse (aForwarder.getFilenamePattern ().isAllowPathSeparator ());
   }
 
   @Test
-  public void testInitFromConfigCustomPattern () throws Exception
+  public void testInitAcceptsAValidPattern ()
   {
-    System.setProperty ("forwarding.mode", "sftp");
-    System.setProperty ("forwarding.sftp.host", "localhost");
-    System.setProperty ("forwarding.sftp.port", "2222");
-    System.setProperty ("forwarding.sftp.user", "dm");
-    System.setProperty ("forwarding.sftp.password", "m@nage");
-    System.setProperty ("forwarding.sftp.uploaddir", "/inbound/");
-    System.setProperty ("forwarding.sftp.filename-pattern", "{datetime}_{receiver-value}_{incoming-id}");
-
-    try
-    {
-      final var aConfigWithFallback = new ConfigWithFallback (ConfigFactory.createDefaultValueProvider ());
-      final SftpDocumentForwarder aForwarder = new SftpDocumentForwarder ();
-      final var eSuccess = aForwarder.initFromConfiguration (aConfigWithFallback, "forwarding.");
-      assertTrue (eSuccess.isSuccess ());
-      assertEquals ("{datetime}_{receiver-value}_{incoming-id}", aForwarder.getFilenamePattern ());
-    }
-    finally
-    {
-      System.clearProperty ("forwarding.mode");
-      System.clearProperty ("forwarding.sftp.host");
-      System.clearProperty ("forwarding.sftp.port");
-      System.clearProperty ("forwarding.sftp.user");
-      System.clearProperty ("forwarding.sftp.password");
-      System.clearProperty ("forwarding.sftp.uploaddir");
-      System.clearProperty ("forwarding.sftp.filename-pattern");
-    }
+    final SftpDocumentForwarder aForwarder = _createForwarder ();
+    assertEquals (ESuccess.SUCCESS, _init (aForwarder, "{receiver-value}_{datetime}_{incoming-id}"));
+    assertEquals ("{receiver-value}_{datetime}_{incoming-id}", aForwarder.getFilenamePattern ().getPattern ());
+    // No unique part - a warning is logged, but the pattern is accepted
+    assertEquals (ESuccess.SUCCESS, _init (_createForwarder (), "{receiver-value}_{datetime}"));
   }
 
   @Test
-  public void testGetResolvedBaseNameDefault ()
+  public void testInitRejectsAnInvalidPattern ()
   {
-    final IInboundTransaction aTx = new MockInboundTransaction (
-        OffsetDateTime.of (2026, 8, 29, 19, 10, 34, 0, ZoneOffset.UTC),
-        "d6c8ec5f-0908-4f6e-9bb5-f889ce628e97",
-        "a7f61007-b08b-49b5-b361-690df20c0c16",
-        "0151:35747532810",
-        "0151:90794605008",
-        "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
-        "urn:peppol:bis:billing");
-
-    final String sResult = SftpDocumentForwarder.getResolvedBaseName (APConfigurationProperties.FORWARDING_SFTP_FILENAME_PATTERN_DEFAULT, aTx);
-    assertEquals ("20260829191034_d6c8ec5f-0908-4f6e-9bb5-f889ce628e97", sResult);
-  }
-
-  @Test
-  public void testGetResolvedBaseNameCustomTokens ()
-  {
-    final IInboundTransaction aTx = new MockInboundTransaction (
-        OffsetDateTime.of (2026, 8, 29, 19, 10, 34, 0, ZoneOffset.UTC),
-        "d6c8ec5f-0908-4f6e-9bb5-f889ce628e97",
-        "a7f61007-b08b-49b5-b361-690df20c0c16",
-        "0151:35747532810",
-        "0151:90794605008",
-        "Invoice-2",
-        "billing");
-
-    final String sPattern = "{datetime}_{receiver-value}_{incoming-id}";
-    final String sResult = SftpDocumentForwarder.getResolvedBaseName (sPattern, aTx);
-    assertEquals ("20260829191034_35747532810_d6c8ec5f-0908-4f6e-9bb5-f889ce628e97", sResult);
-
-    final String sPattern2 = "{receiver-id}_{sbdh-instance-id}";
-    final String sResult2 = SftpDocumentForwarder.getResolvedBaseName (sPattern2, aTx);
-    assertEquals ("0151_35747532810_a7f61007-b08b-49b5-b361-690df20c0c16", sResult2);
-
-    final String sPattern3 = "${datetime}_${receiver-value}_${incoming-id}";
-    final String sResult3 = SftpDocumentForwarder.getResolvedBaseName (sPattern3, aTx);
-    assertEquals ("20260829191034_35747532810_d6c8ec5f-0908-4f6e-9bb5-f889ce628e97", sResult3);
+    // Typo in a placeholder name
+    assertEquals (ESuccess.FAILURE, _init (_createForwarder (), "{datetime}_{reciever-id}"));
+    // Empty pattern
+    assertEquals (ESuccess.FAILURE, _init (_createForwarder (), ""));
+    // Subdirectories are not supported
+    assertEquals (ESuccess.FAILURE, _init (_createForwarder (), "{receiver-value}/{datetime}"));
+    assertEquals (ESuccess.FAILURE, _init (_createForwarder (), "..\\{datetime}"));
+    // Unbalanced braces
+    assertEquals (ESuccess.FAILURE, _init (_createForwarder (), "{datetime_{incoming-id}"));
   }
 }

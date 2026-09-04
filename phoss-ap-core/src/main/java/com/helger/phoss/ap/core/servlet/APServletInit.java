@@ -136,8 +136,8 @@ public class APServletInit
     HttpDebugger.setEnabled (false);
 
     // Sanity check
-    if (CommandMap.getDefaultCommandMap ().createDataContentHandler (CMimeType.MULTIPART_RELATED.getAsString ()) ==
-        null)
+    if (CommandMap.getDefaultCommandMap ()
+                  .createDataContentHandler (CMimeType.MULTIPART_RELATED.getAsString ()) == null)
     {
       throw new IllegalStateException ("No DataContentHandler for MIME Type '" +
                                        CMimeType.MULTIPART_RELATED.getAsString () +

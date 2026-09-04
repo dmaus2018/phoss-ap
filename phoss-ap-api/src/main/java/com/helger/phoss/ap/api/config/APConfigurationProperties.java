@@ -152,6 +152,27 @@ public final class APConfigurationProperties
    */
   public static final String FORWARDING_SECONDARY_MODE_SUFFIX = "mode";
 
+  // Forwarding - MLS copy (since 0.12.0)
+  /**
+   * Prefix for the sink that receives a copy of every MLS this AP generates and sends itself. It is
+   * deliberately a separate sink and not the primary forwarder, because a reporting integration is
+   * normally not the same endpoint as the invoice inbox.
+   *
+   * @since 0.12.0
+   */
+  public static final String FORWARDING_MLS_COPY_PREFIX = "forwarding.mls-copy.";
+  /** @since 0.12.0 */
+  public static final String FORWARDING_MLS_COPY_ENABLED = "forwarding.mls-copy.enabled";
+  /** @since 0.12.0 */
+  public static final boolean FORWARDING_MLS_COPY_ENABLED_DEFAULT = false;
+  /**
+   * The forwarding mode of the MLS copy sink. If it is not set, the whole primary forwarder
+   * configuration is reused.
+   *
+   * @since 0.12.0
+   */
+  public static final String FORWARDING_MLS_COPY_MODE = "forwarding.mls-copy.mode";
+
   // Forwarding - C4 country code determination
   public static final String FORWARDING_C4_COUNTRYCODE_MODES = "forwarding.c4countrycode.modes";
 
@@ -162,6 +183,8 @@ public final class APConfigurationProperties
   public static final String FORWARDING_HTTP_ENDPOINT = "forwarding.http.endpoint";
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_HTTP_HEADERS_PREFIX = "forwarding.http.headers.";
+  /** @since 0.12.0 */
+  public static final boolean FORWARDING_HTTP_VERIFICATION_DETAILS_DEFAULT = false;
 
   // Forwarding - S3
   @Deprecated (forRemoval = true, since = "0.9.0")
@@ -181,6 +204,8 @@ public final class APConfigurationProperties
   public static final boolean FORWARDING_S3_PATH_STYLE_ACCESS_DEFAULT = false;
   /** @since 0.10.2 */
   public static final boolean FORWARDING_S3_WRITE_METADATA_DEFAULT = false;
+  /** @since 0.12.0 */
+  public static final String FORWARDING_S3_FILENAME_PATTERN_DEFAULT = "{sbdh-instance-id}";
 
   // Forwarding - Filesystem (since 0.2.0)
   @Deprecated (forRemoval = true, since = "0.9.0")
@@ -188,6 +213,8 @@ public final class APConfigurationProperties
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final String FORWARDING_FILESYSTEM_LAYOUT = "forwarding.filesystem.layout";
   public static final String FORWARDING_FILESYSTEM_LAYOUT_DEFAULT = "flat";
+  /** @since 0.12.0 */
+  public static final String FORWARDING_FILESYSTEM_FILENAME_PATTERN_DEFAULT = "{sbdh-instance-id}";
 
   // Forwarding - SFTP
   /** @since 0.10.2 */
@@ -301,6 +328,8 @@ public final class APConfigurationProperties
   public static final String VERIFICATION_INBOUND_ENABLED = "verification.inbound.enabled";
   public static final boolean VERIFICATION_INBOUND_ENABLED_DEFAULT = false;
   public static final String VERIFICATION_FAIL_MODE = "verification.verifier-fail-mode";
+  /** @since 0.12.0 */
+  public static final String VERIFICATION_INBOUND_REJECTION_FORWARDING = "verification.inbound.rejection-forwarding";
   public static final String VERIFICATION_DEFERRED_RETRY_INTERVAL = "verification.deferred.retry-interval";
   public static final Duration VERIFICATION_DEFERRED_RETRY_INTERVAL_DEFAULT = Duration.ofMinutes (5);
   public static final String VERIFICATION_DEFERRED_MAX_DURATION = "verification.deferred.max-duration";
@@ -322,6 +351,15 @@ public final class APConfigurationProperties
   public static final int PEPPOL_REPORTING_SCHEDULE_HOUR_DEFAULT = 6;
   public static final String PEPPOL_REPORTING_SCHEDULE_MINUTE = "peppol.reporting.schedule.minute";
   public static final int PEPPOL_REPORTING_SCHEDULE_MINUTE_DEFAULT = 7;
+  /**
+   * Comma separated list of participant identifiers that are excluded from Peppol Reporting. Each
+   * entry may either be URI encoded (like
+   * <code>iso6523-actorid-upis::9915:test</code>) or use the default participant identifier scheme
+   * only (like <code>9915:test</code>).
+   *
+   * @since 0.13.0
+   */
+  public static final String PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS = "peppol.reporting.exclude.participant-ids";
 
   // Duplicate detection
   public static final String DUPLICATE_DETECTION_AS4_MODE = "duplicate.detection.as4.mode";

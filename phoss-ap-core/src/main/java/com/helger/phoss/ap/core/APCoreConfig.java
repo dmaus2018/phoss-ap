@@ -41,6 +41,7 @@ import com.helger.phoss.ap.api.codelist.EC4CountryCodeMode;
 import com.helger.phoss.ap.api.codelist.EDuplicateDetectionMode;
 import com.helger.phoss.ap.api.codelist.EReceiverCheckMode;
 import com.helger.phoss.ap.api.codelist.EVerificationFailMode;
+import com.helger.phoss.ap.api.codelist.EVerificationRejectionForwarding;
 import com.helger.phoss.ap.api.config.APConfigProvider;
 import com.helger.phoss.ap.api.config.APConfigurationProperties;
 
@@ -691,6 +692,33 @@ public final class APCoreConfig
   }
 
   /**
+   * @return The configured behaviour for an inbound document that did not pass the verification.
+   *         Defaults to {@link EVerificationRejectionForwarding#DEFAULT}. Never <code>null</code>.
+   * @since 0.12.0
+   */
+  @NonNull
+  public static EVerificationRejectionForwarding getVerificationRejectionForwarding ()
+  {
+    final String sVal = _getConfig ().getAsString (APConfigurationProperties.VERIFICATION_INBOUND_REJECTION_FORWARDING);
+    if (StringHelper.isEmpty (sVal))
+      return EVerificationRejectionForwarding.DEFAULT;
+
+    final EVerificationRejectionForwarding eRet = EVerificationRejectionForwarding.getFromIDOrNull (sVal);
+    if (eRet != null)
+      return eRet;
+
+    if (WARNED_INVALID_VALUES.add (APConfigurationProperties.VERIFICATION_INBOUND_REJECTION_FORWARDING))
+      LOGGER.warn ("The configuration key '" +
+                   APConfigurationProperties.VERIFICATION_INBOUND_REJECTION_FORWARDING +
+                   "' has the unsupported value '" +
+                   sVal +
+                   "' - falling back to '" +
+                   EVerificationRejectionForwarding.DEFAULT.getID () +
+                   "'");
+    return EVerificationRejectionForwarding.DEFAULT;
+  }
+
+  /**
    * @return The interval in which a deferred verification is retried. Never <code>null</code>.
    * @since 0.12.0
    */
@@ -944,5 +972,28 @@ public final class APCoreConfig
   {
     return _getConfig ().getAsInt (APConfigurationProperties.PEPPOL_REPORTING_SCHEDULE_MINUTE,
                                    APConfigurationProperties.PEPPOL_REPORTING_SCHEDULE_MINUTE_DEFAULT);
+  }
+
+  /**
+   * @return The configured participant identifiers that are excluded from Peppol Reporting, in the
+   *         notation used in the configuration file. The values are neither parsed nor validated
+   *         here. May be empty but never <code>null</code>.
+   * @since 0.13.0
+   */
+  @NonNull
+  public static ICommonsOrderedSet <String> getPeppolReportingExcludedParticipantIDs ()
+  {
+    final String sVal = _getConfig ().getAsString (APConfigurationProperties.PEPPOL_REPORTING_EXCLUDE_PARTICIPANT_IDS);
+    final ICommonsOrderedSet <String> ret = new CommonsLinkedHashSet <> ();
+    if (StringHelper.isNotEmpty (sVal))
+    {
+      for (final String sPart : StringHelper.getExploded (',', sVal))
+      {
+        final String sTrimmed = sPart.trim ();
+        if (StringHelper.isNotEmpty (sTrimmed))
+          ret.add (sTrimmed);
+      }
+    }
+    return ret;
   }
 }

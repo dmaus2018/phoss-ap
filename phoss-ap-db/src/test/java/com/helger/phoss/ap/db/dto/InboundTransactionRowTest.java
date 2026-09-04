@@ -207,7 +207,8 @@ public final class InboundTransactionRowTest
     // The verdict is independent of the status - a rejected document may well be "forwarded"
     assertEquals (EInboundStatus.FORWARDED, aTx.getStatus ());
     assertEquals (EVerificationResult.REJECTED, aTx.getVerificationResult ());
-    assertEquals ("[{\"level\":\"error\",\"type\":\"business_rule\",\"description\":\"Nope\"}]", aTx.getVerificationDetails ());
+    assertEquals ("[{\"level\":\"error\",\"type\":\"business_rule\",\"description\":\"Nope\"}]",
+                  aTx.getVerificationDetails ());
   }
 
   @Test

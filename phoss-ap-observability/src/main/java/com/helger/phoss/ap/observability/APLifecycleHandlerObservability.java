@@ -29,6 +29,7 @@ import com.helger.annotation.Nonnegative;
 import com.helger.annotation.style.IsSPIImplementation;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
 import com.helger.phoss.ap.api.codelist.EMlsReceptionStatus;
+import com.helger.phoss.ap.api.codelist.EVerificationResult;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
 import com.helger.phoss.ap.api.spi.IAPLifecycleEventSPI;
 import com.helger.phoss.ap.observability.ObservabilityEcsJson.Builder;
@@ -157,19 +158,23 @@ public class APLifecycleHandlerObservability implements IAPLifecycleEventSPI
   public void onInboundDocumentForwarded (@NonNull final String sTransactionID,
                                           @NonNull final String sSbdhInstanceID,
                                           @Nullable final Duration aForwardingDuration,
-                                          final boolean bIsRetry)
+                                          final boolean bIsRetry,
+                                          @Nullable final EVerificationResult eVerificationResult)
   {
     final Attributes aAttrs = Attributes.of (AttributeKey.stringKey (CPhossAPOtel.ATTR_TRANSACTION_ID), sTransactionID,
                                              AttributeKey.stringKey (CPhossAPOtel.ATTR_SBDH_INSTANCE_ID), sSbdhInstanceID,
                                              AttributeKey.booleanKey (CPhossAPOtel.ATTR_IS_RETRY), Boolean.valueOf (bIsRetry));
     _addSpanEvent ("inbound.document_forwarded", aAttrs);
 
-    _logSafe (ObservabilityEcsJson.createInfo ("onInboundDocumentForwarded")
-                                 .duration (aForwardingDuration)
-                                 .peppol ("direction", "INBOUND")
-                                 .peppol ("transaction_id", sTransactionID)
-                                 .peppol ("sbdh_instance_id", sSbdhInstanceID)
-                                 .peppol ("is_retry", bIsRetry));
+    final ObservabilityEcsJson.Builder aEcs = ObservabilityEcsJson.createInfo ("onInboundDocumentForwarded")
+                                                                  .duration (aForwardingDuration)
+                                                                  .peppol ("direction", "INBOUND")
+                                                                  .peppol ("transaction_id", sTransactionID)
+                                                                  .peppol ("sbdh_instance_id", sSbdhInstanceID)
+                                                                  .peppol ("is_retry", bIsRetry);
+    if (eVerificationResult != null)
+      aEcs.peppol ("verification_result", eVerificationResult.getID ());
+    _logSafe (aEcs);
   }
 
   public void onOutboundDocumentAccepted (@NonNull final String sTransactionID,

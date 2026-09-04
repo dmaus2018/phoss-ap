@@ -43,6 +43,15 @@ public class VirusScanInboundVerifier implements IInboundDocumentVerifierSPI
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (VirusScanInboundVerifier.class);
 
+  public static final String VERIFIER_ID = "virusscan-inbound";
+
+  @NonNull
+  @Nonempty
+  public String getID ()
+  {
+    return VERIFIER_ID;
+  }
+
   @NonNull
   public VerificationOutcome verifyInboundDocument (@NonNull @Nonempty final String sDocumentPath,
                                                     @NonNull final IDocumentTypeIdentifier aDocTypeID,
