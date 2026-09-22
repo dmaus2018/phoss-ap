@@ -172,6 +172,11 @@
       </dependency>
       <dependency>
         <groupId>com.helger.phoss.ap</groupId>
+        <artifactId>phoss-ap-storage-db</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.helger.phoss.ap</groupId>
         <artifactId>phoss-ap-core</artifactId>
         <version>${project.version}</version>
       </dependency>

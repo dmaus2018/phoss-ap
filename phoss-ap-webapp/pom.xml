@@ -43,12 +43,28 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.helger.phoss.ap</groupId>
+      <artifactId>phoss-ap-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.helger.phoss.ap</groupId>
+      <artifactId>phoss-ap-basic</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.helger.phoss.ap</groupId>
+      <artifactId>phoss-ap-db</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.helger.peppol</groupId>
       <artifactId>peppol-reporting-backend-sql</artifactId>
     </dependency>
     <dependency>
       <groupId>com.helger.phoss.ap</groupId>
       <artifactId>phoss-ap-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.helger.phoss.ap</groupId>
+      <artifactId>phoss-ap-storage-db</artifactId>
     </dependency>
     <dependency>
       <groupId>com.helger.phoss.ap</groupId>

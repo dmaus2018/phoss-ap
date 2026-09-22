@@ -25,7 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  *
  * @author Philip Helger
  */
-@SpringBootTest
+@SpringBootTest (webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 final class PhossAPApplicationTest
 {
   @BeforeAll
