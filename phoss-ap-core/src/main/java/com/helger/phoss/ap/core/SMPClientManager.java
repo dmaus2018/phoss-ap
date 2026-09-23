@@ -19,6 +19,7 @@ package com.helger.phoss.ap.core;
 import java.net.URI;
 import java.time.Duration;
 
+import org.apache.hc.core5.util.Timeout;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -99,16 +100,25 @@ public final class SMPClientManager
       LOGGER.info ("Peppol SMP client caching is disabled");
 
     // Create the shared HTTP client manager, so that the connection pool is reused for all SMP
-    // queries of all SMP clients
+    // queries of all SMP clients. Because the shared manager takes precedence over the per-client
+    // HTTP client settings (see _configure), these are the only timeouts that are ever effective
+    // for an SMP query
     final SMPHttpClientSettings aHCS = new SMPHttpClientSettings ();
     APBasicConfig.applyHttpProxySettings (aHCS);
-    final HttpClientManager aHttpClientMgr = HttpClientManager.create (aHCS);
+    final Duration aConnectTimeout = APCoreConfig.getPeppolSmpTimeoutConnect ();
+    final Duration aResponseTimeout = APCoreConfig.getPeppolSmpTimeoutResponse ();
+    aHCS.setConnectTimeout (Timeout.of (aConnectTimeout));
+    aHCS.setResponseTimeout (Timeout.of (aResponseTimeout));
+    final HttpClientManager aSharedHttpClientMgr = HttpClientManager.create (aHCS);
 
     RW_LOCK.writeLocked (() -> {
       s_bCacheEnabled = bCacheEnabled;
-      s_aSharedHttpClientMgr = aHttpClientMgr;
+      s_aSharedHttpClientMgr = aSharedHttpClientMgr;
     });
-    LOGGER.info ("Created the shared HTTP client manager for all Peppol SMP queries");
+    LOGGER.info ("Created the shared HTTP client manager for all Peppol SMP queries with a connect timeout of " +
+                 aConnectTimeout +
+                 " and a response timeout of " +
+                 aResponseTimeout);
   }
 
   /**
@@ -118,16 +128,16 @@ public final class SMPClientManager
   public static void shutdown ()
   {
     @SuppressWarnings ("resource")
-    final HttpClientManager aHttpClientMgr = RW_LOCK.writeLockedGet (() -> {
+    final HttpClientManager aSharedHttpClientMgr = RW_LOCK.writeLockedGet (() -> {
       final HttpClientManager ret = s_aSharedHttpClientMgr;
       s_aSharedHttpClientMgr = null;
       return ret;
     });
 
-    if (aHttpClientMgr != null)
+    if (aSharedHttpClientMgr != null)
       try
       {
-        aHttpClientMgr.close ();
+        aSharedHttpClientMgr.close ();
         LOGGER.info ("Closed the shared HTTP client manager of all Peppol SMP queries");
       }
       catch (final Exception ex)
@@ -172,9 +182,9 @@ public final class SMPClientManager
     APBasicConfig.applyHttpProxySettings (aSMPClient.httpClientSettings ());
 
     // The shared manager takes precedence over the client specific HTTP client settings
-    final HttpClientManager aHttpClientMgr = RW_LOCK.readLockedGet (() -> s_aSharedHttpClientMgr);
-    if (aHttpClientMgr != null)
-      aSMPClient.setSharedHttpClientManager (aHttpClientMgr);
+    final HttpClientManager aSharedHttpClientMgr = getSharedHttpClientManager ();
+    if (aSharedHttpClientMgr != null)
+      aSMPClient.setSharedHttpClientManager (aSharedHttpClientMgr);
     else
       if (LOGGER.isDebugEnabled ())
         LOGGER.debug ("No shared HTTP client manager is present - each SMP query will create its own one");
