@@ -58,6 +58,9 @@ public class OtelConfig
     // OtelAPTracerSPI / OtelAPMeterSPI bindings (loaded via ServiceLoader by the ph-telemetry
     // facades) resolve it automatically. The metric/notification handlers themselves live in
     // phoss-ap-core and are registered via META-INF/services there.
+    // Reset any temporary fallback no-op global instance registered during startup/Flyway
+    io.opentelemetry.api.GlobalOpenTelemetry.resetForTest ();
+
     final OpenTelemetry aOtel = AutoConfiguredOpenTelemetrySdk.builder ()
                                                               .setResultAsGlobal ()
                                                               .build ()
