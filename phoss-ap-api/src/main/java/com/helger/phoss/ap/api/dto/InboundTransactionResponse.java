@@ -520,37 +520,42 @@ public class InboundTransactionResponse
     verificationDetails = s;
   }
 
+  /** @return <code>true</code> if this transaction was replayed or re-forwarded */
+  public boolean isReplayed ()
+  {
+    return isReplayed;
+  }
+
+  /**
+   * @param b
+   *        <code>true</code> if this transaction was replayed or re-forwarded.
+   */
+  public void setReplayed (final boolean b)
+  {
+    isReplayed = b;
+  }
+
+  /** @return the total number of times a replay or manual re-forward was triggered */
+  public int getReplayCount ()
+  {
+    return replayCount;
+  }
+
+  /**
+   * @param n
+   *        The replay count to set.
+   */
+  public void setReplayCount (final int n)
+  {
+    replayCount = n;
+  }
+
   /**
    * @return This response as a ph-json {@link IJsonObject}. Never <code>null</code>.
    * @since v0.12.0 - was previously called <code>getAsJson</code>
    */
   @NonNull
   @Schema (hidden = true)
-  public boolean isReplayed ()
-  {
-    return isReplayed;
-  }
-
-  public boolean getIsReplayed ()
-  {
-    return isReplayed;
-  }
-
-  public void setReplayed (final boolean b)
-  {
-    isReplayed = b;
-  }
-
-  public int getReplayCount ()
-  {
-    return replayCount;
-  }
-
-  public void setReplayCount (final int n)
-  {
-    replayCount = n;
-  }
-
   public IJsonObject toJson ()
   {
     final IJsonObject ret = new JsonObject ();

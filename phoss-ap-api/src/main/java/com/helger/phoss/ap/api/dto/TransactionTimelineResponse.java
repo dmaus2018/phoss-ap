@@ -95,16 +95,16 @@ public class TransactionTimelineResponse
     this.direction = s;
   }
 
+  /** @return <code>true</code> if this transaction was replayed or re-forwarded */
   public boolean isReplayed ()
   {
     return isReplayed;
   }
 
-  public boolean getIsReplayed ()
-  {
-    return isReplayed;
-  }
-
+  /**
+   * @param b
+   *        <code>true</code> if this transaction was replayed or re-forwarded.
+   */
   public void setReplayed (final boolean b)
   {
     this.isReplayed = b;
