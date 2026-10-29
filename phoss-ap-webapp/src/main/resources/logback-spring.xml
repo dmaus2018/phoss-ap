@@ -21,11 +21,14 @@
   <!-- Standard Spring Boot base logging defaults -->
   <include resource="org/springframework/boot/logging/logback/defaults.xml" />
 
+  <!-- Auto-load application version from the compiled JAR classpath -->
+  <property resource="phoss-ap-version.properties" />
+
   <!-- Single-line ECS JSON Console Appender (for OpenShift & Elasticsearch) -->
   <appender name="CONSOLE_ECS" class="ch.qos.logback.core.ConsoleAppender">
     <encoder class="co.elastic.logging.logback.EcsEncoder">
       <serviceName>phoss-ap</serviceName>
-      <serviceVersion>${APP_VERSION:-0.13.1-SNAPSHOT}</serviceVersion>
+      <serviceVersion>${APP_VERSION:-${version}}</serviceVersion>
       <serviceEnvironment>${DEPLOYMENT_ENVIRONMENT:-production}</serviceEnvironment>
       <includeMarkers>true</includeMarkers>
       <includeMdc>true</includeMdc>
