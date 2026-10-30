@@ -56,6 +56,13 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements
                                        IDocumentPayloadManagerProviderSPI
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (DocumentPayloadManagerDb.class);
+
+  /**
+   * The name of the Flyway history table used for the payload storage migrations. Must be different
+   * from the history table of the core phoss-ap migrations, so that the payload migration versions
+   * are independent of (and never clash with) the upstream core migrations.
+   */
+  public static final String PAYLOAD_FLYWAY_HISTORY_TABLE = "ap_payload_flyway_history";
   private String m_sTableName;
 
   public DocumentPayloadManagerDb ()
@@ -103,9 +110,17 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements
     {
       final String sPayloadLocation = "db/phoss-ap-flyway-payload-" +
                                       aJdbcConfig.getJdbcDatabaseSystemType ().getID ();
-      LOGGER.info ("Running payload Flyway migrations from " + sPayloadLocation);
+      // Use a dedicated history table instead of the shared default one
+      final com.helger.db.flyway.FlywayConfiguration aPayloadFlywayCfg = com.helger.db.flyway.FlywayConfiguration.builder (aFlywayCfg)
+                                                                                                                  .historyTable (PAYLOAD_FLYWAY_HISTORY_TABLE)
+                                                                                                                  .build ();
+      LOGGER.info ("Running payload Flyway migrations from " +
+                   sPayloadLocation +
+                   " using history table '" +
+                   PAYLOAD_FLYWAY_HISTORY_TABLE +
+                   "'");
       com.helger.db.flyway.FlywayMigrationRunner.runFlyway (aJdbcConfig,
-                                                            aFlywayCfg,
+                                                            aPayloadFlywayCfg,
                                                             sPayloadLocation,
                                                             (org.flywaydb.core.api.migration.JavaMigration []) null,
                                                             (org.flywaydb.core.api.callback.Callback []) null);

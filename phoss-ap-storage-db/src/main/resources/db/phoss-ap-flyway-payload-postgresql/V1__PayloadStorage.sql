@@ -15,11 +15,13 @@
 -- limitations under the License.
 --
 
--- Payload Storage Table for MySQL
+-- Payload Storage Table for PostgreSQL
+-- "IF NOT EXISTS" because the table may already exist from an earlier migration
+-- tracked in the shared core Flyway history table. Existing data is preserved.
 
-CREATE TABLE `ap_payload` (
-  `file_path`    VARCHAR(255) NOT NULL,
-  `reference_dt` DATETIME     NOT NULL,
-  `content`      LONGBLOB     NOT NULL,
-  CONSTRAINT `ap_payload_pk` PRIMARY KEY (`file_path`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS ap_payload (
+  file_path     TEXT        NOT NULL,
+  reference_dt  TIMESTAMPTZ NOT NULL,
+  content       BYTEA       NOT NULL,
+  CONSTRAINT ap_payload_pk PRIMARY KEY (file_path)
+);

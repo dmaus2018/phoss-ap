@@ -16,8 +16,10 @@
 --
 
 -- Payload Storage Table for H2
+-- "IF NOT EXISTS" because the table may already exist from an earlier migration
+-- tracked in the shared core Flyway history table. Existing data is preserved.
 
-CREATE TABLE ap_payload (
+CREATE TABLE IF NOT EXISTS ap_payload (
   file_path     VARCHAR(255) NOT NULL,
   reference_dt  TIMESTAMP    NOT NULL,
   content       BLOB         NOT NULL,

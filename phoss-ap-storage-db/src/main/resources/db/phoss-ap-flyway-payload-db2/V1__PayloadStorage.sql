@@ -16,10 +16,18 @@
 --
 
 -- Payload Storage Table for DB2
+--
+-- DB2 11.5 does not support "CREATE TABLE IF NOT EXISTS". The table may already
+-- exist (it was previously created by a migration tracked in the shared core
+-- Flyway history table), so the creation is wrapped in a compound statement that
+-- ignores SQLSTATE 42710 ("object already exists"). Existing data is preserved.
 
-CREATE TABLE ap_payload (
-  file_path     VARCHAR(255)  NOT NULL,
-  reference_dt  TIMESTAMP     NOT NULL,
-  content       BLOB          NOT NULL,
-  CONSTRAINT ap_payload_pk PRIMARY KEY (file_path)
-);
+BEGIN
+  DECLARE CONTINUE HANDLER FOR SQLSTATE '42710' BEGIN END;
+  EXECUTE IMMEDIATE 'CREATE TABLE ap_payload (
+    file_path     VARCHAR(255)  NOT NULL,
+    reference_dt  TIMESTAMP     NOT NULL,
+    content       BLOB          NOT NULL,
+    CONSTRAINT ap_payload_pk PRIMARY KEY (file_path)
+  )';
+END;
