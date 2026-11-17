@@ -21,6 +21,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -41,6 +42,9 @@ import com.helger.collection.commons.CommonsArrayList;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.diagnostics.error.IError;
 import com.helger.diagnostics.error.list.ErrorList;
+import com.helger.json.IJsonArray;
+import com.helger.json.IJsonObject;
+import com.helger.json.serialize.JsonReader;
 import com.helger.peppol.mls.CPeppolMLS;
 import com.helger.peppol.mls.PeppolMLSBuilder;
 import com.helger.peppol.mls.PeppolMLSMarshaller;
@@ -57,6 +61,7 @@ import com.helger.peppolid.peppol.spis.SPIDHelper;
 import com.helger.phoss.ap.api.CPhossAP;
 import com.helger.phoss.ap.api.IInboundForwardingAttemptManager;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
+import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.codelist.EDuplicateDetectionMode;
 import com.helger.phoss.ap.api.codelist.EInboundStatus;
 import com.helger.phoss.ap.api.codelist.EMlsSendingTrigger;
@@ -65,12 +70,14 @@ import com.helger.phoss.ap.api.codelist.EVerificationIssueLevel;
 import com.helger.phoss.ap.api.codelist.EVerificationOutcomeCategory;
 import com.helger.phoss.ap.api.codelist.EVerificationRejectionForwarding;
 import com.helger.phoss.ap.api.codelist.EVerificationResult;
+import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.datetime.IAPTimestampManager;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
 import com.helger.phoss.ap.api.model.ForwardableDocument;
 import com.helger.phoss.ap.api.model.ForwardingResult;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
+import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.model.MlsOutcome;
 import com.helger.phoss.ap.api.model.MlsOutcomeIssue;
 import com.helger.phoss.ap.api.model.VerificationIssue;
@@ -212,6 +219,55 @@ public final class InboundOrchestrator
   static ICommonsList <MlsOutcomeIssue> getAllMlsIssues (@NonNull final VerifierResult aVR)
   {
     return aVR.outcome ().getAllIssues ().getAllMapped (MlsOutcomeIssue::fromVerificationIssue);
+  }
+
+  /**
+   * Get the findings of the verification that accepted the provided inbound transaction as MLS
+   * line responses, read back from its stored verification details. This is what a forwarding
+   * outside of the initial receive path uses instead of the in-memory findings of
+   * {@link #getAllMlsIssues(VerifierResult)}, which are long gone by then.
+   *
+   * @param aInboundTx
+   *        The inbound transaction. May not be <code>null</code>.
+   * @return <code>null</code> if the document was rejected or has no stored findings. Entries that
+   *         cannot be read are skipped.
+   */
+  @Nullable
+  @ReturnsMutableCopy
+  @VisibleForTesting
+  static ICommonsList <MlsOutcomeIssue> getStoredMlsWarnings (@NonNull final IInboundTransaction aInboundTx)
+  {
+    // The findings of a rejected document were already sent as the negative MLS
+    final EVerificationResult eVerificationResult = aInboundTx.getVerificationResult ();
+    if (eVerificationResult == null || eVerificationResult.isRejected ())
+      return null;
+
+    final String sDetails = aInboundTx.getVerificationDetails ();
+    if (StringHelper.isEmpty (sDetails))
+      return null;
+
+    final IJsonArray aIssues = JsonReader.builder ().source (sDetails).readAsArray ();
+    if (aIssues == null)
+    {
+      LOGGER.warn ("The verification details of the inbound transaction '" +
+                   aInboundTx.getID () +
+                   "' are no JSON array - sending the positive MLS without line responses");
+      return null;
+    }
+
+    final ICommonsList <MlsOutcomeIssue> ret = new CommonsArrayList <> ();
+    for (final IJsonObject aIssueJson : aIssues.iteratorObjects ())
+    {
+      final VerificationIssue aIssue = VerificationIssue.getFromJsonOrNull (aIssueJson);
+      if (aIssue != null)
+        ret.add (MlsOutcomeIssue.fromVerificationIssue (aIssue));
+      else
+        LOGGER.warn ("Skipping an unreadable verification issue of the inbound transaction '" +
+                     aInboundTx.getID () +
+                     "': " +
+                     aIssueJson.getAsJsonString ());
+    }
+    return ret;
   }
 
   /**
@@ -391,6 +447,39 @@ public final class InboundOrchestrator
   }
 
   /**
+   * Adapt an inbound transaction to the document handed to the forwarders. For an inbound MLS that
+   * was correlated, the correlated outbound transaction is resolved, so that a forwarder has access
+   * to e.g. its custom fields.
+   *
+   * @param sLogPrefix
+   *        Log message prefix. May not be <code>null</code>.
+   * @param aInboundTx
+   *        The inbound transaction to adapt. May not be <code>null</code>.
+   * @return The forwardable document. Never <code>null</code>.
+   */
+  @NonNull
+  private static ForwardableDocument _createForwardableDocument (@NonNull final String sLogPrefix,
+                                                                 @NonNull final IInboundTransaction aInboundTx)
+  {
+    IOutboundTransaction aCorrelatedOutboundTx = null;
+    final String sCorrelatedOutboundTxID = aInboundTx.getMlsCorrelatedOutboundTransactionID ();
+    if (StringHelper.isNotEmpty (sCorrelatedOutboundTxID))
+    {
+      // The outbound transaction may have been archived in the meantime
+      final IOutboundTransactionManager aOutboundMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+      aCorrelatedOutboundTx = aOutboundMgr.getByIDIncludingArchive (sCorrelatedOutboundTxID);
+      if (aCorrelatedOutboundTx == null)
+        LOGGER.warn (sLogPrefix +
+                     "The outbound transaction '" +
+                     sCorrelatedOutboundTxID +
+                     "' correlated with the inbound MLS '" +
+                     aInboundTx.getID () +
+                     "' could not be found");
+    }
+    return ForwardableDocument.fromInbound (aInboundTx, aCorrelatedOutboundTx);
+  }
+
+  /**
    * Dispatch a copy of an inbound document to all provided document forwarders asynchronously. This
    * has no effect on the inbound transaction at all: no status change, no forwarding attempt row
    * and no retry. A forwarder that fails or throws is logged only and does not prevent the
@@ -423,7 +512,7 @@ public final class InboundOrchestrator
       return;
 
     // Adapt once - all forwarders of this dispatch see the very same document
-    final ForwardableDocument aForwardableDoc = ForwardableDocument.fromInbound (aInboundTx);
+    final ForwardableDocument aForwardableDoc = _createForwardableDocument (sLogPrefix, aInboundTx);
 
     PhotonWorkerPool.getInstance ().run (sTaskName, () -> {
       int nIndex = 0;
@@ -935,9 +1024,12 @@ public final class InboundOrchestrator
    *        The findings of the verification that accepted the document. May be <code>null</code> or
    *        empty. MLS allows line responses on a positive response code, so they are reported to C2
    *        instead of being dropped.
+   * @return The completion of the asynchronous MLS sending, or <code>null</code> if no MLS is sent
+   *         from here.
    */
-  private static void _sendPositiveMlsAfterForwarding (@NonNull final IInboundTransaction aInboundTx,
-                                                       @Nullable final ICommonsList <MlsOutcomeIssue> aMlsWarnings)
+  @Nullable
+  private static CompletableFuture <Void> _sendPositiveMlsAfterForwarding (@NonNull final IInboundTransaction aInboundTx,
+                                                                           @Nullable final ICommonsList <MlsOutcomeIssue> aMlsWarnings)
   {
     if (isMlsSuppressedAfterRejection (aInboundTx))
     {
@@ -946,7 +1038,7 @@ public final class InboundOrchestrator
       LOGGER.info ("Not sending a positive MLS for the rejected but forwarded inbound transaction '" +
                    aInboundTx.getID () +
                    "'");
-      return;
+      return null;
     }
 
     if (aInboundTx.getMlsType () == EPeppolMLSType.ALWAYS_SEND)
@@ -964,11 +1056,11 @@ public final class InboundOrchestrator
           LOGGER.info ("Deferring the positive MLS of the inbound transaction '" +
                        aInboundTx.getID () +
                        "' until the Receiver Backend reports the outcome");
-          return;
+          return null;
         }
 
         // Send asynchronously
-        PhotonWorkerPool.getInstance ().run ("send-mls", () -> {
+        return PhotonWorkerPool.getInstance ().run ("send-mls", () -> {
           // AP for delivery with confirmation (e.g. http), AB for delivery without
           // confirmation (e.g. SFTP, S3, file system)
           final MlsOutcome aOutcome = APCoreMetaManager.getForwarder ().isWithDeliveryConfirmation () ? MlsOutcome
@@ -979,6 +1071,7 @@ public final class InboundOrchestrator
         });
       }
     }
+    return null;
   }
 
   /**
@@ -1211,6 +1304,18 @@ public final class InboundOrchestrator
           }
         }
 
+        // The MLS type from the SBDH has priority. If it is missing or invalid, the Peppol default
+        // (FAILURE_ONLY) applies. The configured "mls.type" is only used for outbound documents
+        EPeppolMLSType eMlsType = aPeppolSBD.getMLSType ();
+        if (eMlsType == null)
+        {
+          eMlsType = EPeppolMLSType.DEFAULT;
+          LOGGER.info (sLogPrefix +
+                       "The incoming SBDH contains no valid MLS_TYPE - using the default '" +
+                       eMlsType.getID () +
+                       "' instead");
+        }
+
         // Store SBD in a persistent storage
         final String sDocumentPath = aDocPayloadMgr.storeDocument (APBasicConfig.getStorageInboundPath (),
                                                                    aAS4Timestamp,
@@ -1236,7 +1341,7 @@ public final class InboundOrchestrator
                                                  bIsDuplicateAS4,
                                                  bIsDuplicateSBDH,
                                                  sValidMlsTo,
-                                                 APCoreConfig.getMlsType ());
+                                                 eMlsType);
         final IInboundTransaction aInboundTx = aInboundMgr.getByID (sTxID);
         if (aInboundTx == null)
           throw new IllegalStateException ("Failed to store incoming transaction");
@@ -1278,6 +1383,14 @@ public final class InboundOrchestrator
           if (_handleIncomingMls (sLogPrefix, aVerifiedTx, aPeppolSBD.getBusinessMessageNoClone (), aProcessingErrors)
                                                                                                                       .isFailure ())
             return aProcessingErrors;
+
+          // The correlation wrote the correlated outbound transaction ID to the database, but this
+          // instance was loaded before it ran - so re-read it for the forwarding
+          aVerifiedTx = aInboundMgr.getByID (sTxID);
+          if (aVerifiedTx == null)
+            throw new IllegalStateException ("Failed to re-read the inbound transaction '" +
+                                             sTxID +
+                                             "' after its MLS correlation");
         }
 
         // Forward - Business Document and MLS
@@ -1305,15 +1418,93 @@ public final class InboundOrchestrator
   }
 
   /**
+   * Determine the C4 country code of a forwarded inbound transaction and store the Peppol Reporting
+   * item if possible. If the C4 country code cannot be determined, the reporting item is created
+   * later via the inbound reporting API.
+   *
+   * @param sLogPrefix
+   *        Log message prefix. May not be <code>null</code>.
+   * @param aInboundTx
+   *        The affected inbound transaction. May not be <code>null</code>.
+   * @param sC4CountryCodeFromForwarder
+   *        The C4 country code provided synchronously by the forwarder. May be <code>null</code>.
+   */
+  private static void _storeInboundReporting (@NonNull final String sLogPrefix,
+                                              @NonNull final IInboundTransaction aInboundTx,
+                                              @Nullable final String sC4CountryCodeFromForwarder)
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+
+    // Determine C4 country code: either from sync response or via configured resolution modes
+    String sC4CountryCode = sC4CountryCodeFromForwarder;
+    if (sC4CountryCode == null)
+    {
+      sC4CountryCode = Telemetry.withSpan (CPhossAPOtel.SPAN_INBOUND_C4_RESOLVE,
+                                           ETelemetrySpanKind.INTERNAL,
+                                           aResolveSpan -> {
+                                             aResolveSpan.setAttribute (CPhossAPOtel.ATTR_TRANSACTION_ID,
+                                                                        aInboundTx.getID ())
+                                                         .setAttribute (CPhossAPOtel.ATTR_RECEIVER_ID,
+                                                                        aInboundTx.getReceiverID ());
+                                             return C4CountryCodeResolver.resolve (aInboundTx);
+                                           });
+    }
+
+    if (sC4CountryCode != null)
+    {
+      // We can store the reporting item immediately
+      aTxMgr.updateC4CountryCode (aInboundTx.getID (), sC4CountryCode);
+      if (APPeppolReportingHelper.createInboundPeppolReportingItem (aInboundTx.getID ()).isFailure ())
+      {
+        LOGGER.error (sLogPrefix +
+                      "Forwarding finished, but failed to store Peppol Reporting entry for '" +
+                      aInboundTx.getID () +
+                      "'");
+      }
+    }
+    else
+      if (APPeppolReportingHelper.isExcludedFromReporting (aInboundTx.getSenderID (), aInboundTx.getReceiverID ()))
+      {
+        // A transaction that is not counted anyway needs no C4 country code - close the reporting
+        // status, so that it is neither queried via the API nor blocks the archival
+        APPeppolReportingHelper.createInboundPeppolReportingItem (aInboundTx.getID ());
+      }
+  }
+
+  /**
+   * Check if the provided inbound transaction is deliberately not forwarded by the primary
+   * forwarder. This is the case for a received MLS that could not be correlated with an outbound
+   * transaction, if <code>forwarding.mls.skip-uncorrelated</code> is enabled.
+   *
+   * @param aInboundTx
+   *        The inbound transaction to check. May not be <code>null</code>.
+   * @return <code>true</code> if the primary forwarding is skipped, <code>false</code> if not.
+   * @since 0.14.0
+   */
+  @VisibleForTesting
+  static boolean isSkipPrimaryForwarding (@NonNull final IInboundTransaction aInboundTx)
+  {
+    return APCoreConfig.isForwardingMlsSkipUncorrelated () &&
+           CPhossAP.isMLS (aInboundTx.getDocTypeID (), aInboundTx.getProcessID ()) &&
+           StringHelper.isEmpty (aInboundTx.getMlsCorrelatedOutboundTransactionID ());
+  }
+
+  /**
    * Forward a received inbound document to the configured C4 endpoint. Handles retry scheduling
    * with exponential backoff and triggers MLS rejection responses when maximum retries are
    * exhausted.
+   * <p>
+   * If <code>forwarding.mls.skip-uncorrelated</code> is enabled, a received MLS that could not be
+   * correlated with an outbound transaction is not forwarded by the primary forwarder, but ends in
+   * {@link EInboundStatus#NOT_FORWARDED}. The secondary forwarders still receive it.
+   * </p>
    *
    * @param sLogPrefix
    *        Log message prefix for traceability. May not be <code>null</code>.
    * @param aInboundTx
    *        The inbound transaction to forward. May not be <code>null</code>.
-   * @return {@link ESuccess#SUCCESS} if forwarding succeeded, {@link ESuccess#FAILURE} otherwise.
+   * @return {@link ESuccess#SUCCESS} if forwarding succeeded or was deliberately skipped,
+   *         {@link ESuccess#FAILURE} otherwise.
    */
   @NonNull
   public static ESuccess forwardDocument (@NonNull final String sLogPrefix,
@@ -1322,6 +1513,31 @@ public final class InboundOrchestrator
     final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
     final IInboundForwardingAttemptManager aAttemptMgr = APJdbcMetaManager.getInboundForwardingAttemptMgr ();
     final IAPTimestampManager aTimestampMgr = APBasicMetaManager.getTimestampMgr ();
+
+    if (isSkipPrimaryForwarding (aInboundTx))
+    {
+      LOGGER.info (sLogPrefix +
+                   "Not forwarding the uncorrelated inbound MLS '" +
+                   aInboundTx.getID () +
+                   "' to the primary forwarder, because '" +
+                   APConfigurationProperties.FORWARDING_MLS_SKIP_UNCORRELATED +
+                   "' is enabled");
+      aTxMgr.updateStatusCompleted (aInboundTx.getID (), EInboundStatus.NOT_FORWARDED);
+
+      // The MLS was received via Peppol, so it is counted like any other received document.
+      // Note: whether a received MLS that was not forwarded to C4 must be part of the Peppol
+      // Reporting is currently not covered by the Peppol specifications and needs clarification
+      _storeInboundReporting (sLogPrefix, aInboundTx, null);
+
+      // The secondary forwarders still receive it
+      _dispatchFireAndForget (sLogPrefix,
+                              aInboundTx,
+                              APCoreMetaManager.getAllSecondaryForwarders (),
+                              "forward-secondary",
+                              CPhossAPOtel.SPAN_INBOUND_FORWARD_SECONDARY,
+                              "Secondary forwarding");
+      return ESuccess.SUCCESS;
+    }
 
     boolean bForwardSuccess = false;
     try (final ITelemetrySpan aSpan = Telemetry.startSpan (CPhossAPOtel.SPAN_INBOUND_FORWARD,
@@ -1371,7 +1587,7 @@ public final class InboundOrchestrator
             Throwable aForwardingCause = null;
             try
             {
-              aResult = aForwarder.forwardDocument (ForwardableDocument.fromInbound (aInboundTx));
+              aResult = aForwarder.forwardDocument (_createForwardableDocument (sLogPrefix, aInboundTx));
             }
             catch (final Exception ex)
             {
@@ -1420,43 +1636,7 @@ public final class InboundOrchestrator
 
               bForwardSuccess = true;
 
-              // Determine C4 country code: either from sync response or via configured resolution
-              // modes
-              String sC4CountryCode = aResult.getCountryCodeC4 ();
-              if (sC4CountryCode == null)
-              {
-                sC4CountryCode = Telemetry.withSpan (CPhossAPOtel.SPAN_INBOUND_C4_RESOLVE,
-                                                     ETelemetrySpanKind.INTERNAL,
-                                                     aResolveSpan -> {
-                                                       aResolveSpan.setAttribute (CPhossAPOtel.ATTR_TRANSACTION_ID,
-                                                                                  aInboundTx.getID ())
-                                                                   .setAttribute (CPhossAPOtel.ATTR_RECEIVER_ID,
-                                                                                  aInboundTx.getReceiverID ());
-                                                       return C4CountryCodeResolver.resolve (aInboundTx);
-                                                     });
-              }
-
-              if (sC4CountryCode != null)
-              {
-                // We can store the reporting item immediately
-                aTxMgr.updateC4CountryCode (aInboundTx.getID (), sC4CountryCode);
-                if (APPeppolReportingHelper.createInboundPeppolReportingItem (aInboundTx.getID ()).isFailure ())
-                {
-                  LOGGER.error (sLogPrefix +
-                                "Forwarding successful, but failed to store Peppol Reporting entry for '" +
-                                aInboundTx.getID () +
-                                "'");
-                }
-              }
-              else
-                if (APPeppolReportingHelper.isExcludedFromReporting (aInboundTx.getSenderID (),
-                                                                     aInboundTx.getReceiverID ()))
-                {
-                  // A transaction that is not counted anyway needs no C4 country code - close the
-                  // reporting status, so that it is neither queried via the API nor blocks the
-                  // archival
-                  APPeppolReportingHelper.createInboundPeppolReportingItem (aInboundTx.getID ());
-                }
+              _storeInboundReporting (sLogPrefix, aInboundTx, aResult.getCountryCodeC4 ());
 
               // Fire-and-forget dispatch to all configured secondary forwarders. Failures are
               // logged
@@ -1706,13 +1886,85 @@ public final class InboundOrchestrator
 
     // Now do what was skipped when the document was received
     if (CPhossAP.isMLS (aVerifiedTx.getDocTypeID (), aVerifiedTx.getProcessID ()))
+    {
       if (_correlateStoredMls (sLogPrefix, aVerifiedTx).isFailure ())
         return ESuccess.FAILURE;
+
+      // The correlation wrote the correlated outbound transaction ID to the database - re-read it,
+      // exactly as the initial receive path does
+      aVerifiedTx = aTxMgr.getByID (sTxID);
+      if (aVerifiedTx == null)
+      {
+        LOGGER.error (sLogPrefix +
+                      "Failed to re-read the inbound transaction '" +
+                      sTxID +
+                      "' after its MLS correlation");
+        return ESuccess.FAILURE;
+      }
+    }
 
     // Forward - Business Document and MLS
     final ESuccess eForward = forwardDocument (sLogPrefix, aVerifiedTx);
     if (eForward.isSuccess ())
       _sendPositiveMlsAfterForwarding (aVerifiedTx, aMlsWarnings.get ());
     return eForward;
+  }
+
+  /**
+   * Same as {@link #forwardDocumentAndSendMls(String, IInboundTransaction)}, but additionally hands
+   * out the completion of the asynchronous MLS sending, so that a test can wait for it.
+   *
+   * @param sLogPrefix
+   *        Log message prefix for traceability. May not be <code>null</code>.
+   * @param aInboundTx
+   *        The inbound transaction to be forwarded again. May not be <code>null</code>.
+   * @param aMlsCompletionHolder
+   *        Filled with the completion of the asynchronous MLS sending, or with <code>null</code> if
+   *        no MLS is sent from here. May be <code>null</code>.
+   * @return The result of {@link #forwardDocument(String, IInboundTransaction)}.
+   */
+  @NonNull
+  @VisibleForTesting
+  static ESuccess forwardDocumentAndSendMls (@NonNull final String sLogPrefix,
+                                            @NonNull final IInboundTransaction aInboundTx,
+                                            @Nullable final Wrapper <CompletableFuture <Void>> aMlsCompletionHolder)
+  {
+    ValueEnforcer.notNull (sLogPrefix, "LogPrefix");
+    ValueEnforcer.notNull (aInboundTx, "InboundTx");
+
+    final ESuccess eForward = forwardDocument (sLogPrefix, aInboundTx);
+    CompletableFuture <Void> aMlsCompletion = null;
+    if (eForward.isSuccess ())
+      aMlsCompletion = _sendPositiveMlsAfterForwarding (aInboundTx, getStoredMlsWarnings (aInboundTx));
+    if (aMlsCompletionHolder != null)
+      aMlsCompletionHolder.set (aMlsCompletion);
+    return eForward;
+  }
+
+  /**
+   * Forward an inbound document again, outside of the initial receive path - by the retry scheduler
+   * or by the operations replay. If it succeeds, the positive MLS is sent to C2, exactly as after a
+   * successful forwarding in
+   * {@link #processIncomingDocument(String, String, String, java.security.cert.X509Certificate, OffsetDateTime, PeppolSBDHData, byte[])}.
+   * If C2 was already answered for this transaction, no second MLS is created, because the MLS slot
+   * of the transaction is claimed atomically.
+   * <p>
+   * The findings of the verification that accepted the document are read back from the stored
+   * verification details, so the positive MLS carries the same line responses as after the
+   * initial forwarding.
+   * </p>
+   *
+   * @param sLogPrefix
+   *        Log message prefix for traceability. May not be <code>null</code>.
+   * @param aInboundTx
+   *        The inbound transaction to be forwarded again. May not be <code>null</code>.
+   * @return The result of {@link #forwardDocument(String, IInboundTransaction)}.
+   * @since 0.14.0
+   */
+  @NonNull
+  public static ESuccess forwardDocumentAndSendMls (@NonNull final String sLogPrefix,
+                                                    @NonNull final IInboundTransaction aInboundTx)
+  {
+    return forwardDocumentAndSendMls (sLogPrefix, aInboundTx, null);
   }
 }

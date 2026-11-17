@@ -78,6 +78,27 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
     m_sTableName = sTableNamePrefix + "outbound_transaction";
   }
 
+  /**
+   * Get the SQL condition that an outbound transaction must fulfil to be archived. It is shared by
+   * {@link #getAllForArchival(int)} and the archival itself, so that the archival re-checks exactly
+   * the criteria of the candidate selection.
+   *
+   * @param aParams
+   *        The parameters to which the values of the placeholders of the condition are appended.
+   *        May not be <code>null</code>.
+   * @return The SQL condition without a leading <code>AND</code>. Never <code>null</code>.
+   */
+  @NonNull
+  static String getArchivalCondition (@NonNull final ConstantPreparedStatementDataProvider aParams)
+  {
+    aParams.addValue (EOutboundStatus.REJECTED.getID ())
+           .addValue (EOutboundStatus.SENT.getID ())
+           .addValue (EOutboundStatus.PERMANENTLY_FAILED.getID ())
+           .addValue (EReportingStatus.REPORTED.getID ())
+           .addValue (EReportingStatus.EXCLUDED.getID ());
+    return "status IN (?,?,?) AND reporting_status IN (?,?)";
+  }
+
   /** {@inheritDoc} */
   @Nullable
   public String create (@NonNull final ETransactionType eTransactionType,
@@ -169,6 +190,37 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
   }
 
   /** {@inheritDoc} */
+  @Nullable
+  public IOutboundTransaction getByIDIncludingArchive (@NonNull final String sID)
+  {
+    // Active table first
+    final IOutboundTransaction aActive = getByID (sID);
+    if (aActive != null)
+      return aActive;
+
+    // Fall back to archive table
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM " +
+                                                                      m_sTableName +
+                                                                      "_archive" +
+                                                                      " WHERE id=?",
+                                                                      new ConstantPreparedStatementDataProvider (sID));
+    if (aRows != null)
+    {
+      if (aRows.size () == 1)
+        return new OutboundTransactionRow (aRows.getFirstOrNull ());
+      if (aRows.size () > 1)
+        LOGGER.warn ("Found " +
+                     aRows.size () +
+                     " archived transactions that all match the Transaction Identifier '" +
+                     sID +
+                     "'");
+    }
+    return null;
+  }
+
+  /** {@inheritDoc} */
   public boolean containsTransactionWithID (@NonNull final String sID)
   {
     final long nAffectedRows = newExecutor ().queryCount ("SELECT COUNT(*)" + " FROM " + m_sTableName + " WHERE id=?",
@@ -245,6 +297,43 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
 
   /** {@inheritDoc} */
   @NonNull
+  public ESuccess claimForRetry (@NonNull final String sID)
+  {
+    ValueEnforcer.notNull (sID, "ID");
+
+    // "next_retry_dt" keeps an instance with an old batch from claiming a transaction that was
+    // retried and failed again in the meantime
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                                      m_sTableName +
+                                                                      " SET status=?" +
+                                                                      " WHERE id=? AND status IN (?,?) AND next_retry_dt <= NOW()",
+                                                                      new ConstantPreparedStatementDataProvider (EOutboundStatus.SENDING.getID (),
+                                                                                                                 sID,
+                                                                                                                 EOutboundStatus.FAILED.getID (),
+                                                                                                                 EOutboundStatus.RECOVERING.getID ()));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  /** {@inheritDoc} */
+  @Nonnegative
+  public long markAllInFlightAsRecovering (@NonNull final OffsetDateTime aRecoveryDueDT)
+  {
+    ValueEnforcer.notNull (aRecoveryDueDT, "RecoveryDueDT");
+
+    // Rows that are being processed right now are marked as well - their next regular status update
+    // overwrites the mark again
+    return newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                  m_sTableName +
+                                                  " SET status=?, next_retry_dt=?" +
+                                                  " WHERE status IN (?,?)",
+                                                  new ConstantPreparedStatementDataProvider (EOutboundStatus.RECOVERING.getID (),
+                                                                                             DBValueHelper.toTimestamp (aRecoveryDueDT),
+                                                                                             EOutboundStatus.PENDING.getID (),
+                                                                                             EOutboundStatus.SENDING.getID ()));
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
   public ESuccess updateStatusAndRetry (@NonNull final String sID,
                                         @NonNull final EOutboundStatus eStatus,
                                         @Nonnegative final int nAttemptCount,
@@ -288,12 +377,13 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
     final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
                                                                       m_sTableName +
                                                                       " SET mls_status=?, mls_received_dt=?, mls_id=?, mls_inbound_transaction_id=?" +
-                                                                      " WHERE id=?",
+                                                                      " WHERE id=? AND (mls_status IS NULL OR mls_status=?)",
                                                                       new ConstantPreparedStatementDataProvider (eMlsStatus.getID (),
                                                                                                                  DBValueHelper.toTimestamp (aMlsReceivedDT),
                                                                                                                  sMlsID,
                                                                                                                  sMlsInboundTransactionID,
-                                                                                                                 sID));
+                                                                                                                 sID,
+                                                                                                                 EMlsReceptionStatus.PENDING.getID ()));
     return ESuccess.valueOf (nRowsAffected == 1);
   }
 
@@ -319,10 +409,11 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
-                                                                      " WHERE status IN (?,?,?)",
+                                                                      " WHERE status IN (?,?,?,?)",
                                                                       new ConstantPreparedStatementDataProvider (EOutboundStatus.PENDING.getID (),
                                                                                                                  EOutboundStatus.SENDING.getID (),
-                                                                                                                 EOutboundStatus.FAILED.getID ()));
+                                                                                                                 EOutboundStatus.FAILED.getID (),
+                                                                                                                 EOutboundStatus.RECOVERING.getID ()));
     final ICommonsList <IOutboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)
@@ -341,12 +432,12 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
-                                                                      " WHERE status=? AND next_retry_dt <= NOW()" +
+                                                                      " WHERE status IN (?,?) AND next_retry_dt <= NOW()" +
                                                                       " ORDER BY next_retry_dt" +
                                                                       " LIMIT " +
-                                                                      nBatchSize +
-                                                                      " FOR UPDATE SKIP LOCKED",
-                                                                      new ConstantPreparedStatementDataProvider (EOutboundStatus.FAILED.getID ()));
+                                                                      nBatchSize,
+                                                                      new ConstantPreparedStatementDataProvider (EOutboundStatus.FAILED.getID (),
+                                                                                                                 EOutboundStatus.RECOVERING.getID ()));
     final ICommonsList <IOutboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)
@@ -359,20 +450,18 @@ public class OutboundTransactionManagerJdbc extends AbstractAPJdbcManager implem
   @ReturnsMutableCopy
   public ICommonsList <IOutboundTransaction> getAllForArchival (@Nonnegative final int nBatchSize)
   {
+    final ConstantPreparedStatementDataProvider aParams = new ConstantPreparedStatementDataProvider ();
+    final String sCondition = getArchivalCondition (aParams);
     final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
-                                                                      " WHERE status IN (?,?,?) AND reporting_status IN (?,?)" +
+                                                                      " WHERE " +
+                                                                      sCondition +
                                                                       " ORDER BY completed_dt" +
                                                                       " LIMIT " +
-                                                                      nBatchSize +
-                                                                      " FOR UPDATE SKIP LOCKED",
-                                                                      new ConstantPreparedStatementDataProvider (EOutboundStatus.REJECTED.getID (),
-                                                                                                                 EOutboundStatus.SENT.getID (),
-                                                                                                                 EOutboundStatus.PERMANENTLY_FAILED.getID (),
-                                                                                                                 EReportingStatus.REPORTED.getID (),
-                                                                                                                 EReportingStatus.EXCLUDED.getID ()));
+                                                                      nBatchSize,
+                                                                      aParams);
     final ICommonsList <IOutboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)

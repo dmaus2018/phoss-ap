@@ -17,7 +17,7 @@
 
 -- Transaction lifecycle history and operator audit log
 
-CREATE TABLE `transaction_audit_log` (
+CREATE TABLE IF NOT EXISTS `transaction_audit_log` (
   `id`                  BIGINT        NOT NULL AUTO_INCREMENT,
   `transaction_id`      VARCHAR(64),
   `sbdh_instance_id`    VARCHAR(255)  NOT NULL,
@@ -33,8 +33,8 @@ CREATE TABLE `transaction_audit_log` (
   PRIMARY KEY (`id`)
 );
 
-CREATE INDEX `idx_tx_audit_sbdh` ON `transaction_audit_log` (`sbdh_instance_id`, `performed_dt`);
-CREATE INDEX `idx_tx_audit_tx_id` ON `transaction_audit_log` (`transaction_id`);
+DROP TRIGGER IF EXISTS `trg_inbound_status_audit`;
+DROP TRIGGER IF EXISTS `trg_outbound_status_audit`;
 
 DELIMITER $$
 

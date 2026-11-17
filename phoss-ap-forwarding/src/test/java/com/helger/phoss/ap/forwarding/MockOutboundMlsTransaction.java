@@ -186,7 +186,7 @@ public final class MockOutboundMlsTransaction implements IOutboundTransaction
   @Nullable
   public String getMlsInboundTransactionID ()
   {
-    return "tx-1";
+    return MockInboundTransaction.ID;
   }
 
   @Nullable

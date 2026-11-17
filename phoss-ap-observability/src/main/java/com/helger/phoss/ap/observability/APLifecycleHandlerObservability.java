@@ -30,6 +30,7 @@ import com.helger.annotation.style.IsSPIImplementation;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
 import com.helger.phoss.ap.api.codelist.EMlsReceptionStatus;
 import com.helger.phoss.ap.api.codelist.EVerificationResult;
+import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
 import com.helger.phoss.ap.api.spi.IAPLifecycleEventSPI;
 import com.helger.phoss.ap.observability.ObservabilityEcsJson.Builder;
@@ -130,14 +131,15 @@ public class APLifecycleHandlerObservability implements IAPLifecycleEventSPI
   }
 
   public void onInboundMLSCorrelated (@NonNull final String sMlsTransactionID,
-                                      @NonNull final String sReferencedSbdhInstanceID,
-                                      @NonNull final String sCorrelatedOutboundTransactionID,
+                                      @NonNull final IOutboundTransaction aCorrelatedOutboundTransaction,
                                       @NonNull final EPeppolMLSResponseCode eMlsResponseCode,
                                       @NonNull final EMlsReceptionStatus eMlsReceptionStatus,
                                       @Nullable final String sMlsDocumentID,
                                       @NonNull final OffsetDateTime aMlsReceivedDT,
                                       @Nullable final Duration aRoundTrip)
   {
+    final String sReferencedSbdhInstanceID = aCorrelatedOutboundTransaction.getSbdhInstanceID ();
+    final String sCorrelatedOutboundTransactionID = aCorrelatedOutboundTransaction.getID ();
     final Attributes aAttrs = Attributes.of (AttributeKey.stringKey (CPhossAPOtel.ATTR_TRANSACTION_ID), sMlsTransactionID,
                                              AttributeKey.stringKey (CPhossAPOtel.ATTR_SBDH_INSTANCE_ID), sReferencedSbdhInstanceID,
                                              AttributeKey.stringKey (CPhossAPOtel.ATTR_MLS_RESPONSE_CODE), eMlsResponseCode.getID (),
@@ -150,6 +152,7 @@ public class APLifecycleHandlerObservability implements IAPLifecycleEventSPI
                                  .peppol ("mls_transaction_id", sMlsTransactionID)
                                  .peppol ("referenced_sbdh_instance_id", sReferencedSbdhInstanceID)
                                  .peppol ("correlated_outbound_transaction_id", sCorrelatedOutboundTransactionID)
+                                 .outboundTransaction (aCorrelatedOutboundTransaction)
                                  .peppol ("mls_response_code", eMlsResponseCode.getID ())
                                  .peppol ("mls_reception_status", eMlsReceptionStatus.getID ())
                                  .peppol ("mls_document_id", sMlsDocumentID));
@@ -202,11 +205,12 @@ public class APLifecycleHandlerObservability implements IAPLifecycleEventSPI
                                  .peppol ("process_id", sProcessID));
   }
 
-  public void onOutboundDocumentSent (@NonNull final String sTransactionID,
-                                      @NonNull final String sSbdhInstanceID,
+  public void onOutboundDocumentSent (@NonNull final IOutboundTransaction aTransaction,
                                       @Nullable final Duration aSendingDuration,
                                       @Nonnegative final int nAttempts)
   {
+    final String sTransactionID = aTransaction.getID ();
+    final String sSbdhInstanceID = aTransaction.getSbdhInstanceID ();
     final Attributes aAttrs = Attributes.of (AttributeKey.stringKey (CPhossAPOtel.ATTR_TRANSACTION_ID), sTransactionID,
                                              AttributeKey.stringKey (CPhossAPOtel.ATTR_SBDH_INSTANCE_ID), sSbdhInstanceID);
     _addSpanEvent ("outbound.document_sent", aAttrs);
@@ -216,6 +220,7 @@ public class APLifecycleHandlerObservability implements IAPLifecycleEventSPI
                                  .peppol ("direction", "OUTBOUND")
                                  .peppol ("transaction_id", sTransactionID)
                                  .peppol ("sbdh_instance_id", sSbdhInstanceID)
+                                 .outboundTransaction (aTransaction)
                                  .peppol ("attempts", nAttempts));
   }
 

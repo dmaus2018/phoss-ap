@@ -49,8 +49,33 @@ public enum EInboundStatus implements IHasID <String>
   FORWARDED ("forwarded"),
   /** Last forwarding attempt failed &mdash; scheduled for retry. */
   FORWARD_FAILED ("forward_failed"),
+  /**
+   * The transaction was found in {@link #FORWARDING} and may have been left behind by an instance
+   * that stopped unexpectedly &mdash; it is forwarded again once the recovery grace period has
+   * passed, unless the instance processing it finishes it before.
+   *
+   * @since 0.14.0
+   */
+  RECOVERING ("recovering"),
+  /**
+   * The transaction was found in {@link #RECEIVED} and may have been left behind by an instance that
+   * stopped unexpectedly &mdash; its processing is resumed (verification, MLS correlation and
+   * forwarding) once the received recovery grace period has passed, unless the instance processing
+   * it finishes it before.
+   *
+   * @since 0.14.0
+   */
+  RECEIVE_RECOVERING ("receive_recovering"),
   /** Max retries exhausted &mdash; no further attempts. */
-  PERMANENTLY_FAILED ("permanently_failed");
+  PERMANENTLY_FAILED ("permanently_failed"),
+  /**
+   * Deliberately not forwarded to the Receiver Backend by the primary forwarder &mdash; a received
+   * MLS that could not be correlated, while <code>forwarding.mls.skip-uncorrelated</code> is
+   * enabled.
+   *
+   * @since 0.14.0
+   */
+  NOT_FORWARDED ("not_forwarded");
 
   private final String m_sID;
 
@@ -73,7 +98,7 @@ public enum EInboundStatus implements IHasID <String>
    */
   public boolean isFinalState ()
   {
-    return this == REJECTED || this == FORWARDED || this == PERMANENTLY_FAILED;
+    return this == REJECTED || this == FORWARDED || this == PERMANENTLY_FAILED || this == NOT_FORWARDED;
   }
 
   /**

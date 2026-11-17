@@ -33,25 +33,37 @@ public interface IArchivalManager
 {
   /**
    * Archive the provided outbound transaction. This includes the main transaction as well as all
-   * attempts.
+   * attempts. The transaction is only archived, if it still fulfils the criteria of
+   * {@link IOutboundTransactionManager#getAllForArchival(int)} - it may have changed since it was
+   * selected.
    *
    * @param sID
    *        The outbound transaction to archive. May not be <code>null</code>.
-   * @return {@link ESuccess}
+   * @return {@link ESuccess#SUCCESS} if this call archived the transaction,
+   *         {@link ESuccess#FAILURE} if it is already archived, no longer eligible for archival or
+   *         locked by a concurrent transaction.
    */
   @NonNull
   ESuccess archiveOutboundTransaction (@NonNull String sID);
 
   /**
    * Archive the provided inbound transaction. This includes the main transaction as well as all
-   * attempts.
+   * attempts. The transaction is only archived, if it still fulfils the criteria of
+   * {@link IInboundTransactionManager#getAllForArchival(int, boolean)} - it may have changed since
+   * it was selected.
    *
    * @param sID
    *        The inbound transaction to archive. May not be <code>null</code>.
-   * @return {@link ESuccess}
+   * @param bExcludeMlsPending
+   *        <code>true</code> to not archive a transaction that still waits for its MLS. Must be the
+   *        same value that was used for {@link IInboundTransactionManager#getAllForArchival(int, boolean)}.
+   * @return {@link ESuccess#SUCCESS} if this call archived the transaction,
+   *         {@link ESuccess#FAILURE} if it is already archived, no longer eligible for archival or
+   *         locked by a concurrent transaction.
+   * @since 0.14.0
    */
   @NonNull
-  ESuccess archiveInboundTransaction (@NonNull String sID);
+  ESuccess archiveInboundTransaction (@NonNull String sID, boolean bExcludeMlsPending);
 
   /**
    * Run a single cleanup pass on archived outbound transactions whose {@code completed_dt} is older

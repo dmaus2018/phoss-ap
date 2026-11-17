@@ -39,10 +39,10 @@ import com.helger.base.lang.clazz.ClassHelper;
  * </p>
  * <p>
  * An implementation that holds a resource - typically an HTTP connection pool towards the backend
- * service it asks - may additionally implement {@link AutoCloseable}. Its {@link
- * AutoCloseable#close()} is then invoked on application shutdown. Note that an implementation of
- * both sub-interfaces is loaded once per sub-interface, so it is closed once per instance and must
- * tolerate being closed more than once.
+ * service it asks - may additionally implement {@link AutoCloseable}. Its
+ * {@link AutoCloseable#close()} is then invoked on application shutdown. Note that an
+ * implementation of both sub-interfaces is loaded once per sub-interface, so it is closed once per
+ * instance and must tolerate being closed more than once.
  * </p>
  *
  * @author Philip Helger
@@ -50,6 +50,13 @@ import com.helger.base.lang.clazz.ClassHelper;
  */
 public interface IDocumentVerifier extends IHasID <String>
 {
+  /**
+   * The default priority of a verifier, if {@link #getPriority()} is not overridden.
+   *
+   * @since 0.14.0
+   */
+  int DEFAULT_PRIORITY = 0;
+
   /**
    * The stable identifier of this verifier. Contrary to {@link #getVerifierName()} it is not meant
    * to be read by a human but to identify the verifier in a machine readable way - it is e.g. used
@@ -79,5 +86,20 @@ public interface IDocumentVerifier extends IHasID <String>
   default String getVerifierName ()
   {
     return ClassHelper.getClassLocalName (this);
+  }
+
+  /**
+   * The priority defines the order in which the verifiers of one direction are invoked: a verifier
+   * with a lower value is invoked first. Verifiers with the same priority are ordered by their
+   * {@link #getID() ID}, so the order is always deterministic. This allows e.g. a virus scan to run
+   * before the document validation - the first rejection stops the verification, so the order
+   * also decides which verifier is reported as responsible for a rejection.
+   *
+   * @return The priority of this verifier. Defaults to {@link #DEFAULT_PRIORITY}.
+   * @since 0.14.0
+   */
+  default int getPriority ()
+  {
+    return DEFAULT_PRIORITY;
   }
 }

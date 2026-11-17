@@ -19,12 +19,16 @@ package com.helger.phoss.ap.webapp.controller;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.springframework.http.HttpStatus;
@@ -32,9 +36,12 @@ import org.springframework.http.ResponseEntity;
 
 import com.helger.base.state.ESuccess;
 import com.helger.collection.commons.CommonsArrayList;
+import com.helger.peppol.sbdh.EPeppolMLSType;
 import com.helger.phoss.ap.api.IInboundTransactionManager;
 import com.helger.phoss.ap.api.IOutboundTransactionManager;
 import com.helger.phoss.ap.api.ITransactionAuditManager;
+import com.helger.phoss.ap.api.codelist.EInboundStatus;
+import com.helger.phoss.ap.api.codelist.EReportingStatus;
 import com.helger.phoss.ap.api.dto.InboundTransactionResponse;
 import com.helger.phoss.ap.api.dto.OutboundTransactionResponse;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
@@ -136,6 +143,17 @@ final class OperationsControllerTest
     }
   }
 
+  @NonNull
+  private static IInboundTransaction _mockInboundTx (@NonNull final EInboundStatus eStatus)
+  {
+    final IInboundTransaction aTx = mock (IInboundTransaction.class);
+    when (aTx.getID ()).thenReturn ("id-123");
+    when (aTx.getStatus ()).thenReturn (eStatus);
+    when (aTx.getReportingStatus ()).thenReturn (EReportingStatus.PENDING);
+    when (aTx.getMlsType ()).thenReturn (EPeppolMLSType.ALWAYS_SEND);
+    return aTx;
+  }
+
   @Test
   void testReplayInboundSuccess ()
   {
@@ -143,19 +161,102 @@ final class OperationsControllerTest
          final MockedStatic <InboundOrchestrator> aMockOrchestrator = mockStatic (InboundOrchestrator.class))
     {
       final IInboundTransactionManager aTxMgr = mock (IInboundTransactionManager.class);
-      final IInboundTransaction aTx = mock (IInboundTransaction.class);
-      when (aTx.getStatus ()).thenReturn (com.helger.phoss.ap.api.codelist.EInboundStatus.FORWARDED);
-      when (aTx.getReportingStatus ()).thenReturn (com.helger.phoss.ap.api.codelist.EReportingStatus.PENDING);
-      when (aTx.getMlsType ()).thenReturn (com.helger.peppol.sbdh.EPeppolMLSType.ALWAYS_SEND);
-      when (aTxMgr.getBySbdhInstanceIDIncludingArchive ("tx-123")).thenReturn (aTx);
+      final IInboundTransaction aTx = _mockInboundTx (EInboundStatus.FORWARD_FAILED);
+      when (aTxMgr.getBySbdhInstanceID ("tx-123")).thenReturn (aTx);
+      when (aTxMgr.claimForReplay ("id-123", EInboundStatus.FORWARD_FAILED)).thenReturn (ESuccess.SUCCESS);
       aMockJdbc.when (APJdbcMetaManager::getInboundTransactionMgr).thenReturn (aTxMgr);
 
-      aMockOrchestrator.when (() -> InboundOrchestrator.forwardDocument ("API Replay: ", aTx))
+      aMockOrchestrator.when (() -> InboundOrchestrator.forwardDocumentAndSendMls ("API Replay: ", aTx))
                        .thenReturn (ESuccess.SUCCESS);
 
       final ResponseEntity <InboundTransactionResponse> aResp = m_aController.replayInbound ("tx-123");
       assertEquals (HttpStatus.OK, aResp.getStatusCode ());
       assertNotNull (aResp.getBody ());
+      verify (aTxMgr).claimForReplay ("id-123", EInboundStatus.FORWARD_FAILED);
+    }
+  }
+
+  private void _assertReplayRejected (@NonNull final EInboundStatus eStatus)
+  {
+    try (final MockedStatic <APJdbcMetaManager> aMockJdbc = mockStatic (APJdbcMetaManager.class);
+         final MockedStatic <InboundOrchestrator> aMockOrchestrator = mockStatic (InboundOrchestrator.class))
+    {
+      final IInboundTransactionManager aTxMgr = mock (IInboundTransactionManager.class);
+      final IInboundTransaction aTx = _mockInboundTx (eStatus);
+      when (aTxMgr.getBySbdhInstanceID ("tx-123")).thenReturn (aTx);
+      aMockJdbc.when (APJdbcMetaManager::getInboundTransactionMgr).thenReturn (aTxMgr);
+
+      final ResponseEntity <InboundTransactionResponse> aResp = m_aController.replayInbound ("tx-123");
+      assertEquals (HttpStatus.CONFLICT, aResp.getStatusCode ());
+      assertNotNull (aResp.getBody ());
+      // Neither claimed, nor forwarded, nor answered
+      verify (aTxMgr, never ()).claimForReplay (any (), any ());
+      aMockOrchestrator.verifyNoInteractions ();
+    }
+  }
+
+  @Test
+  void testReplayInboundReceived ()
+  {
+    _assertReplayRejected (EInboundStatus.RECEIVED);
+  }
+
+  @Test
+  void testReplayInboundReceiveRecovering ()
+  {
+    _assertReplayRejected (EInboundStatus.RECEIVE_RECOVERING);
+  }
+
+  @Test
+  void testReplayInboundVerificationDeferred ()
+  {
+    _assertReplayRejected (EInboundStatus.VERIFICATION_DEFERRED);
+  }
+
+  @Test
+  void testReplayInboundForwarding ()
+  {
+    _assertReplayRejected (EInboundStatus.FORWARDING);
+  }
+
+  @Test
+  void testReplayInboundClaimLost ()
+  {
+    try (final MockedStatic <APJdbcMetaManager> aMockJdbc = mockStatic (APJdbcMetaManager.class);
+         final MockedStatic <InboundOrchestrator> aMockOrchestrator = mockStatic (InboundOrchestrator.class))
+    {
+      final IInboundTransactionManager aTxMgr = mock (IInboundTransactionManager.class);
+      final IInboundTransaction aTx = _mockInboundTx (EInboundStatus.FORWARD_FAILED);
+      when (aTxMgr.getBySbdhInstanceID ("tx-123")).thenReturn (aTx);
+      // E.g. the retry scheduler claimed it first
+      when (aTxMgr.claimForReplay ("id-123", EInboundStatus.FORWARD_FAILED)).thenReturn (ESuccess.FAILURE);
+      aMockJdbc.when (APJdbcMetaManager::getInboundTransactionMgr).thenReturn (aTxMgr);
+
+      final ResponseEntity <InboundTransactionResponse> aResp = m_aController.replayInbound ("tx-123");
+      assertEquals (HttpStatus.CONFLICT, aResp.getStatusCode ());
+      assertNotNull (aResp.getBody ());
+      aMockOrchestrator.verifyNoInteractions ();
+    }
+  }
+
+  @Test
+  void testReplayInboundArchived ()
+  {
+    try (final MockedStatic <APJdbcMetaManager> aMockJdbc = mockStatic (APJdbcMetaManager.class);
+         final MockedStatic <InboundOrchestrator> aMockOrchestrator = mockStatic (InboundOrchestrator.class))
+    {
+      final IInboundTransactionManager aTxMgr = mock (IInboundTransactionManager.class);
+      final IInboundTransaction aTx = _mockInboundTx (EInboundStatus.FORWARDED);
+      // Only in the archive
+      when (aTxMgr.getBySbdhInstanceID ("tx-123")).thenReturn (null);
+      when (aTxMgr.getBySbdhInstanceIDIncludingArchive ("tx-123")).thenReturn (aTx);
+      aMockJdbc.when (APJdbcMetaManager::getInboundTransactionMgr).thenReturn (aTxMgr);
+
+      final ResponseEntity <InboundTransactionResponse> aResp = m_aController.replayInbound ("tx-123");
+      assertEquals (HttpStatus.CONFLICT, aResp.getStatusCode ());
+      assertNotNull (aResp.getBody ());
+      verify (aTxMgr, never ()).claimForReplay (any (), any ());
+      aMockOrchestrator.verifyNoInteractions ();
     }
   }
 
@@ -343,13 +444,15 @@ final class OperationsControllerTest
       when (aTx.getReportingStatus ()).thenReturn (com.helger.phoss.ap.api.codelist.EReportingStatus.PENDING);
       when (aTx.getMlsType ()).thenReturn (com.helger.peppol.sbdh.EPeppolMLSType.ALWAYS_SEND);
       when (aTx.getAttemptCount ()).thenReturn (1);
+      when (aTxMgr.getBySbdhInstanceID ("tx-123")).thenReturn (aTx);
       when (aTxMgr.getBySbdhInstanceIDIncludingArchive ("tx-123")).thenReturn (aTx);
+      when (aTxMgr.claimForReplay ("tx-id-999", EInboundStatus.FORWARDED)).thenReturn (ESuccess.SUCCESS);
       aMockJdbc.when (APJdbcMetaManager::getInboundTransactionMgr).thenReturn (aTxMgr);
 
       final ITransactionAuditManager aAuditMgr = mock (ITransactionAuditManager.class);
       aMockJdbc.when (APJdbcMetaManager::getTransactionAuditMgr).thenReturn (aAuditMgr);
 
-      aMockOrchestrator.when (() -> InboundOrchestrator.forwardDocument ("API Replay: ", aTx))
+      aMockOrchestrator.when (() -> InboundOrchestrator.forwardDocumentAndSendMls ("API Replay: ", aTx))
                        .thenReturn (ESuccess.SUCCESS);
 
       final ResponseEntity <InboundTransactionResponse> aResp = m_aController.replayInbound ("tx-123",

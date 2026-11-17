@@ -62,7 +62,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                      " status, attempt_count, received_dt, completed_dt," +
                                      " reporting_status, next_retry_dt, error_details," +
                                      " mls_to, mls_type, mls_response_code, mls_outbound_transaction_id," +
-                                     " verification_result, verification_details";
+                                     " verification_result, verification_details, mls_correlated_outbound_transaction_id";
   private static final Logger LOGGER = LoggerFactory.getLogger (InboundTransactionManagerJdbc.class);
 
   private final String m_sTableName;
@@ -80,6 +80,49 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
   {
     super (aTimestampMgr);
     m_sTableName = sTableNamePrefix + "inbound_transaction";
+  }
+
+  /**
+   * Get the SQL condition that an inbound transaction must fulfil to be archived. It is shared by
+   * {@link #getAllForArchival(int, boolean)} and the archival itself, so that the archival
+   * re-checks exactly the criteria of the candidate selection.
+   *
+   * @param bExcludeMlsPending
+   *        <code>true</code> to exclude the transactions that still wait for their MLS, as in
+   *        {@link #getAllForArchival(int, boolean)}.
+   * @param aParams
+   *        The parameters to which the values of the placeholders of the condition are appended.
+   *        May not be <code>null</code>.
+   * @return The SQL condition without a leading <code>AND</code>. Never <code>null</code>.
+   */
+  @NonNull
+  static String getArchivalCondition (final boolean bExcludeMlsPending,
+                                      @NonNull final ConstantPreparedStatementDataProvider aParams)
+  {
+    aParams.addValue (EInboundStatus.REJECTED.getID ())
+           .addValue (EInboundStatus.FORWARDED.getID ())
+           .addValue (EInboundStatus.PERMANENTLY_FAILED.getID ())
+           .addValue (EInboundStatus.NOT_FORWARDED.getID ())
+           .addValue (EReportingStatus.REPORTED.getID ())
+           .addValue (EReportingStatus.EXCLUDED.getID ());
+    String ret = "status IN (?,?,?,?) AND reporting_status IN (?,?)";
+    if (bExcludeMlsPending)
+    {
+      // Same criteria as getAllForMlsApiTimeout
+      ret += " AND NOT (status=? AND mls_response_code IS NULL" +
+             " AND mls_type <> ?" +
+             " AND NOT (doc_type_id=? AND process_id=?)" +
+             " AND NOT (doc_type_id=? AND process_id=?)" +
+             " AND (verification_result IS NULL OR verification_result <> ?))";
+      aParams.addValue (EInboundStatus.FORWARDED.getID ())
+             .addValue (EPeppolMLSType.FAILURE_ONLY.getID ())
+             .addValue (EPredefinedDocumentTypeIdentifier.PEPPOL_MLS_1_0.getURIEncoded ())
+             .addValue (EPredefinedProcessIdentifier.urn_peppol_edec_mls.getURIEncoded ())
+             .addValue (EPredefinedDocumentTypeIdentifier.APPLICATIONRESPONSE_FDC_PEPPOL_EU_POACC_TRNS_MLR_3.getURIEncoded ())
+             .addValue (EPredefinedProcessIdentifier.BIS3_MLR.getURIEncoded ())
+             .addValue (EVerificationResult.REJECTED.getID ());
+    }
+    return ret;
   }
 
   /** {@inheritDoc} */
@@ -113,7 +156,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                  " (" +
                                                                  COLS +
                                                                  ")" +
-                                                                 " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                                                 " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                                                  new ConstantPreparedStatementDataProvider (sID,
                                                                                                             sIncomingID,
                                                                                                             sC2SeatID,
@@ -142,6 +185,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                                                             null,
                                                                                                             sMlsTo,
                                                                                                             eMlsType.getID (),
+                                                                                                            null,
                                                                                                             null,
                                                                                                             null,
                                                                                                             null,
@@ -291,6 +335,108 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
 
   /** {@inheritDoc} */
   @NonNull
+  public ESuccess claimForRetry (@NonNull final String sID)
+  {
+    ValueEnforcer.notNull (sID, "ID");
+
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                                      m_sTableName +
+                                                                      " SET status=?" +
+                                                                      " WHERE id=? AND status IN (?,?) AND next_retry_dt <= NOW()",
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARDING.getID (),
+                                                                                                                 sID,
+                                                                                                                 EInboundStatus.FORWARD_FAILED.getID (),
+                                                                                                                 EInboundStatus.RECOVERING.getID ()));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
+  public ESuccess claimForReplay (@NonNull final String sID, @NonNull final EInboundStatus eExpectedStatus)
+  {
+    ValueEnforcer.notNull (sID, "ID");
+    ValueEnforcer.notNull (eExpectedStatus, "ExpectedStatus");
+
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                                      m_sTableName +
+                                                                      " SET status=?" +
+                                                                      " WHERE id=? AND status=?",
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARDING.getID (),
+                                                                                                                 sID,
+                                                                                                                 eExpectedStatus.getID ()));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  /** {@inheritDoc} */
+  @Nonnegative
+  public long markAllInFlightAsRecovering(@NonNull final OffsetDateTime aRecoveryDueDT)
+  {
+    ValueEnforcer.notNull (aRecoveryDueDT, "RecoveryDueDT");
+
+    // Rows that are being forwarded right now are marked as well - their next regular status update
+    // overwrites the mark again
+    return newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                  m_sTableName +
+                                                  " SET status=?, next_retry_dt=?" +
+                                                  " WHERE status=?",
+                                                  new ConstantPreparedStatementDataProvider (EInboundStatus.RECOVERING.getID (),
+                                                                                             DBValueHelper.toTimestamp (aRecoveryDueDT),
+                                                                                             EInboundStatus.FORWARDING.getID ()));
+  }
+
+  /** {@inheritDoc} */
+  @Nonnegative
+  public long markAllReceivedAsRecovering (@NonNull final OffsetDateTime aRecoveryDueDT)
+  {
+    ValueEnforcer.notNull (aRecoveryDueDT, "RecoveryDueDT");
+
+    // Rows that are being processed right now are marked as well - their next regular status update
+    // overwrites the mark again
+    return newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                  m_sTableName +
+                                                  " SET status=?, next_retry_dt=?" +
+                                                  " WHERE status=?",
+                                                  new ConstantPreparedStatementDataProvider (EInboundStatus.RECEIVE_RECOVERING.getID (),
+                                                                                             DBValueHelper.toTimestamp (aRecoveryDueDT),
+                                                                                             EInboundStatus.RECEIVED.getID ()));
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
+  public ESuccess claimForReceiveRecovery (@NonNull final String sID)
+  {
+    ValueEnforcer.notNull (sID, "ID");
+
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                                      m_sTableName +
+                                                                      " SET status=?" +
+                                                                      " WHERE id=? AND status=? AND next_retry_dt <= NOW()",
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.RECEIVED.getID (),
+                                                                                                                 sID,
+                                                                                                                 EInboundStatus.RECEIVE_RECOVERING.getID ()));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
+  public ESuccess claimForVerificationRetry (@NonNull final String sID, @NonNull final OffsetDateTime aLeaseEndDT)
+  {
+    ValueEnforcer.notNull (sID, "ID");
+    ValueEnforcer.notNull (aLeaseEndDT, "LeaseEndDT");
+
+    // The status stays - moving "next_retry_dt" out of the "<= NOW()" window is the claim
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                                      m_sTableName +
+                                                                      " SET next_retry_dt=?" +
+                                                                      " WHERE id=? AND status=? AND next_retry_dt <= NOW()",
+                                                                      new ConstantPreparedStatementDataProvider (DBValueHelper.toTimestamp (aLeaseEndDT),
+                                                                                                                 sID,
+                                                                                                                 EInboundStatus.VERIFICATION_DEFERRED.getID ()));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
   public ESuccess updateStatusAndRetry (@NonNull final String sID,
                                         @NonNull final EInboundStatus eStatus,
                                         @Nonnegative final int nAttemptCount,
@@ -427,6 +573,20 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
 
   /** {@inheritDoc} */
   @NonNull
+  public ESuccess updateMlsCorrelatedOutboundTransactionID (@NonNull final String sID,
+                                                            @NonNull final String sCorrelatedOutboundTransactionID)
+  {
+    final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
+                                                                      m_sTableName +
+                                                                      " SET mls_correlated_outbound_transaction_id=?" +
+                                                                      " WHERE id=?",
+                                                                      new ConstantPreparedStatementDataProvider (sCorrelatedOutboundTransactionID,
+                                                                                                                 sID));
+    return ESuccess.valueOf (nRowsAffected == 1);
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
   public ESuccess updateReportingStatus (@NonNull final String sID, @NonNull final EReportingStatus eReportingStatus)
   {
     final long nRowsAffected = newExecutor ().insertOrUpdateOrDelete ("UPDATE " +
@@ -446,11 +606,13 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
-                                                                      " WHERE status IN (?,?,?,?)",
+                                                                      " WHERE status IN (?,?,?,?,?,?)",
                                                                       new ConstantPreparedStatementDataProvider (EInboundStatus.RECEIVED.getID (),
                                                                                                                  EInboundStatus.VERIFICATION_DEFERRED.getID (),
                                                                                                                  EInboundStatus.FORWARDING.getID (),
-                                                                                                                 EInboundStatus.FORWARD_FAILED.getID ()));
+                                                                                                                 EInboundStatus.FORWARD_FAILED.getID (),
+                                                                                                                 EInboundStatus.RECOVERING.getID (),
+                                                                                                                 EInboundStatus.RECEIVE_RECOVERING.getID ()));
     final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)
@@ -466,12 +628,34 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
+                                                                      " WHERE status IN (?,?) AND next_retry_dt <= NOW()" +
+                                                                      " ORDER BY next_retry_dt" +
+                                                                      " LIMIT " +
+                                                                      nBatchSize,
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARD_FAILED.getID (),
+                                                                                                                 EInboundStatus.RECOVERING.getID ()));
+    final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
+    if (aRows != null)
+      for (final DBResultRow aRow : aRows)
+        ret.add (new InboundTransactionRow (aRow));
+    return ret;
+  }
+
+  /** {@inheritDoc} */
+  @NonNull
+  public ICommonsList <IInboundTransaction> getAllForReceiveRecovery (@Nonnegative final int nBatchSize)
+  {
+    ValueEnforcer.isGT0 (nBatchSize, "BatchSize");
+
+    final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
+                                                                      COLS +
+                                                                      " FROM " +
+                                                                      m_sTableName +
                                                                       " WHERE status=? AND next_retry_dt <= NOW()" +
                                                                       " ORDER BY next_retry_dt" +
                                                                       " LIMIT " +
-                                                                      nBatchSize +
-                                                                      " FOR UPDATE SKIP LOCKED",
-                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.FORWARD_FAILED.getID ()));
+                                                                      nBatchSize,
+                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.RECEIVE_RECOVERING.getID ()));
     final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)
@@ -490,8 +674,7 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
                                                                       " WHERE status=? AND next_retry_dt <= NOW()" +
                                                                       " ORDER BY next_retry_dt" +
                                                                       " LIMIT " +
-                                                                      nBatchSize +
-                                                                      " FOR UPDATE SKIP LOCKED",
+                                                                      nBatchSize,
                                                                       new ConstantPreparedStatementDataProvider (EInboundStatus.VERIFICATION_DEFERRED.getID ()));
     final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
@@ -547,24 +730,23 @@ public class InboundTransactionManagerJdbc extends AbstractAPJdbcManager impleme
 
   /** {@inheritDoc} */
   @NonNull
-  public ICommonsList <IInboundTransaction> getAllForArchival (@Nonnegative final int nBatchSize)
+  public ICommonsList <IInboundTransaction> getAllForArchival (@Nonnegative final int nBatchSize,
+                                                               final boolean bExcludeMlsPending)
   {
     ValueEnforcer.isGT0 (nBatchSize, "BatchSize");
 
+    final ConstantPreparedStatementDataProvider aParams = new ConstantPreparedStatementDataProvider ();
+    final String sCondition = getArchivalCondition (bExcludeMlsPending, aParams);
     final ICommonsList <DBResultRow> aRows = newExecutor ().queryAll ("SELECT " +
                                                                       COLS +
                                                                       " FROM " +
                                                                       m_sTableName +
-                                                                      " WHERE status IN (?,?,?) AND reporting_status IN (?,?)" +
+                                                                      " WHERE " +
+                                                                      sCondition +
                                                                       " ORDER BY completed_dt" +
                                                                       " LIMIT " +
-                                                                      nBatchSize +
-                                                                      " FOR UPDATE SKIP LOCKED",
-                                                                      new ConstantPreparedStatementDataProvider (EInboundStatus.REJECTED.getID (),
-                                                                                                                 EInboundStatus.FORWARDED.getID (),
-                                                                                                                 EInboundStatus.PERMANENTLY_FAILED.getID (),
-                                                                                                                 EReportingStatus.REPORTED.getID (),
-                                                                                                                 EReportingStatus.EXCLUDED.getID ()));
+                                                                      nBatchSize,
+                                                                      aParams);
     final ICommonsList <IInboundTransaction> ret = new CommonsArrayList <> ();
     if (aRows != null)
       for (final DBResultRow aRow : aRows)

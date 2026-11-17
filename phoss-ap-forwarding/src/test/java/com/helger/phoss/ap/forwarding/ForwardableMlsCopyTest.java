@@ -25,6 +25,7 @@ import org.junit.Test;
 
 import com.helger.phoss.ap.api.codelist.EForwardableKind;
 import com.helger.phoss.ap.api.model.ForwardableDocument;
+import com.helger.phoss.ap.api.model.IInboundTransaction;
 
 /**
  * Test class for the adaptation of a self-generated MLS to a forwardable document, i.e. the copy of
@@ -37,7 +38,7 @@ public final class ForwardableMlsCopyTest
   @Test
   public void testEveryFieldIsMapped ()
   {
-    final ForwardableDocument aDoc = ForwardableDocument.fromOutboundMlsCopy (new MockOutboundMlsTransaction ());
+    final ForwardableDocument aDoc = ForwardableDocument.fromOutboundMlsCopy (new MockOutboundMlsTransaction (), null);
 
     assertEquals (MockOutboundMlsTransaction.ID, aDoc.id ());
     assertEquals (MockOutboundMlsTransaction.SBDH_INSTANCE_ID, aDoc.sbdhInstanceID ());
@@ -55,7 +56,7 @@ public final class ForwardableMlsCopyTest
   @Test
   public void testKindIsOutboundMlsCopy ()
   {
-    final ForwardableDocument aDoc = ForwardableDocument.fromOutboundMlsCopy (new MockOutboundMlsTransaction ());
+    final ForwardableDocument aDoc = ForwardableDocument.fromOutboundMlsCopy (new MockOutboundMlsTransaction (), null);
     // This is the whole point: C4 can tell an MLS we sent from an MLS we received
     assertSame (EForwardableKind.OUTBOUND_MLS_COPY, aDoc.kind ());
     assertFalse (aDoc.kind ().isInbound ());
@@ -64,11 +65,40 @@ public final class ForwardableMlsCopyTest
   @Test
   public void testNoVerificationAndNoSidecar ()
   {
-    final ForwardableDocument aDoc = ForwardableDocument.fromOutboundMlsCopy (new MockOutboundMlsTransaction ());
+    final ForwardableDocument aDoc = ForwardableDocument.fromOutboundMlsCopy (new MockOutboundMlsTransaction (), null);
     // A self-generated document is never verified
     assertNull (aDoc.verificationResult ());
     assertNull (aDoc.verificationDetails ());
     // OutboundTransactionResponse has no JSON rendering, so no metadata sidecar is offered
     assertNull (aDoc.metadataJson ());
+  }
+
+  @Test
+  public void testNeverCorrelated ()
+  {
+    final ForwardableDocument aDoc = ForwardableDocument.fromOutboundMlsCopy (new MockOutboundMlsTransaction (), null);
+    // Only a received MLS is correlated with an outbound transaction
+    assertNull (aDoc.correlatedOutboundTransactionID ());
+    assertNull (aDoc.correlatedOutboundTransaction ());
+  }
+
+  @Test
+  public void testAnsweredInboundTransaction ()
+  {
+    final IInboundTransaction aInboundTx = new MockInboundTransaction (null, null);
+    final ForwardableDocument aDoc = ForwardableDocument.fromOutboundMlsCopy (new MockOutboundMlsTransaction (),
+                                                                              aInboundTx);
+    // The MLS answers the received business document it was created for
+    assertEquals (MockInboundTransaction.ID, aDoc.answeredInboundTransactionID ());
+    assertSame (aInboundTx, aDoc.answeredInboundTransaction ());
+  }
+
+  @Test
+  public void testAnsweredInboundTransactionNotFound ()
+  {
+    // The link is known, but the inbound transaction could not be resolved
+    final ForwardableDocument aDoc = ForwardableDocument.fromOutboundMlsCopy (new MockOutboundMlsTransaction (), null);
+    assertEquals (MockInboundTransaction.ID, aDoc.answeredInboundTransactionID ());
+    assertNull (aDoc.answeredInboundTransaction ());
   }
 }

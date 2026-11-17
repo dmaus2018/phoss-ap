@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.style.IsSPIImplementation;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
+import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.model.MlsOutcome;
 import com.helger.phoss.ap.api.model.VerifierResult;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
@@ -260,10 +261,11 @@ public class APNotificationHandlerObservability implements IAPNotificationHandle
                                  .error (sErrorDetails != null ? sErrorDetails : "Inbound permanent forwarding failure"));
   }
 
-  public void onOutboundPermanentSendingFailure (@NonNull final String sTransactionID,
-                                                 @NonNull final String sSbdhInstanceID,
+  public void onOutboundPermanentSendingFailure (@NonNull final IOutboundTransaction aTransaction,
                                                  @Nullable final String sErrorDetails)
   {
+    final String sTransactionID = aTransaction.getID ();
+    final String sSbdhInstanceID = aTransaction.getSbdhInstanceID ();
     final String sMsg = "Outbound permanent sending failure" + (sErrorDetails != null ? ": " + sErrorDetails : "");
     final Attributes aAttrs = Attributes.of (AttributeKey.stringKey (CPhossAPOtel.ATTR_TRANSACTION_ID), sTransactionID,
                                              AttributeKey.stringKey (CPhossAPOtel.ATTR_SBDH_INSTANCE_ID), sSbdhInstanceID);
@@ -273,6 +275,7 @@ public class APNotificationHandlerObservability implements IAPNotificationHandle
                                  .peppol ("direction", "OUTBOUND")
                                  .peppol ("transaction_id", sTransactionID)
                                  .peppol ("sbdh_instance_id", sSbdhInstanceID)
+                                 .outboundTransaction (aTransaction)
                                  .error (sErrorDetails != null ? sErrorDetails : "Outbound permanent sending failure"));
   }
 

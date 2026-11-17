@@ -48,6 +48,17 @@ VOLUME /var/phoss-ap/data
 
 ENV LOADER_PATH=/ext
 
+# Block the compromised eMudhra intermediate CA certificates (16 certificates, including the
+# ones cross-signed by Sectigo AAA), see https://github.com/phax/phoss-ap/issues/115
+# The hashes are appended to the JDK "blocked.certs" file. This is idempotent, so it stays
+# harmless once the base image ships a JDK that already blocks them.
+# The file must remain world-readable for arbitrary non-root UIDs.
+COPY docker/emudhra-blocked-certs.txt /tmp/emudhra-blocked-certs.txt
+RUN BLOCKED="$JAVA_HOME/lib/security/blocked.certs" && \
+    grep -q 42C4ACCD12C4F59597925E1A08A7A90102608543809308D50EC427E118BA1493 "$BLOCKED" || \
+      { echo >> "$BLOCKED" && cat /tmp/emudhra-blocked-certs.txt >> "$BLOCKED"; } && \
+    rm /tmp/emudhra-blocked-certs.txt
+
 # Store all runtime data below the /var/phoss-ap/data volume declared above. Without
 # this, the "global.datapath=generated/" default of the bundled application.properties
 # is resolved relative to the working directory "/", so documents and AS4 dumps end up

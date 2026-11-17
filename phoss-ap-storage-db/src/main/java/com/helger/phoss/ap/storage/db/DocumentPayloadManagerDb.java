@@ -67,7 +67,7 @@ public class DocumentPayloadManagerDb extends AbstractAPJdbcManager implements
 
   public DocumentPayloadManagerDb ()
   {
-    super (APBasicMetaManager.getTimestampMgr ());
+    super (() -> APBasicMetaManager.getTimestampMgr ().getCurrentDateTimeUTC ());
   }
 
   @NonNull

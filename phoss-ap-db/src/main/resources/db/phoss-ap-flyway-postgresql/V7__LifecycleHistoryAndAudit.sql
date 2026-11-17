@@ -17,7 +17,10 @@
 
 -- Transaction lifecycle history and operator audit log
 
-CREATE TABLE transaction_audit_log (
+ALTER TABLE inbound_transaction         ADD COLUMN IF NOT EXISTS mls_correlated_outbound_transaction_id TEXT;
+ALTER TABLE inbound_transaction_archive ADD COLUMN IF NOT EXISTS mls_correlated_outbound_transaction_id TEXT;
+
+CREATE TABLE IF NOT EXISTS transaction_audit_log (
   id                  BIGINT        NOT NULL GENERATED ALWAYS AS IDENTITY,
   transaction_id      VARCHAR(64),
   sbdh_instance_id    VARCHAR(255)  NOT NULL,
@@ -33,8 +36,8 @@ CREATE TABLE transaction_audit_log (
   CONSTRAINT pk_transaction_audit_log PRIMARY KEY (id)
 );
 
-CREATE INDEX idx_tx_audit_sbdh ON transaction_audit_log (sbdh_instance_id, performed_dt);
-CREATE INDEX idx_tx_audit_tx_id ON transaction_audit_log (transaction_id);
+CREATE INDEX IF NOT EXISTS idx_tx_audit_sbdh ON transaction_audit_log (sbdh_instance_id, performed_dt);
+CREATE INDEX IF NOT EXISTS idx_tx_audit_tx_id ON transaction_audit_log (transaction_id);
 
 CREATE OR REPLACE FUNCTION trg_fn_transaction_status_audit()
 RETURNS TRIGGER AS $$
@@ -61,11 +64,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_inbound_status_audit ON inbound_transaction;
 CREATE TRIGGER trg_inbound_status_audit
 AFTER UPDATE ON inbound_transaction
 FOR EACH ROW
 EXECUTE FUNCTION trg_fn_transaction_status_audit('INBOUND');
 
+DROP TRIGGER IF EXISTS trg_outbound_status_audit ON outbound_transaction;
 CREATE TRIGGER trg_outbound_status_audit
 AFTER UPDATE ON outbound_transaction
 FOR EACH ROW

@@ -24,9 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonnegative;
-import com.helger.base.exception.InitializationException;
 import com.helger.base.timing.StopWatch;
 import com.helger.collection.commons.ICommonsList;
+import com.helger.phoss.ap.api.codelist.EMlsSendingTrigger;
 import com.helger.phoss.ap.api.model.IInboundTransaction;
 import com.helger.phoss.ap.api.model.IOutboundTransaction;
 import com.helger.phoss.ap.api.otel.CPhossAPOtel;
@@ -71,8 +71,8 @@ public final class ArchivalScheduler
           LOGGER.info ("Archiving " + aTransactions.size () + " outbound transactions");
           for (final IOutboundTransaction aTx : aTransactions)
           {
-            aArchivalMgr.archiveOutboundTransaction (aTx.getID ());
-            nArchived++;
+            if (aArchivalMgr.archiveOutboundTransaction (aTx.getID ()).isSuccess ())
+              nArchived++;
           }
         }
         else
@@ -113,14 +113,17 @@ public final class ArchivalScheduler
     {
       try
       {
-        final ICommonsList <IInboundTransaction> aTransactions = aInboundMgr.getAllForArchival (nBatchSize);
+        final boolean bExcludeMlsPending = APCoreConfig.getMlsSendingTrigger () == EMlsSendingTrigger.API &&
+                                           APCoreConfig.isMlsSendingEnabled ();
+        final ICommonsList <IInboundTransaction> aTransactions = aInboundMgr.getAllForArchival (nBatchSize,
+                                                                                                bExcludeMlsPending);
         if (aTransactions.isNotEmpty ())
         {
           LOGGER.info ("Archiving " + aTransactions.size () + " inbound transactions");
           for (final IInboundTransaction aTx : aTransactions)
           {
-            aArchivalMgr.archiveInboundTransaction (aTx.getID ());
-            nArchived++;
+            if (aArchivalMgr.archiveInboundTransaction (aTx.getID (), bExcludeMlsPending).isSuccess ())
+              nArchived++;
           }
         }
         else
@@ -159,9 +162,8 @@ public final class ArchivalScheduler
       return;
     }
 
+    // The configuration was verified by StartupCheckArchivalScheduler
     final int nBatchSize = APCoreConfig.getArchivalSchedulerBatchSize ();
-    if (nBatchSize < 1)
-      throw new InitializationException ("The archival scheduler batch size must be >= 1, but is " + nBatchSize);
 
     final Duration aInterval = APCoreConfig.getArchivalSchedulerInterval ();
     final long nIntervalMs = aInterval.toMillis ();

@@ -38,6 +38,7 @@ import com.helger.base.string.StringHelper;
 import com.helger.io.file.FileHelper;
 import com.helger.io.file.FileOperationManager;
 import com.helger.io.file.IFileOperationManager;
+import com.helger.phoss.ap.api.APFilenameHelper;
 import com.helger.phoss.ap.api.mgr.IDocumentPayloadManager;
 import com.helger.phoss.ap.basic.APBasicConfig;
 
@@ -51,6 +52,8 @@ public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
 {
   private static final Logger LOGGER = LoggerFactory.getLogger (DocumentPayloadManagerFileSystem.class);
   private static final int MAX_UNIQUENESS_TRIES = 1_000;
+  /** The filename to be used if nothing usable remains of the provided filename */
+  static final String FALLBACK_FILENAME = "document";
 
   /**
    * Default constructor.
@@ -107,6 +110,31 @@ public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
   }
 
   /**
+   * Make a caller-supplied filename safe to use as a single path segment under the date/hour
+   * storage directory. SBDH Instance Identifiers may contain characters that are illegal or
+   * meaningful in filesystem paths (notably {@code '/'} and spaces). Without sanitization,
+   * {@link Path#resolve(String)} treats those as nested directories and {@link Files#write} fails
+   * with {@link java.nio.file.NoSuchFileException} because only the hour directory is created.
+   * <p>
+   * See {@link APFilenameHelper#getAsSafeFilename(String)} for the rules. If nothing usable remains
+   * (e.g. for an SBDH Instance Identifier consisting of dots only), {@value #FALLBACK_FILENAME} is
+   * used instead.
+   *
+   * @param sFilename
+   *        The raw filename. May not be <code>null</code>.
+   * @return A non-empty safe filename. Never <code>null</code>.
+   */
+  @NonNull
+  @Nonempty
+  static String getSafeFilename (@NonNull final String sFilename)
+  {
+    ValueEnforcer.notNull (sFilename, "Filename");
+
+    final String sSafe = APFilenameHelper.getAsSafeFilename (sFilename);
+    return StringHelper.isEmpty (sSafe) ? FALLBACK_FILENAME : sSafe;
+  }
+
+  /**
    * Store a document as a file on the filesystem under a date/hour organized directory structure.
    *
    * @param sBaseDir
@@ -131,11 +159,12 @@ public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
     ValueEnforcer.notNull (sFilename, "Filename");
     ValueEnforcer.notNull (aBytes, "Bytes");
 
+    final String sSafeFilename = getSafeFilename (sFilename);
     final File aEffectiveBaseDir = _getStorageDir (new File (sBaseDir), aReferenceDT);
     try
     {
       Files.createDirectories (aEffectiveBaseDir.toPath ());
-      final Path aFilePath = aEffectiveBaseDir.toPath ().resolve (sFilename);
+      final Path aFilePath = aEffectiveBaseDir.toPath ().resolve (sSafeFilename);
 
       LOGGER.info ("Storing document with " + aBytes.length + " bytes to '" + aFilePath.toString () + "'");
 
@@ -145,7 +174,7 @@ public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
     catch (final Exception ex)
     {
       throw new IllegalStateException ("Failed to store document '" +
-                                       sFilename +
+                                       sSafeFilename +
                                        "' in " +
                                        aEffectiveBaseDir.getAbsolutePath () +
                                        "'",
@@ -158,7 +187,8 @@ public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
                                          @NonNull @Nonempty final String sFilename,
                                          @NonNull @Nonempty final String sFileExt)
   {
-    File aFilePath = new File (aBaseDir, sFilename + sFileExt);
+    final String sSafeFilename = getSafeFilename (sFilename);
+    File aFilePath = new File (aBaseDir, sSafeFilename + sFileExt);
 
     // Make sure the file does not exist yet
     if (aFilePath.exists ())
@@ -167,7 +197,7 @@ public class DocumentPayloadManagerFileSystem implements IDocumentPayloadManager
       int nSuffix = 1;
       do
       {
-        aFilePath = new File (aBaseDir, sFilename + "-" + nSuffix + sFileExt);
+        aFilePath = new File (aBaseDir, sSafeFilename + "-" + nSuffix + sFileExt);
         nSuffix++;
         if (nSuffix >= MAX_UNIQUENESS_TRIES)
         {

@@ -24,6 +24,10 @@ import static org.junit.Assert.assertTrue;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.jspecify.annotations.NonNull;
 import org.junit.ClassRule;
@@ -31,7 +35,13 @@ import org.junit.Test;
 
 import com.helger.base.state.EChange;
 import com.helger.base.state.EContinue;
+import com.helger.base.timing.StopWatch;
+import com.helger.base.wrapper.Wrapper;
 import com.helger.collection.commons.ICommonsList;
+import com.helger.db.api.helper.DBSystemHelper;
+import com.helger.db.jdbc.callback.ConstantPreparedStatementDataProvider;
+import com.helger.db.jdbc.executor.DBExecutor;
+import com.helger.db.jdbc.executor.DBResultRow;
 import com.helger.phase4.duplicate.IAS4DuplicateItem;
 import com.helger.phase4.duplicate.IAS4DuplicateManager;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
@@ -81,6 +91,46 @@ public final class JdbcManagerIntegrationTest
   private static OffsetDateTime _now ()
   {
     return APBasicMetaManager.getTimestampMgr ().getCurrentDateTimeUTC ();
+  }
+
+  // Another pooled connection is what a second AP instance looks like to the database
+  private static <T> T _onOtherConnection (@NonNull final Callable <T> aCallable) throws Exception
+  {
+    final ExecutorService aES = Executors.newSingleThreadExecutor ();
+    try
+    {
+      return aES.submit (aCallable).get (30, TimeUnit.SECONDS);
+    }
+    finally
+    {
+      aES.shutdownNow ();
+    }
+  }
+
+  // Like an instance in the middle of an archival: this thread holds the row lock meanwhile
+  private static <T> T _onOtherConnectionWhileRowLocked (@NonNull final String sTable,
+                                                         @NonNull final String sID,
+                                                         @NonNull final Callable <T> aCallable)
+  {
+    final var aJdbcConfig = APJdbcMetaManager.getJdbcConfig ();
+    final String sTableNamePrefix = DBSystemHelper.getTableNamePrefix (aJdbcConfig.getJdbcDatabaseSystemType (),
+                                                                       aJdbcConfig.getJdbcSchema ());
+    final DBExecutor aExecutor = APDBExecutor.createNew ().get ();
+    final Wrapper <T> aRet = new Wrapper <> ();
+    assertTrue (aExecutor.performInTransaction ( () -> {
+      final ICommonsList <DBResultRow> aRows = aExecutor.queryAll ("SELECT id FROM " +
+                                                                   sTableNamePrefix +
+                                                                   sTable +
+                                                                   " WHERE id=? FOR UPDATE",
+                                                                   new ConstantPreparedStatementDataProvider (sID));
+      assertEquals (1, aRows.size ());
+
+      final StopWatch aSW = StopWatch.createdStarted ();
+      aRet.set (_onOtherConnection (aCallable));
+      // A lock timeout fails as well - only the duration tells skipping from waiting
+      assertTrue ("Waited " + aSW.stopAndGetDuration () + " for the row lock", aSW.getMillis () < 1_000);
+    }).isSuccess ());
+    return aRet.get ();
   }
 
   // --- OutboundTransactionManager ---
@@ -451,6 +501,34 @@ public final class JdbcManagerIntegrationTest
   }
 
   @Test
+  public void testOutboundUpdateMlsStatusOnlyFirstWins ()
+  {
+    final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final String sID = _createOutboundTx ();
+    assertNotNull (sID);
+    assertEquals (EMlsReceptionStatus.PENDING, aMgr.getByID (sID).getMlsStatus ());
+
+    assertTrue (aMgr.updateMlsStatus (sID,
+                                      EMlsReceptionStatus.RECEIVED_AB,
+                                      _now (),
+                                      "mls-msg-first",
+                                      "inbound-mls-tx-first").isSuccess ());
+
+    // Only the first MLS needs to be considered - a second, different one is not stored
+    assertTrue (aMgr.updateMlsStatus (sID,
+                                      EMlsReceptionStatus.RECEIVED_RE,
+                                      _now (),
+                                      "mls-msg-second",
+                                      "inbound-mls-tx-second").isFailure ());
+
+    final IOutboundTransaction aTx = aMgr.getByID (sID);
+    assertNotNull (aTx);
+    assertEquals (EMlsReceptionStatus.RECEIVED_AB, aTx.getMlsStatus ());
+    assertEquals ("mls-msg-first", aTx.getMlsID ());
+    assertEquals ("inbound-mls-tx-first", aTx.getMlsInboundTransactionID ());
+  }
+
+  @Test
   public void testOutboundUpdateReportingStatus ()
   {
     final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
@@ -489,6 +567,112 @@ public final class JdbcManagerIntegrationTest
     final ICommonsList <IOutboundTransaction> aList = aMgr.getAllForRetry (100);
     assertNotNull (aList);
     assertTrue (aList.containsAny (x -> x.getID ().equals (sID)));
+  }
+
+  @Test
+  public void testOutboundRetryClaimIsExclusiveAcrossConnections () throws Exception
+  {
+    final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final String sID = _createOutboundTx ();
+    aMgr.updateStatusAndRetry (sID, EOutboundStatus.FAILED, 1, _now ().minusHours (1), "test error");
+
+    final ICommonsList <IOutboundTransaction> aBatchA = aMgr.getAllForRetry (1000);
+    assertTrue (aBatchA.containsAny (x -> x.getID ().equals (sID)));
+
+    // The SELECT does not lock, so the second instance gets the same candidate
+    final ICommonsList <IOutboundTransaction> aBatchB = _onOtherConnection ( () -> aMgr.getAllForRetry (1000));
+    assertTrue (aBatchB.containsAny (x -> x.getID ().equals (sID)));
+
+    assertTrue (aMgr.claimForRetry (sID).isSuccess ());
+    assertFalse (_onOtherConnection ( () -> aMgr.claimForRetry (sID)).isSuccess ());
+    assertEquals (EOutboundStatus.SENDING, aMgr.getByID (sID).getStatus ());
+  }
+
+  @Test
+  public void testOutboundRetryClaimAfterOtherInstanceFailedItAgain () throws Exception
+  {
+    final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final String sID = _createOutboundTx ();
+    aMgr.updateStatusAndRetry (sID, EOutboundStatus.FAILED, 1, _now ().minusHours (1), "test error");
+
+    final ICommonsList <IOutboundTransaction> aBatchA = aMgr.getAllForRetry (1000);
+    assertTrue (aBatchA.containsAny (x -> x.getID ().equals (sID)));
+
+    // B claims it, the attempt fails again
+    assertTrue (_onOtherConnection ( () -> aMgr.claimForRetry (sID)).isSuccess ());
+    aMgr.updateStatusAndRetry (sID, EOutboundStatus.FAILED, 2, _now ().plusHours (1), "test error");
+
+    // A with its old batch must not claim it before the next retry
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EOutboundStatus.FAILED, aMgr.getByID (sID).getStatus ());
+  }
+
+  @Test
+  public void testOutboundClaimForRetry ()
+  {
+    final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final String sID = _createOutboundTx ();
+
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EOutboundStatus.PENDING, aMgr.getByID (sID).getStatus ());
+
+    aMgr.updateStatusAndRetry (sID, EOutboundStatus.FAILED, 1, _now ().plusHours (1), "test error");
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EOutboundStatus.FAILED, aMgr.getByID (sID).getStatus ());
+
+    aMgr.updateStatusAndRetry (sID, EOutboundStatus.FAILED, 1, _now ().minusHours (1), "test error");
+    assertTrue (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EOutboundStatus.SENDING, aMgr.getByID (sID).getStatus ());
+
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+
+    assertFalse (aMgr.claimForRetry ("does-not-exist").isSuccess ());
+  }
+
+  @Test
+  public void testOutboundMarkAllInFlightAsRecovering ()
+  {
+    final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final String sPendingID = _createOutboundTx ();
+    final String sSendingID = _createOutboundTx ();
+    aMgr.updateStatus (sSendingID, EOutboundStatus.SENDING);
+    final String sFailedID = _createOutboundTx ();
+    aMgr.updateStatusAndRetry (sFailedID, EOutboundStatus.FAILED, 1, _now ().plusHours (1), "test error");
+
+    assertTrue (aMgr.markAllInFlightAsRecovering (_now ().plusHours (1)) >= 2);
+    assertEquals (EOutboundStatus.RECOVERING, aMgr.getByID (sPendingID).getStatus ());
+    assertEquals (EOutboundStatus.RECOVERING, aMgr.getByID (sSendingID).getStatus ());
+    assertEquals (EOutboundStatus.FAILED, aMgr.getByID (sFailedID).getStatus ());
+    assertTrue (aMgr.getAllInTransmission ().containsAny (x -> x.getID ().equals (sSendingID)));
+
+    // Not due before the grace period has passed
+    assertFalse (aMgr.getAllForRetry (1000).containsAny (x -> x.getID ().equals (sSendingID)));
+    assertFalse (aMgr.claimForRetry (sSendingID).isSuccess ());
+
+    // A recovering transaction is not marked again, so its grace period is not extended or shortened
+    aMgr.markAllInFlightAsRecovering (_now ().minusMinutes (1));
+    assertFalse (aMgr.claimForRetry (sSendingID).isSuccess ());
+
+    // The instance that is still processing it finishes it
+    aMgr.updateStatusCompleted (sPendingID, EOutboundStatus.SENT);
+    assertEquals (EOutboundStatus.SENT, aMgr.getByID (sPendingID).getStatus ());
+  }
+
+  @Test
+  public void testOutboundRecoveringIsRetriedWhenDue ()
+  {
+    final IOutboundTransactionManager aMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final String sID = _createOutboundTx ();
+    aMgr.updateStatus (sID, EOutboundStatus.SENDING);
+
+    // The grace period has already passed
+    assertTrue (aMgr.markAllInFlightAsRecovering (_now ().minusMinutes (1)) >= 1);
+    assertEquals (EOutboundStatus.RECOVERING, aMgr.getByID (sID).getStatus ());
+    assertTrue (aMgr.getAllForRetry (1000).containsAny (x -> x.getID ().equals (sID)));
+
+    assertTrue (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EOutboundStatus.SENDING, aMgr.getByID (sID).getStatus ());
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
   }
 
   @Test
@@ -889,6 +1073,27 @@ public final class JdbcManagerIntegrationTest
   }
 
   @Test
+  public void testInboundUpdateMlsCorrelatedOutboundTransactionID ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+    assertNotNull (sID);
+
+    // Not correlated yet
+    assertNull (aMgr.getByID (sID).getMlsCorrelatedOutboundTransactionID ());
+
+    final String sOutboundTxID = _uniqueID ();
+    assertTrue (aMgr.updateMlsCorrelatedOutboundTransactionID (sID, sOutboundTxID).isSuccess ());
+    assertEquals (sOutboundTxID, aMgr.getByID (sID).getMlsCorrelatedOutboundTransactionID ());
+
+    // The other MLS fields are not touched
+    assertNull (aMgr.getByID (sID).getMlsOutboundTransactionID ());
+
+    // Unknown transaction
+    assertTrue (aMgr.updateMlsCorrelatedOutboundTransactionID (_uniqueID (), sOutboundTxID).isFailure ());
+  }
+
+  @Test
   public void testInboundUpdateC4CountryCode ()
   {
     final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
@@ -1019,6 +1224,232 @@ public final class JdbcManagerIntegrationTest
   }
 
   @Test
+  public void testInboundRetryClaimIsExclusiveAcrossConnections () throws Exception
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+    aMgr.updateStatusAndRetry (sID, EInboundStatus.FORWARD_FAILED, 1, _now ().minusHours (1), "test error");
+
+    final ICommonsList <IInboundTransaction> aBatchA = aMgr.getAllForRetry (1000);
+    assertTrue (aBatchA.containsAny (x -> x.getID ().equals (sID)));
+    final ICommonsList <IInboundTransaction> aBatchB = _onOtherConnection ( () -> aMgr.getAllForRetry (1000));
+    assertTrue (aBatchB.containsAny (x -> x.getID ().equals (sID)));
+
+    assertTrue (aMgr.claimForRetry (sID).isSuccess ());
+    assertFalse (_onOtherConnection ( () -> aMgr.claimForRetry (sID)).isSuccess ());
+    assertEquals (EInboundStatus.FORWARDING, aMgr.getByID (sID).getStatus ());
+  }
+
+  @Test
+  public void testInboundRetryClaimAfterOtherInstanceFailedItAgain () throws Exception
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+    aMgr.updateStatusAndRetry (sID, EInboundStatus.FORWARD_FAILED, 1, _now ().minusHours (1), "test error");
+
+    final ICommonsList <IInboundTransaction> aBatchA = aMgr.getAllForRetry (1000);
+    assertTrue (aBatchA.containsAny (x -> x.getID ().equals (sID)));
+
+    assertTrue (_onOtherConnection ( () -> aMgr.claimForRetry (sID)).isSuccess ());
+    aMgr.updateStatusAndRetry (sID, EInboundStatus.FORWARD_FAILED, 2, _now ().plusHours (1), "test error");
+
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EInboundStatus.FORWARD_FAILED, aMgr.getByID (sID).getStatus ());
+  }
+
+  @Test
+  public void testInboundClaimForRetry ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EInboundStatus.RECEIVED, aMgr.getByID (sID).getStatus ());
+
+    aMgr.updateStatusAndRetry (sID, EInboundStatus.FORWARD_FAILED, 1, _now ().plusHours (1), "test error");
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EInboundStatus.FORWARD_FAILED, aMgr.getByID (sID).getStatus ());
+
+    aMgr.updateStatusAndRetry (sID, EInboundStatus.FORWARD_FAILED, 1, _now ().minusHours (1), "test error");
+    assertTrue (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EInboundStatus.FORWARDING, aMgr.getByID (sID).getStatus ());
+
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+
+    assertFalse (aMgr.claimForRetry ("does-not-exist").isSuccess ());
+  }
+
+  @Test
+  public void testInboundClaimForReplay () throws Exception
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+
+    // Not due yet - a replay ignores the next retry date time
+    aMgr.updateStatusAndRetry (sID, EInboundStatus.FORWARD_FAILED, 1, _now ().plusHours (1), "test error");
+
+    // The status was read before somebody else changed it
+    assertFalse (aMgr.claimForReplay (sID, EInboundStatus.RECOVERING).isSuccess ());
+    assertEquals (EInboundStatus.FORWARD_FAILED, aMgr.getByID (sID).getStatus ());
+
+    assertTrue (aMgr.claimForReplay (sID, EInboundStatus.FORWARD_FAILED).isSuccess ());
+    assertEquals (EInboundStatus.FORWARDING, aMgr.getByID (sID).getStatus ());
+
+    // A second replay or the retry scheduler loses
+    assertFalse (_onOtherConnection ( () -> aMgr.claimForReplay (sID, EInboundStatus.FORWARD_FAILED)).isSuccess ());
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+
+    // A final status can be replayed as well
+    aMgr.updateStatusCompleted (sID, EInboundStatus.PERMANENTLY_FAILED);
+    assertTrue (aMgr.claimForReplay (sID, EInboundStatus.PERMANENTLY_FAILED).isSuccess ());
+    assertEquals (EInboundStatus.FORWARDING, aMgr.getByID (sID).getStatus ());
+
+    assertFalse (aMgr.claimForReplay ("does-not-exist", EInboundStatus.FORWARD_FAILED).isSuccess ());
+  }
+
+  @Test
+  public void testInboundArchivedCannotBeClaimedOrAnswered ()
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
+    final String sTxID = _createInboundTx ();
+    final String sSbdhID = aTxMgr.getByID (sTxID).getSbdhInstanceID ();
+    aTxMgr.updateStatusCompleted (sTxID, EInboundStatus.FORWARDED);
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
+    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID, false).isSuccess ());
+
+    // Only found including the archive
+    assertNull (aTxMgr.getBySbdhInstanceID (sSbdhID));
+    final IInboundTransaction aArchived = aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhID);
+    assertNotNull (aArchived);
+    assertEquals (EInboundStatus.FORWARDED, aArchived.getStatus ());
+
+    // Neither a replay nor an MLS can touch an archived transaction
+    assertFalse (aTxMgr.claimForReplay (sTxID, EInboundStatus.FORWARDED).isSuccess ());
+    assertFalse (aTxMgr.claimMlsResponseCode (sTxID, EPeppolMLSResponseCode.ACCEPTANCE).isSuccess ());
+    assertEquals (EInboundStatus.FORWARDED, aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhID).getStatus ());
+  }
+
+  @Test
+  public void testInboundMarkAllInFlightAsRecovering ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sReceivedID = _createInboundTx ();
+    final String sForwardingID = _createInboundTx ();
+    aMgr.updateStatus (sForwardingID, EInboundStatus.FORWARDING);
+    final String sFailedID = _createInboundTx ();
+    aMgr.updateStatusAndRetry (sFailedID, EInboundStatus.FORWARD_FAILED, 1, _now ().plusHours (1), "test error");
+
+    assertTrue (aMgr.markAllInFlightAsRecovering (_now ().plusHours (1)) >= 1);
+    assertEquals (EInboundStatus.RECEIVED, aMgr.getByID (sReceivedID).getStatus ());
+    assertEquals (EInboundStatus.RECOVERING, aMgr.getByID (sForwardingID).getStatus ());
+    assertEquals (EInboundStatus.FORWARD_FAILED, aMgr.getByID (sFailedID).getStatus ());
+    assertTrue (aMgr.getAllInProcessing ().containsAny (x -> x.getID ().equals (sForwardingID)));
+
+    assertFalse (aMgr.getAllForRetry (1000).containsAny (x -> x.getID ().equals (sForwardingID)));
+    assertFalse (aMgr.claimForRetry (sForwardingID).isSuccess ());
+
+    aMgr.markAllInFlightAsRecovering (_now ().minusMinutes (1));
+    assertFalse (aMgr.claimForRetry (sForwardingID).isSuccess ());
+
+    // The instance that is still forwarding it finishes it
+    aMgr.updateStatusCompleted (sForwardingID, EInboundStatus.FORWARDED);
+    assertEquals (EInboundStatus.FORWARDED, aMgr.getByID (sForwardingID).getStatus ());
+  }
+
+  @Test
+  public void testInboundRecoveringIsRetriedWhenDue ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+    aMgr.updateStatus (sID, EInboundStatus.FORWARDING);
+
+    assertTrue (aMgr.markAllInFlightAsRecovering (_now ().minusMinutes (1)) >= 1);
+    assertEquals (EInboundStatus.RECOVERING, aMgr.getByID (sID).getStatus ());
+    assertTrue (aMgr.getAllForRetry (1000).containsAny (x -> x.getID ().equals (sID)));
+
+    assertTrue (aMgr.claimForRetry (sID).isSuccess ());
+    assertEquals (EInboundStatus.FORWARDING, aMgr.getByID (sID).getStatus ());
+    assertFalse (aMgr.claimForRetry (sID).isSuccess ());
+  }
+
+  @Test
+  public void testInboundMarkAllReceivedAsRecovering ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sReceivedID = _createInboundTx ();
+    final String sForwardingID = _createInboundTx ();
+    aMgr.updateStatus (sForwardingID, EInboundStatus.FORWARDING);
+
+    assertTrue (aMgr.markAllReceivedAsRecovering (_now ().plusHours (1)) >= 1);
+    assertEquals (EInboundStatus.RECEIVE_RECOVERING, aMgr.getByID (sReceivedID).getStatus ());
+    assertEquals (EInboundStatus.FORWARDING, aMgr.getByID (sForwardingID).getStatus ());
+    assertTrue (aMgr.getAllInProcessing ().containsAny (x -> x.getID ().equals (sReceivedID)));
+
+    // Not due before the grace period has passed
+    assertFalse (aMgr.getAllForReceiveRecovery (1000).containsAny (x -> x.getID ().equals (sReceivedID)));
+    assertFalse (aMgr.claimForReceiveRecovery (sReceivedID).isSuccess ());
+
+    // Not marked again
+    aMgr.markAllReceivedAsRecovering (_now ().minusMinutes (1));
+    assertFalse (aMgr.claimForReceiveRecovery (sReceivedID).isSuccess ());
+
+    // The instance that is still processing it starts the forwarding
+    aMgr.updateStatus (sReceivedID, EInboundStatus.FORWARDING);
+    assertEquals (EInboundStatus.FORWARDING, aMgr.getByID (sReceivedID).getStatus ());
+    assertFalse (aMgr.claimForReceiveRecovery (sReceivedID).isSuccess ());
+  }
+
+  @Test
+  public void testInboundReceiveRecoveringIsResumedWhenDue ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+
+    assertTrue (aMgr.markAllReceivedAsRecovering (_now ().minusMinutes (1)) >= 1);
+    assertEquals (EInboundStatus.RECEIVE_RECOVERING, aMgr.getByID (sID).getStatus ());
+    assertTrue (aMgr.getAllForReceiveRecovery (1000).containsAny (x -> x.getID ().equals (sID)));
+    // The forwarding retry does not pick it up
+    assertFalse (aMgr.getAllForRetry (1000).containsAny (x -> x.getID ().equals (sID)));
+
+    // Claimed back to "received", so it is marked again if the claiming instance stops too
+    assertTrue (aMgr.claimForReceiveRecovery (sID).isSuccess ());
+    assertEquals (EInboundStatus.RECEIVED, aMgr.getByID (sID).getStatus ());
+    assertFalse (aMgr.claimForReceiveRecovery (sID).isSuccess ());
+    assertFalse (aMgr.claimForReceiveRecovery ("does-not-exist").isSuccess ());
+  }
+
+  @Test
+  public void testInboundVerificationRetryClaimIsExclusiveAcrossConnections () throws Exception
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+    aMgr.updateStatusAndNextRetry (sID, EInboundStatus.VERIFICATION_DEFERRED, _now ().minusHours (1), "verifier down");
+
+    final ICommonsList <IInboundTransaction> aBatchA = aMgr.getAllForVerificationRetry (1000);
+    assertTrue (aBatchA.containsAny (x -> x.getID ().equals (sID)));
+    final var aBatchB = _onOtherConnection ( () -> aMgr.getAllForVerificationRetry (1000));
+    assertTrue (aBatchB.containsAny (x -> x.getID ().equals (sID)));
+
+    final OffsetDateTime aLeaseEndDT = _now ().plusMinutes (5);
+    assertTrue (aMgr.claimForVerificationRetry (sID, aLeaseEndDT).isSuccess ());
+    final IInboundTransaction aClaimed = aMgr.getByID (sID);
+    assertEquals (EInboundStatus.VERIFICATION_DEFERRED, aClaimed.getStatus ());
+    assertTrue (aClaimed.getNextRetryDT ().isAfter (_now ()));
+    assertFalse (aMgr.getAllForVerificationRetry (1000).containsAny (x -> x.getID ().equals (sID)));
+
+    assertFalse (_onOtherConnection ( () -> aMgr.claimForVerificationRetry (sID, aLeaseEndDT)).isSuccess ());
+
+    // Lease ended (claiming instance died)
+    aMgr.updateStatusAndNextRetry (sID, EInboundStatus.VERIFICATION_DEFERRED, _now ().minusMinutes (1), "lease ended");
+    assertTrue (_onOtherConnection ( () -> aMgr.claimForVerificationRetry (sID, aLeaseEndDT)).isSuccess ());
+
+    final String sOtherID = _createInboundTx ();
+    assertFalse (aMgr.claimForVerificationRetry (sOtherID, aLeaseEndDT).isSuccess ());
+  }
+
+  @Test
   public void testInboundGetAllForArchival ()
   {
     final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
@@ -1028,7 +1459,23 @@ public final class JdbcManagerIntegrationTest
     aMgr.updateStatusCompleted (sID, EInboundStatus.FORWARDED);
     aMgr.updateReportingStatus (sID, EReportingStatus.REPORTED);
 
-    final ICommonsList <IInboundTransaction> aList = aMgr.getAllForArchival (100);
+    final ICommonsList <IInboundTransaction> aList = aMgr.getAllForArchival (100, false);
+    assertNotNull (aList);
+    assertTrue (aList.containsAny (x -> x.getID ().equals (sID)));
+  }
+
+  @Test
+  public void testInboundGetAllForArchivalNotForwarded ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+    assertNotNull (sID);
+
+    aMgr.updateStatusCompleted (sID, EInboundStatus.NOT_FORWARDED);
+    aMgr.updateReportingStatus (sID, EReportingStatus.REPORTED);
+
+    // A deliberately not forwarded transaction is final and must be archived as well
+    final ICommonsList <IInboundTransaction> aList = aMgr.getAllForArchival (100, false);
     assertNotNull (aList);
     assertTrue (aList.containsAny (x -> x.getID ().equals (sID)));
   }
@@ -1044,9 +1491,71 @@ public final class JdbcManagerIntegrationTest
     aMgr.updateReportingStatus (sID, EReportingStatus.EXCLUDED);
 
     // Transactions excluded from Peppol Reporting must be archived as well
-    final ICommonsList <IInboundTransaction> aList = aMgr.getAllForArchival (100);
+    final ICommonsList <IInboundTransaction> aList = aMgr.getAllForArchival (100, false);
     assertNotNull (aList);
     assertTrue (aList.containsAny (x -> x.getID ().equals (sID)));
+  }
+
+  @Test
+  public void testInboundGetAllForArchivalExcludesPendingMls ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+    assertNotNull (sID);
+
+    aMgr.updateStatusCompleted (sID, EInboundStatus.FORWARDED);
+    aMgr.updateReportingStatus (sID, EReportingStatus.REPORTED);
+
+    // Forwarded, but no MLS yet
+    assertFalse (aMgr.getAllForArchival (100, true).containsAny (x -> x.getID ().equals (sID)));
+
+    // Once the MLS was determined, it may be archived
+    aMgr.updateMlsFields (sID, EPeppolMLSResponseCode.ACKNOWLEDGING, null);
+    assertTrue (aMgr.getAllForArchival (100, true).containsAny (x -> x.getID ().equals (sID)));
+  }
+
+  @Test
+  public void testInboundGetAllForArchivalPendingMlsWithoutWatchdog ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final String sID = _createInboundTx ();
+    assertNotNull (sID);
+
+    aMgr.updateStatusCompleted (sID, EInboundStatus.FORWARDED);
+    aMgr.updateReportingStatus (sID, EReportingStatus.REPORTED);
+
+    assertTrue (aMgr.getAllForArchival (100, false).containsAny (x -> x.getID ().equals (sID)));
+  }
+
+  @Test
+  public void testInboundGetAllForArchivalWithoutMlsExpected ()
+  {
+    final IInboundTransactionManager aMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+
+    // Documents that never get a positive MLS must not wait for one
+    final String sFailureOnlyID = _createInboundTx ("busdox-docid-qns::urn:test:invoice",
+                                                    "cenbii-procid-ubl::urn:test:process",
+                                                    EPeppolMLSType.FAILURE_ONLY);
+    final String sMlsID = _createInboundTx (EPredefinedDocumentTypeIdentifier.PEPPOL_MLS_1_0.getURIEncoded (),
+                                            EPredefinedProcessIdentifier.urn_peppol_edec_mls.getURIEncoded ());
+    final String sMlrID = _createInboundTx (EPredefinedDocumentTypeIdentifier.APPLICATIONRESPONSE_FDC_PEPPOL_EU_POACC_TRNS_MLR_3.getURIEncoded (),
+                                            EPredefinedProcessIdentifier.BIS3_MLR.getURIEncoded ());
+    final String sRejectedForwardedID = _createInboundTx ();
+    aMgr.updateVerificationResult (sRejectedForwardedID, EVerificationResult.REJECTED, null);
+    for (final String sID : new String [] { sFailureOnlyID, sMlsID, sMlrID, sRejectedForwardedID })
+    {
+      aMgr.updateStatusCompleted (sID, EInboundStatus.FORWARDED);
+      aMgr.updateReportingStatus (sID, EReportingStatus.REPORTED);
+    }
+
+    // Not forwarded at all
+    final String sRejectedID = _createInboundTx ();
+    aMgr.updateStatusCompleted (sRejectedID, EInboundStatus.REJECTED);
+    aMgr.updateReportingStatus (sRejectedID, EReportingStatus.REPORTED);
+
+    final ICommonsList <IInboundTransaction> aList = aMgr.getAllForArchival (100, true);
+    for (final String sID : new String [] { sFailureOnlyID, sMlsID, sMlrID, sRejectedForwardedID, sRejectedID })
+      assertTrue (sID, aList.containsAny (x -> x.getID ().equals (sID)));
   }
 
   @Test
@@ -1304,11 +1813,144 @@ public final class JdbcManagerIntegrationTest
                         null,
                         null);
     aTxMgr.updateStatusCompleted (sTxID, EOutboundStatus.SENT);
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
+
+    assertNotNull (aTxMgr.getByIDIncludingArchive (sTxID));
 
     assertTrue (aArchivalMgr.archiveOutboundTransaction (sTxID).isSuccess ());
 
     assertNull (aTxMgr.getByID (sTxID));
     assertTrue (aAttemptMgr.getByTransactionID (sTxID).isEmpty ());
+
+    // Still found in the archive
+    final IOutboundTransaction aArchivedTx = aTxMgr.getByIDIncludingArchive (sTxID);
+    assertNotNull (aArchivedTx);
+    assertEquals (sTxID, aArchivedTx.getID ());
+    assertEquals (EOutboundStatus.SENT, aArchivedTx.getStatus ());
+  }
+
+  @Test
+  public void testArchiveOutboundTransactionIsExclusiveAcrossConnections () throws Exception
+  {
+    final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
+    final String sTxID = _createOutboundTx ();
+    final String sSbdhID = aTxMgr.getByID (sTxID).getSbdhInstanceID ();
+    aTxMgr.updateStatusCompleted (sTxID, EOutboundStatus.SENT);
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
+
+    final ICommonsList <IOutboundTransaction> aBatchA = aTxMgr.getAllForArchival (1000);
+    assertTrue (aBatchA.containsAny (x -> x.getID ().equals (sTxID)));
+    final ICommonsList <IOutboundTransaction> aBatchB = _onOtherConnection ( () -> aTxMgr.getAllForArchival (1000));
+    assertTrue (aBatchB.containsAny (x -> x.getID ().equals (sTxID)));
+
+    // Overlap: skipped instead of failing on the archive primary key
+    assertFalse (_onOtherConnectionWhileRowLocked ("outbound_transaction",
+                                                   sTxID,
+                                                   () -> aArchivalMgr.archiveOutboundTransaction (sTxID)).isSuccess ());
+    assertNotNull (aTxMgr.getByID (sTxID));
+
+    assertTrue (aArchivalMgr.archiveOutboundTransaction (sTxID).isSuccess ());
+    assertNull (aTxMgr.getByID (sTxID));
+
+    // Already archived: no second "successful" archival
+    assertFalse (_onOtherConnection ( () -> aArchivalMgr.archiveOutboundTransaction (sTxID)).isSuccess ());
+
+    final IOutboundTransaction aArchived = aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhID);
+    assertNotNull (aArchived);
+    assertEquals (sTxID, aArchived.getID ());
+  }
+
+  @Test
+  public void testArchiveInboundTransactionIsExclusiveAcrossConnections () throws Exception
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
+    final String sTxID = _createInboundTx ();
+    final String sSbdhID = aTxMgr.getByID (sTxID).getSbdhInstanceID ();
+    aTxMgr.updateStatusCompleted (sTxID, EInboundStatus.FORWARDED);
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
+
+    // No MLS response code, so only a candidate with bExcludeMlsPending=false
+    final ICommonsList <IInboundTransaction> aBatchA = aTxMgr.getAllForArchival (1000, false);
+    assertTrue (aBatchA.containsAny (x -> x.getID ().equals (sTxID)));
+    final var aBatchB = _onOtherConnection ( () -> aTxMgr.getAllForArchival (1000, false));
+    assertTrue (aBatchB.containsAny (x -> x.getID ().equals (sTxID)));
+
+    assertFalse (_onOtherConnectionWhileRowLocked ("inbound_transaction",
+                                                   sTxID,
+                                                   () -> aArchivalMgr.archiveInboundTransaction (sTxID, false)).isSuccess ());
+    assertNotNull (aTxMgr.getByID (sTxID));
+
+    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID, false).isSuccess ());
+    assertNull (aTxMgr.getByID (sTxID));
+    assertFalse (_onOtherConnection ( () -> aArchivalMgr.archiveInboundTransaction (sTxID, false)).isSuccess ());
+
+    final IInboundTransaction aArchived = aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhID);
+    assertNotNull (aArchived);
+    assertEquals (sTxID, aArchived.getID ());
+  }
+
+  @Test
+  public void testArchiveOutboundTransactionNoLongerEligible ()
+  {
+    final IOutboundTransactionManager aTxMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
+    final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
+    final String sTxID = _createOutboundTx ();
+    aTxMgr.updateStatusCompleted (sTxID, EOutboundStatus.SENT);
+    assertFalse (aArchivalMgr.archiveOutboundTransaction (sTxID).isSuccess ());
+
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
+    assertTrue (aTxMgr.getAllForArchival (1000).containsAny (x -> x.getID ().equals (sTxID)));
+
+    // Changed after it was selected
+    aTxMgr.updateStatus (sTxID, EOutboundStatus.SENDING);
+    assertFalse (aArchivalMgr.archiveOutboundTransaction (sTxID).isSuccess ());
+    assertNotNull (aTxMgr.getByID (sTxID));
+  }
+
+  @Test
+  public void testArchiveInboundTransactionNoLongerEligible ()
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
+    final String sTxID = _createInboundTx ();
+    aTxMgr.updateStatusCompleted (sTxID, EInboundStatus.FORWARDED);
+    assertFalse (aArchivalMgr.archiveInboundTransaction (sTxID, false).isSuccess ());
+
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
+    assertTrue (aTxMgr.getAllForArchival (1000, false).containsAny (x -> x.getID ().equals (sTxID)));
+
+    // Changed after it was selected, e.g. by a replay
+    aTxMgr.updateStatus (sTxID, EInboundStatus.FORWARDING);
+    assertFalse (aArchivalMgr.archiveInboundTransaction (sTxID, false).isSuccess ());
+    assertNotNull (aTxMgr.getByID (sTxID));
+  }
+
+  @Test
+  public void testArchiveInboundTransactionMlsPendingAgain ()
+  {
+    final IInboundTransactionManager aTxMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    final IArchivalManager aArchivalMgr = APJdbcMetaManager.getArchivalMgr ();
+
+    final String sTxID = _createInboundTx ();
+    aTxMgr.updateStatusCompleted (sTxID, EInboundStatus.FORWARDED);
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
+    assertTrue (aTxMgr.claimMlsResponseCode (sTxID, EPeppolMLSResponseCode.ACKNOWLEDGING).isSuccess ());
+    assertTrue (aTxMgr.getAllForArchival (1000, true).containsAny (x -> x.getID ().equals (sTxID)));
+
+    // Sending the MLS failed after the selection, so it waits for its MLS again
+    assertTrue (aTxMgr.releaseMlsResponseCodeClaim (sTxID).isSuccess ());
+    assertFalse (aArchivalMgr.archiveInboundTransaction (sTxID, true).isSuccess ());
+    assertNotNull (aTxMgr.getByID (sTxID));
+
+    // Without the MLS exclusion it is eligible
+    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID, false).isSuccess ());
+    assertNull (aTxMgr.getByID (sTxID));
   }
 
   @Test
@@ -1323,8 +1965,9 @@ public final class JdbcManagerIntegrationTest
 
     aAttemptMgr.createSuccess (sTxID);
     aTxMgr.updateStatusCompleted (sTxID, EInboundStatus.FORWARDED);
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
 
-    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID).isSuccess ());
+    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID, false).isSuccess ());
 
     assertNull (aTxMgr.getByID (sTxID));
     assertTrue (aAttemptMgr.getByTransactionID (sTxID).isEmpty ());
@@ -1342,17 +1985,21 @@ public final class JdbcManagerIntegrationTest
 
     final String sDetails = "[{\"level\":\"error\",\"type\":\"business_rule\",\"code\":\"PEPPOL-EN16931-R001\",\"description\":\"Missing ID\"}]";
     assertTrue (aTxMgr.updateVerificationResult (sTxID, EVerificationResult.REJECTED, sDetails).isSuccess ());
+    final String sOutboundTxID = _uniqueID ();
+    assertTrue (aTxMgr.updateMlsCorrelatedOutboundTransactionID (sTxID, sOutboundTxID).isSuccess ());
     aTxMgr.updateStatusCompleted (sTxID, EInboundStatus.FORWARDED);
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
 
     // Archival copies rows with "INSERT INTO ..._archive SELECT * FROM ...", so a column order
     // mismatch between the two tables would surface here
-    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID).isSuccess ());
+    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID, false).isSuccess ());
     assertNull (aTxMgr.getByID (sTxID));
 
     final IInboundTransaction aArchived = aTxMgr.getBySbdhInstanceIDIncludingArchive (sSbdhInstanceID);
     assertNotNull (aArchived);
     assertEquals (EVerificationResult.REJECTED, aArchived.getVerificationResult ());
     assertEquals (sDetails, aArchived.getVerificationDetails ());
+    assertEquals (sOutboundTxID, aArchived.getMlsCorrelatedOutboundTransactionID ());
   }
 
   @Test
@@ -1393,6 +2040,7 @@ public final class JdbcManagerIntegrationTest
 
     // Archive the transaction
     aTxMgr.updateStatusCompleted (sTxID, EOutboundStatus.SENT);
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
     assertTrue (aArchivalMgr.archiveOutboundTransaction (sTxID).isSuccess ());
 
     // Active-only lookup returns null; including-archive returns the archived row
@@ -1452,7 +2100,8 @@ public final class JdbcManagerIntegrationTest
     // Archive the transaction
     aAttemptMgr.createSuccess (sTxID);
     aTxMgr.updateStatusCompleted (sTxID, EInboundStatus.FORWARDED);
-    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID).isSuccess ());
+    aTxMgr.updateReportingStatus (sTxID, EReportingStatus.REPORTED);
+    assertTrue (aArchivalMgr.archiveInboundTransaction (sTxID, false).isSuccess ());
 
     // Active-only lookup returns null; including-archive returns the archived row
     assertNull (aTxMgr.getBySbdhInstanceID (sSbdhID));

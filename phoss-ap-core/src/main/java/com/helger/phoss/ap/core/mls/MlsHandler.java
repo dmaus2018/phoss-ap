@@ -100,7 +100,21 @@ public final class MlsHandler
       return;
     }
 
-    final ForwardableDocument aDocument = ForwardableDocument.fromOutboundMlsCopy (aMlsTx);
+    // Resolve the received business document the MLS answers, so that the sink can link the copy
+    IInboundTransaction aAnsweredInboundTx = null;
+    final String sAnsweredInboundTxID = aMlsTx.getMlsInboundTransactionID ();
+    if (StringHelper.isNotEmpty (sAnsweredInboundTxID))
+    {
+      aAnsweredInboundTx = APJdbcMetaManager.getInboundTransactionMgr ().getByID (sAnsweredInboundTxID);
+      if (aAnsweredInboundTx == null)
+        LOGGER.warn ("The inbound transaction '" +
+                     sAnsweredInboundTxID +
+                     "' answered by the MLS of outbound transaction '" +
+                     aMlsTx.getID () +
+                     "' could not be found");
+    }
+
+    final ForwardableDocument aDocument = ForwardableDocument.fromOutboundMlsCopy (aMlsTx, aAnsweredInboundTx);
 
     PhotonWorkerPool.getInstance ().run ("forward-mls-copy", () -> {
       try (final ITelemetrySpan aSpan = Telemetry.startSpan (CPhossAPOtel.SPAN_MLS_FORWARD_COPY,
@@ -150,7 +164,8 @@ public final class MlsHandler
   /**
    * Create the outbound MLS response transaction for the outcome of an inbound document, if
    * required by the MLS strategy. The MLS is <b>not</b> sent by this method - the caller decides
-   * when and on which thread that happens, e.g. via {@link #sendCreatedMlsAsync(MlsCreationResult)}.
+   * when and on which thread that happens, e.g. via
+   * {@link #sendCreatedMlsAsync(MlsCreationResult)}.
    *
    * @param aInboundTx
    *        The inbound transaction. Never <code>null</code>.
@@ -184,8 +199,9 @@ public final class MlsHandler
   }
 
   /**
-   * Send an MLS that was previously created by {@link #createInboundResultMls(IInboundTransaction, MlsOutcome)}
-   * asynchronously. Nothing happens if the MLS was suppressed or its creation failed.
+   * Send an MLS that was previously created by
+   * {@link #createInboundResultMls(IInboundTransaction, MlsOutcome)} asynchronously. Nothing
+   * happens if the MLS was suppressed or its creation failed.
    *
    * @param aCreationResult
    *        The result of the MLS creation. May not be <code>null</code>.
@@ -362,9 +378,7 @@ public final class MlsHandler
     if (aDefaultSpidReceiverPID == null)
     {
       // Failed to build PID
-      LOGGER.error ("Failed to create default SPID MLS receiver participant ID with value '" +
-                    sDefaultSpidValue +
-                    "'");
+      LOGGER.error ("Failed to create default SPID MLS receiver participant ID with value '" + sDefaultSpidValue + "'");
       return MlsCreationResult.failure (eResponseCode);
     }
 
@@ -510,7 +524,12 @@ public final class MlsHandler
   }
 
   /**
-   * Correlate an incoming MLS to a previous outbound transaction.
+   * Correlate an incoming MLS to a previous outbound transaction. Only the first MLS received for an
+   * outbound transaction is correlated, as only that one needs to be considered according to the
+   * Peppol specifications. Every later MLS is ignored: the outbound transaction is not modified, the
+   * inbound MLS is not linked to it and no lifecycle event is fired. If the same inbound MLS is
+   * correlated again - when its processing is resumed after the receiving instance stopped
+   * unexpectedly - the correlation is completed again and the lifecycle event is fired again.
    *
    * @param sLogPrefix
    *        Log prefix. Never <code>null</code>.
@@ -524,7 +543,9 @@ public final class MlsHandler
    *        The MLS document ID received. May not be <code>null</code>.
    * @param sMlsInboundTransactionID
    *        The transaction ID of the inbound MLS transaction. May not be <code>null</code>.
-   * @return {@link ESuccess}
+   * @return {@link ESuccess#FAILURE} if the MLS could not be correlated, {@link ESuccess#SUCCESS}
+   *         if it was correlated or if it was ignored because it is not the first MLS for the
+   *         outbound transaction.
    */
   @NonNull
   public static ESuccess handleIncomingMls (@NonNull final String sLogPrefix,
@@ -556,17 +577,69 @@ public final class MlsHandler
       case REJECTION -> EMlsReceptionStatus.RECEIVED_RE;
     };
 
-    // Store in DB
+    // Store in DB - only the first MLS wins
     if (aOutboundMgr.updateMlsStatus (aTx.getID (), eMlsStatus, aMlsAS4ReceivedDT, sMlsID, sMlsInboundTransactionID)
                     .isFailure ())
-      return ESuccess.FAILURE;
+    {
+      // Re-read, because another MLS may have won in the meantime
+      final IOutboundTransaction aCurrentTx = aOutboundMgr.getByID (aTx.getID ());
+      if (aCurrentTx != null && sMlsInboundTransactionID.equals (aCurrentTx.getMlsInboundTransactionID ()))
+      {
+        // This MLS itself won before - its processing is resumed after the receiving instance
+        // stopped unexpectedly. The correlation is completed again, including the lifecycle event,
+        // because it is unknown whether it was fired before
+        LOGGER.info (sLogPrefix +
+                     "The MLS response of inbound transaction '" +
+                     sMlsInboundTransactionID +
+                     "' was already stored for outbound transaction '" +
+                     aTx.getID () +
+                     "' - completing the correlation again");
+      }
+      else
+      {
+        final EMlsReceptionStatus eCurrentMlsStatus = aCurrentTx == null ? null : aCurrentTx.getMlsStatus ();
+        if (eCurrentMlsStatus == EMlsReceptionStatus.RECEIVED_AP ||
+            eCurrentMlsStatus == EMlsReceptionStatus.RECEIVED_AB ||
+            eCurrentMlsStatus == EMlsReceptionStatus.RECEIVED_RE)
+        {
+          LOGGER.warn (sLogPrefix +
+                       "Ignoring the MLS response (" +
+                       eResponseCode.getID () +
+                       ") of inbound transaction '" +
+                       sMlsInboundTransactionID +
+                       "' for outbound transaction '" +
+                       aTx.getID () +
+                       "', because an MLS was already received for it with status '" +
+                       eCurrentMlsStatus.getID () +
+                       "' from inbound transaction '" +
+                       aCurrentTx.getMlsInboundTransactionID () +
+                       "' - only the first MLS is considered");
+          return ESuccess.SUCCESS;
+        }
+        return ESuccess.FAILURE;
+      }
+    }
+    else
+    {
+      LOGGER.info (sLogPrefix +
+                   "Updated MLS status for transaction '" +
+                   aTx.getID () +
+                   "' to '" +
+                   eMlsStatus.getID () +
+                   "'");
+    }
 
-    LOGGER.info (sLogPrefix +
-                 "Updated MLS status for transaction '" +
-                 aTx.getID () +
-                 "' to '" +
-                 eMlsStatus.getID () +
-                 "'");
+    // Remember the correlation on the inbound MLS, so that the forwarding (also a later retry) can
+    // tell a correlated MLS apart from an uncorrelated one
+    if (APJdbcMetaManager.getInboundTransactionMgr ()
+                         .updateMlsCorrelatedOutboundTransactionID (sMlsInboundTransactionID, aTx.getID ())
+                         .isFailure ())
+      LOGGER.warn (sLogPrefix +
+                   "Failed to store the correlated outbound transaction '" +
+                   aTx.getID () +
+                   "' on the inbound MLS transaction '" +
+                   sMlsInboundTransactionID +
+                   "'");
 
     // Compute round-trip duration if the original outbound send completion timestamp is known
     final OffsetDateTime aOutboundCompletedDT = aTx.getCompletedDT ();
@@ -574,8 +647,7 @@ public final class MlsHandler
                                                                                  aMlsAS4ReceivedDT) : null;
     for (final var aHandler : APCoreMetaManager.getAllLifecycleHandlers ())
       aHandler.onInboundMLSCorrelated (sMlsInboundTransactionID,
-                                       sSbdhInstanceID,
-                                       aTx.getID (),
+                                       aTx,
                                        eResponseCode,
                                        eMlsStatus,
                                        sMlsID,

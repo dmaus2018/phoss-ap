@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.helger.annotation.Nonnegative;
-import com.helger.base.exception.InitializationException;
 import com.helger.base.timing.StopWatch;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.peppol.mls.EPeppolMLSResponseCode;
@@ -61,6 +60,45 @@ public final class RetryScheduler
   private RetryScheduler ()
   {}
 
+  // Runs before the retries, so that the rows of a stopped instance get due after the grace period
+  private static void _markInFlightAsRecovering ()
+  {
+    try
+    {
+      final OffsetDateTime aNow = APBasicMetaManager.getTimestampMgr ().getCurrentDateTimeUTC ();
+      final OffsetDateTime aRecoveryDueDT = aNow.plus (APCoreConfig.getRecoveryGracePeriodInFlight ());
+      final long nOutbound = APJdbcMetaManager.getOutboundTransactionMgr ()
+                                              .markAllInFlightAsRecovering (aRecoveryDueDT);
+      final long nInbound = APJdbcMetaManager.getInboundTransactionMgr ().markAllInFlightAsRecovering (aRecoveryDueDT);
+      if (nOutbound > 0 || nInbound > 0)
+        LOGGER.info ("Marked " +
+                     nOutbound +
+                     " outbound and " +
+                     nInbound +
+                     " inbound in-flight transactions as recovering - they are retried at " +
+                     aRecoveryDueDT +
+                     " unless they are finished before");
+
+      final OffsetDateTime aReceivedDueDT = aNow.plus (APCoreConfig.getRecoveryGracePeriodReceived ());
+      final long nReceived = APJdbcMetaManager.getInboundTransactionMgr ().markAllReceivedAsRecovering (aReceivedDueDT);
+      if (nReceived > 0)
+        LOGGER.info ("Marked " +
+                     nReceived +
+                     " received inbound transactions as receive recovering - their processing is resumed at " +
+                     aReceivedDueDT +
+                     " unless they are finished before");
+    }
+    catch (final Exception ex)
+    {
+      LOGGER.error ("Internal error marking in-flight transactions as recovering", ex);
+
+      for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+        aHandler.onUnexpectedException ("RetryScheduler._markInFlightAsRecovering",
+                                        "Internal error marking in-flight transactions as recovering",
+                                        ex);
+    }
+  }
+
   private static void _retryOutbound (@Nonnegative final int nBatchSize)
   {
     final var aOutboundMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
@@ -83,6 +121,18 @@ public final class RetryScheduler
 
           for (final IOutboundTransaction aTx : aTransactions)
           {
+            // The row locks of the SELECT end with its commit, so another instance may hold the
+            // same transaction - only the one that claims it may send it
+            if (aOutboundMgr.claimForRetry (aTx.getID ()).isFailure ())
+            {
+              if (LOGGER.isDebugEnabled ())
+                LOGGER.debug (sLogPrefix +
+                              "Outbound transaction '" +
+                              aTx.getID () +
+                              "' is no longer eligible for retry (claimed by another instance) - skipping");
+              continue;
+            }
+
             nProcessed++;
             try
             {
@@ -125,6 +175,85 @@ public final class RetryScheduler
       aHandler.onRetrySchedulerCycle (true, nProcessed, aCycleDuration);
   }
 
+  // Resumes the processing of a document whose receiving instance stopped before it was forwarded
+  private static void _resumeReceiveRecovering (@Nonnegative final int nBatchSize)
+  {
+    final var aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
+    int nProcessed = 0;
+
+    // Note: deliberately no "onRetrySchedulerCycle" callback - that SPI method only distinguishes
+    // inbound from outbound, and the receive recovery is neither of the two existing cycles
+    try (final ITelemetrySpan aSpan = Telemetry.startSpan (CPhossAPOtel.SPAN_SCHEDULER_CYCLE,
+                                                           ETelemetrySpanKind.INTERNAL)
+                                               .setAttribute (CPhossAPOtel.ATTR_SCHEDULER_NAME, "receive-recovery")
+                                               .setAttribute (CPhossAPOtel.ATTR_IS_OUTBOUND, false))
+    {
+      try
+      {
+        final ICommonsList <IInboundTransaction> aTransactions = aInboundMgr.getAllForReceiveRecovery (nBatchSize);
+
+        if (aTransactions.isNotEmpty ())
+        {
+          LOGGER.info ("Resuming " + aTransactions.size () + " received inbound transactions");
+          final String sLogPrefix = "[ReceiveRecovery] ";
+
+          for (final IInboundTransaction aInboundTx : aTransactions)
+          {
+            if (aInboundMgr.claimForReceiveRecovery (aInboundTx.getID ()).isFailure ())
+            {
+              if (LOGGER.isDebugEnabled ())
+                LOGGER.debug (sLogPrefix +
+                              "Inbound transaction '" +
+                              aInboundTx.getID () +
+                              "' is no longer eligible for receive recovery (finished or claimed by another instance) - skipping");
+              continue;
+            }
+
+            // Re-read, so that the status is "received" again
+            final IInboundTransaction aClaimedTx = aInboundMgr.getByID (aInboundTx.getID ());
+            if (aClaimedTx == null)
+              continue;
+
+            nProcessed++;
+            LOGGER.warn (sLogPrefix +
+                         "Resuming the processing of inbound transaction '" +
+                         aClaimedTx.getID () +
+                         "' with SBDH '" +
+                         aClaimedTx.getSbdhInstanceID () +
+                         "', that was left behind by an instance that stopped unexpectedly");
+            if (InboundOrchestrator.resumeDeferredInboundDocument (sLogPrefix, aClaimedTx).isFailure ())
+            {
+              // A still unavailable verifier is not a forwarding error
+              final IInboundTransaction aUpdatedTx = aInboundMgr.getByID (aClaimedTx.getID ());
+              if (aUpdatedTx != null && aUpdatedTx.getStatus () != EInboundStatus.VERIFICATION_DEFERRED)
+                for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+                  aHandler.onInboundForwardingError (aClaimedTx.getID (), true);
+            }
+          }
+        }
+        else
+        {
+          if (LOGGER.isDebugEnabled ())
+            LOGGER.debug ("Found no inbound transactions for receive recovery");
+        }
+      }
+      catch (final Exception ex)
+      {
+        LOGGER.error ("Internal error in inbound receive recovery cycle", ex);
+        aSpan.recordException (ex).setStatusError (ex.getMessage ());
+
+        for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
+          aHandler.onUnexpectedException ("RetryScheduler._resumeReceiveRecovering",
+                                          "Internal error in inbound receive recovery cycle",
+                                          ex);
+      }
+      finally
+      {
+        aSpan.setAttribute (CPhossAPOtel.ATTR_SCHEDULER_ITEMS, nProcessed);
+      }
+    }
+  }
+
   private static void _retryDeferredVerification (@Nonnegative final int nBatchSize)
   {
     final var aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
@@ -145,9 +274,23 @@ public final class RetryScheduler
         {
           LOGGER.info ("Re-verifying " + aTransactions.size () + " inbound transactions");
           final String sLogPrefix = "[RetryVerification] ";
+          final Duration aLease = APCoreConfig.getVerificationDeferredRetryInterval ();
 
           for (final IInboundTransaction aInboundTx : aTransactions)
           {
+            final OffsetDateTime aLeaseEndDT = APBasicMetaManager.getTimestampMgr ()
+                                                                 .getCurrentDateTimeUTC ()
+                                                                 .plus (aLease);
+            if (aInboundMgr.claimForVerificationRetry (aInboundTx.getID (), aLeaseEndDT).isFailure ())
+            {
+              if (LOGGER.isDebugEnabled ())
+                LOGGER.debug (sLogPrefix +
+                              "Inbound transaction '" +
+                              aInboundTx.getID () +
+                              "' is no longer eligible for re-verification (claimed by another instance) - skipping");
+              continue;
+            }
+
             nProcessed++;
             if (InboundOrchestrator.resumeDeferredInboundDocument (sLogPrefix, aInboundTx).isFailure ())
             {
@@ -205,9 +348,19 @@ public final class RetryScheduler
 
           for (final IInboundTransaction aInboundTx : aTransactions)
           {
+            if (aInboundMgr.claimForRetry (aInboundTx.getID ()).isFailure ())
+            {
+              if (LOGGER.isDebugEnabled ())
+                LOGGER.debug (sLogPrefix +
+                              "Inbound transaction '" +
+                              aInboundTx.getID () +
+                              "' is no longer eligible for retry (claimed by another instance) - skipping");
+              continue;
+            }
+
             nProcessed++;
             // Re-forward using the original InboundOrchestrator logic
-            if (InboundOrchestrator.forwardDocument (sLogPrefix, aInboundTx).isFailure ())
+            if (InboundOrchestrator.forwardDocumentAndSendMls (sLogPrefix, aInboundTx).isFailure ())
             {
               for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
                 aHandler.onInboundForwardingError (aInboundTx.getID (), true);
@@ -315,8 +468,7 @@ public final class RetryScheduler
             }
             catch (final Exception ex)
             {
-              LOGGER.error ("Error sending the fallback MLS for inbound transaction '" + aInboundTx.getID () + "'",
-                            ex);
+              LOGGER.error ("Error sending the fallback MLS for inbound transaction '" + aInboundTx.getID () + "'", ex);
 
               for (final var aHandler : APCoreMetaManager.getAllNotificationHandlers ())
                 aHandler.onUnexpectedException ("RetryScheduler._sendMlsAfterApiTimeout",
@@ -353,12 +505,18 @@ public final class RetryScheduler
   /**
    * Start the retry scheduler. It periodically checks for outbound and inbound transactions that
    * are eligible for retry and processes them.
+   * <p>
+   * The retry scheduler is deliberately not configurable to be disabled: it also runs the stale
+   * transaction recovery, the receive recovery, the re-verification of deferred documents and the
+   * MLS watchdog, and the atomic claims make it safe on every instance of a multi-instance
+   * deployment. An instance without it would leave its own interrupted transactions unrecovered
+   * and gain nothing.
+   * </p>
    */
   public static void start ()
   {
+    // The configuration was verified by StartupCheckRetryScheduler
     final int nBatchSize = APCoreConfig.getRetrySchedulerBatchSize ();
-    if (nBatchSize < 1)
-      throw new InitializationException ("The retry scheduler batch size must be >= 1, but is " + nBatchSize);
 
     final Duration aInterval = APCoreConfig.getRetrySchedulerInterval ();
     final long nIntervalMs = aInterval.toMillis ();
@@ -370,8 +528,10 @@ public final class RetryScheduler
       @Override
       public void run ()
       {
+        _markInFlightAsRecovering ();
         _retryOutbound (nBatchSize);
         _retryInbound (nBatchSize);
+        _resumeReceiveRecovering (nBatchSize);
         _retryDeferredVerification (nBatchSize);
         _sendMlsAfterApiTimeout (nBatchSize);
       }

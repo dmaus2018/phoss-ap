@@ -348,6 +348,17 @@ public final class APCoreConfig
   }
 
   /**
+   * @return <code>true</code> if a received MLS that could not be correlated with an outbound
+   *         transaction should not be forwarded by the primary forwarder.
+   * @since 0.14.0
+   */
+  public static boolean isForwardingMlsSkipUncorrelated ()
+  {
+    return _getConfig ().getAsBoolean (APConfigurationProperties.FORWARDING_MLS_SKIP_UNCORRELATED,
+                                       APConfigurationProperties.FORWARDING_MLS_SKIP_UNCORRELATED_DEFAULT);
+  }
+
+  /**
    * @return The configured C4 country code determination modes as an ordered list. May be empty if
    *         no automatic determination is configured (only async API reporting). Never
    *         <code>null</code>.
@@ -400,6 +411,52 @@ public final class APCoreConfig
     final String sVal = _getConfig ().getAsString (APConfigurationProperties.PHASE4_DUMP_MODE,
                                                    APConfigurationProperties.PHASE4_DUMP_MODE_DEFAULT);
     return EAS4DumpMode.getFromIDOrDefault (sVal);
+  }
+
+  /**
+   * @return The connect timeout for sending an AS4 message. Never <code>null</code>.
+   * @since 0.14.0
+   */
+  @NonNull
+  public static Duration getPhase4SendTimeoutConnect ()
+  {
+    return _getDuration (APConfigurationProperties.PHASE4_SEND_TIMEOUT_CONNECT,
+                         APConfigurationProperties.PHASE4_SEND_TIMEOUT_CONNECT_DEFAULT);
+  }
+
+  /**
+   * @return The response (read) timeout for sending an AS4 message. Never <code>null</code>.
+   * @since 0.14.0
+   */
+  @NonNull
+  public static Duration getPhase4SendTimeoutResponse ()
+  {
+    return _getDuration (APConfigurationProperties.PHASE4_SEND_TIMEOUT_RESPONSE,
+                         APConfigurationProperties.PHASE4_SEND_TIMEOUT_RESPONSE_DEFAULT);
+  }
+
+  /**
+   * @return How often phase4 retries an AS4 message within one sending attempt. 0 means no retry.
+   *         Must be &ge; 0, as verified by the startup check.
+   * @since 0.14.0
+   */
+  @CheckForSigned
+  public static int getPhase4SendHttpRetryMaxRetries ()
+  {
+    return _getConfig ().getAsInt (APConfigurationProperties.PHASE4_SEND_HTTP_RETRY_MAX_RETRIES,
+                                   APConfigurationProperties.PHASE4_SEND_HTTP_RETRY_MAX_RETRIES_DEFAULT);
+  }
+
+  /**
+   * @return The wait time before a phase4 retry within one sending attempt. Never
+   *         <code>null</code>.
+   * @since 0.14.0
+   */
+  @NonNull
+  public static Duration getPhase4SendHttpRetryInterval ()
+  {
+    return _getDuration (APConfigurationProperties.PHASE4_SEND_HTTP_RETRY_INTERVAL,
+                         APConfigurationProperties.PHASE4_SEND_HTTP_RETRY_INTERVAL_DEFAULT);
   }
 
   /**
@@ -528,6 +585,31 @@ public final class APCoreConfig
   public static long getRetryForwardingMaxBackoffMs ()
   {
     return getRetryForwardingMaxBackoff ().toMillis ();
+  }
+
+  /**
+   * @return The duration after which an in-flight transaction marked as recovering is retried,
+   *         unless the instance processing it finishes it before. Never <code>null</code>.
+   * @since 0.14.0
+   */
+  @NonNull
+  public static Duration getRecoveryGracePeriodInFlight ()
+  {
+    return _getDuration (APConfigurationProperties.RECOVERY_GRACE_PERIOD_IN_FLIGHT,
+                         APConfigurationProperties.RECOVERY_GRACE_PERIOD_IN_FLIGHT_DEFAULT);
+  }
+
+  /**
+   * @return The duration after which the processing of a received inbound transaction marked as
+   *         receive recovering is resumed, unless the instance processing it finishes it before.
+   *         Never <code>null</code>.
+   * @since 0.14.0
+   */
+  @NonNull
+  public static Duration getRecoveryGracePeriodReceived ()
+  {
+    return _getDuration (APConfigurationProperties.RECOVERY_GRACE_PERIOD_RECEIVED,
+                         APConfigurationProperties.RECOVERY_GRACE_PERIOD_RECEIVED_DEFAULT);
   }
 
   /**
@@ -842,8 +924,10 @@ public final class APCoreConfig
   }
 
   /**
-   * @return The configured MLS type strategy (e.g. always send, failure only). Defaults to
-   *         {@link EPeppolMLSType#ALWAYS_SEND}. Never <code>null</code>.
+   * @return The configured MLS type strategy (e.g. always send, failure only) that is put into the
+   *         SBDH of <b>outbound</b> documents. It is not used for inbound documents, where the MLS
+   *         type of the received SBDH applies. Defaults to {@link EPeppolMLSType#ALWAYS_SEND}. Never
+   *         <code>null</code>.
    */
   @NonNull
   public static EPeppolMLSType getMlsType ()
@@ -1081,7 +1165,9 @@ public final class APCoreConfig
   }
 
   /**
-   * @return {@code true} if startup recovery of in-flight transactions is enabled.
+   * @return {@code true} if startup recovery of in-flight transactions is enabled. It resets all
+   *         in-flight transactions immediately, so it must only be enabled in a single-instance
+   *         deployment.
    */
   public static boolean isStartupRecoveryEnabled ()
   {

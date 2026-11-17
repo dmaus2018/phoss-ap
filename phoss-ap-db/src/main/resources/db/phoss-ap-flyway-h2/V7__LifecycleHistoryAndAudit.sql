@@ -17,8 +17,11 @@
 
 -- Transaction lifecycle history and operator audit log
 
-CREATE TABLE transaction_audit_log (
-  id                  BIGINT        NOT NULL GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+ALTER TABLE inbound_transaction         ADD COLUMN IF NOT EXISTS mls_correlated_outbound_transaction_id TEXT;
+ALTER TABLE inbound_transaction_archive ADD COLUMN IF NOT EXISTS mls_correlated_outbound_transaction_id TEXT;
+
+CREATE TABLE IF NOT EXISTS transaction_audit_log (
+  id                  BIGINT        NOT NULL GENERATED ALWAYS AS IDENTITY,
   transaction_id      VARCHAR(64),
   sbdh_instance_id    VARCHAR(255)  NOT NULL,
   direction           VARCHAR(10)   NOT NULL,
@@ -29,37 +32,21 @@ CREATE TABLE transaction_audit_log (
   attempt_count       INT,
   performed_by        VARCHAR(256)  NOT NULL DEFAULT 'SYSTEM',
   performed_dt        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  details             CLOB(64K),
+  details             TEXT,
   CONSTRAINT pk_transaction_audit_log PRIMARY KEY (id)
 );
 
-CREATE INDEX idx_tx_audit_sbdh ON transaction_audit_log (sbdh_instance_id, performed_dt);
-CREATE INDEX idx_tx_audit_tx_id ON transaction_audit_log (transaction_id);
+CREATE INDEX IF NOT EXISTS idx_tx_audit_sbdh ON transaction_audit_log (sbdh_instance_id, performed_dt);
+CREATE INDEX IF NOT EXISTS idx_tx_audit_tx_id ON transaction_audit_log (transaction_id);
 
 -- Trigger for inbound transaction status updates
-CREATE TRIGGER trg_inbound_status_audit
+CREATE TRIGGER IF NOT EXISTS trg_inbound_status_audit
 AFTER UPDATE ON inbound_transaction
-REFERENCING OLD AS o NEW AS n
 FOR EACH ROW
-WHEN (o.status IS DISTINCT FROM n.status OR o.attempt_count IS DISTINCT FROM n.attempt_count)
-INSERT INTO transaction_audit_log (
-  transaction_id, sbdh_instance_id, direction, event_type, action,
-  from_status, to_status, attempt_count, performed_by, performed_dt, details
-) VALUES (
-  n.id, n.sbdh_instance_id, 'INBOUND', 'STATUS_CHANGE', 'STATUS_UPDATE',
-  o.status, n.status, n.attempt_count, 'SYSTEM', CURRENT_TIMESTAMP, n.error_details
-);
+CALL "com.helger.phoss.ap.db.trigger.H2StatusAuditTrigger";
 
 -- Trigger for outbound transaction status updates
-CREATE TRIGGER trg_outbound_status_audit
+CREATE TRIGGER IF NOT EXISTS trg_outbound_status_audit
 AFTER UPDATE ON outbound_transaction
-REFERENCING OLD AS o NEW AS n
 FOR EACH ROW
-WHEN (o.status IS DISTINCT FROM n.status OR o.attempt_count IS DISTINCT FROM n.attempt_count)
-INSERT INTO transaction_audit_log (
-  transaction_id, sbdh_instance_id, direction, event_type, action,
-  from_status, to_status, attempt_count, performed_by, performed_dt, details
-) VALUES (
-  n.id, n.sbdh_instance_id, 'OUTBOUND', 'STATUS_CHANGE', 'STATUS_UPDATE',
-  o.status, n.status, n.attempt_count, 'SYSTEM', CURRENT_TIMESTAMP, n.error_details
-);
+CALL "com.helger.phoss.ap.db.trigger.H2StatusAuditTrigger";

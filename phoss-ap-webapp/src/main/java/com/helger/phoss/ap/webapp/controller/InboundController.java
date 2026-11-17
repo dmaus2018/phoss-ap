@@ -169,7 +169,7 @@ public class InboundController
   @GetMapping ("/in-processing")
   @Operation (summary = "List inbound transactions in processing",
               description = "Returns all inbound transactions that are not yet in a final state — includes status received, " +
-                            "forwarding, forward_failed (awaiting retry). Excludes rejected, forwarded, permanently_failed.")
+                            "verification_deferred, forwarding, forward_failed (awaiting retry), recovering and receive_recovering. Excludes rejected, forwarded, permanently_failed, not_forwarded.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "List of inbound transactions"),
                    @ApiResponse (responseCode = "401",
                                  description = "Missing or invalid API token",

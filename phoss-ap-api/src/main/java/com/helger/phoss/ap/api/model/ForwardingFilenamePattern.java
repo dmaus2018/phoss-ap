@@ -38,6 +38,7 @@ import com.helger.collection.commons.ICommonsOrderedSet;
 import com.helger.collection.commons.ICommonsSet;
 import com.helger.config.IConfig;
 import com.helger.io.file.FilenameHelper;
+import com.helger.phoss.ap.api.APFilenameHelper;
 
 /**
  * The configurable name under which a document forwarder stores a forwarded document - the base
@@ -53,8 +54,9 @@ import com.helger.io.file.FilenameHelper;
  * pattern never reaches this class intact.
  * </p>
  * <p>
- * Every placeholder value comes from the received document and is therefore sanitized: everything
- * that is not an ASCII letter, an ASCII digit, '.', '-' or '_' is replaced with '_'. That is
+ * Every placeholder value comes from the received document and is therefore sanitized with
+ * {@link APFilenameHelper#getSanitized(String, boolean)}: everything that is not an ASCII letter, an
+ * ASCII digit, '.', '-' or '_' is replaced with '_'. That is
  * deliberately stricter than {@link FilenameHelper#getAsSecureValidASCIIFilename(String)}, because
  * the path separators must not survive - the resolved name is appended to an upload directory, so a
  * sender provided value like the SBDH Instance Identifier must never be able to point outside of it
@@ -106,36 +108,6 @@ public class ForwardingFilenamePattern
     m_sPattern = sPattern;
     m_bAllowPathSeparator = bAllowPathSeparator;
     m_nMaxLength = nMaxLength;
-  }
-
-  /**
-   * Replace every character that is not safe within a name with an underscore.
-   *
-   * @param sValue
-   *        The value to be sanitized. May be <code>null</code>.
-   * @param bAllowPathSeparator
-   *        <code>true</code> to keep the path separators.
-   * @return The sanitized value. Never <code>null</code> but maybe empty.
-   */
-  @NonNull
-  private static String _getSanitized (@Nullable final String sValue, final boolean bAllowPathSeparator)
-  {
-    if (StringHelper.isEmpty (sValue))
-      return "";
-
-    final StringBuilder ret = new StringBuilder (sValue.length ());
-    for (final char c : sValue.toCharArray ())
-      if ((c >= 'a' && c <= 'z') ||
-          (c >= 'A' && c <= 'Z') ||
-          (c >= '0' && c <= '9') ||
-          c == '.' ||
-          c == '-' ||
-          c == '_' ||
-          (bAllowPathSeparator && c == '/'))
-        ret.append (c);
-      else
-        ret.append ('_');
-    return ret.toString ();
   }
 
   /**
@@ -337,8 +309,8 @@ public class ForwardingFilenamePattern
     // An unknown placeholder is rejected by checkPattern already
     final String sResolved = _resolve (m_sPattern, x -> {
       final EForwardingFilenamePlaceholder ePlaceholder = EForwardingFilenamePlaceholder.getFromIDOrNull (x);
-      return ePlaceholder == null ? "" : _getSanitized (ePlaceholder.getValue (aDocument), false);
-    }, x -> _getSanitized (x, m_bAllowPathSeparator));
+      return ePlaceholder == null ? "" : APFilenameHelper.getSanitized (ePlaceholder.getValue (aDocument), false);
+    }, x -> APFilenameHelper.getSanitized (x, m_bAllowPathSeparator));
     // The leading dots are removed, so that no value can turn the result into a hidden file that a
     // downstream poller never picks up
     String sBaseName = StringHelper.trimStartRepeatedly (sResolved, '.');
@@ -365,7 +337,7 @@ public class ForwardingFilenamePattern
                    "' - using the default layout instead");
       return EForwardingFilenamePlaceholder.DATETIME.getValue (aDocument) +
              "_" +
-             _getSanitized (EForwardingFilenamePlaceholder.INCOMING_ID.getValue (aDocument), false);
+             APFilenameHelper.getSanitized (EForwardingFilenamePlaceholder.INCOMING_ID.getValue (aDocument), false);
     }
 
     return sSecureBaseName;

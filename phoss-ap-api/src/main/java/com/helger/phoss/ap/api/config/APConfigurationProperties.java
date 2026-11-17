@@ -82,6 +82,43 @@ public final class APConfigurationProperties
   public static final String PHASE4_API_REQUIREDTOKEN = "phase4.api.requiredtoken";
   public static final String PHASE4_DUMP_MODE = "phase4.dump.mode";
   public static final String PHASE4_DUMP_MODE_DEFAULT = "direction";
+  /**
+   * The connect timeout for sending an AS4 message. The default equals the phase4 Peppol default.
+   *
+   * @since 0.14.0
+   */
+  public static final String PHASE4_SEND_TIMEOUT_CONNECT = "phase4.send.timeout.connect";
+  /** @since 0.14.0 */
+  public static final Duration PHASE4_SEND_TIMEOUT_CONNECT_DEFAULT = Duration.ofSeconds (10);
+  /**
+   * The response (read) timeout for sending an AS4 message. The default equals the phase4 Peppol
+   * default.
+   *
+   * @since 0.14.0
+   */
+  public static final String PHASE4_SEND_TIMEOUT_RESPONSE = "phase4.send.timeout.response";
+  /** @since 0.14.0 */
+  public static final Duration PHASE4_SEND_TIMEOUT_RESPONSE_DEFAULT = Duration.ofSeconds (120);
+  /**
+   * How often phase4 retries an AS4 message within one sending attempt, before the attempt fails
+   * and the retry scheduler takes over. The default is 0, so that all retries are done by the retry
+   * scheduler, each with a new sending attempt and a new AS4 Message ID.
+   *
+   * @since 0.14.0
+   */
+  public static final String PHASE4_SEND_HTTP_RETRY_MAX_RETRIES = "phase4.send.http-retry.max-retries";
+  /** @since 0.14.0 */
+  public static final int PHASE4_SEND_HTTP_RETRY_MAX_RETRIES_DEFAULT = 0;
+  /**
+   * The wait time before a phase4 retry within one sending attempt. Only used if
+   * {@link #PHASE4_SEND_HTTP_RETRY_MAX_RETRIES} is &gt; 0. The default equals the reception
+   * awareness of the default Peppol PMode.
+   *
+   * @since 0.14.0
+   */
+  public static final String PHASE4_SEND_HTTP_RETRY_INTERVAL = "phase4.send.http-retry.interval";
+  /** @since 0.14.0 */
+  public static final Duration PHASE4_SEND_HTTP_RETRY_INTERVAL_DEFAULT = Duration.ofSeconds (10);
 
   // Connection pooling
   public static final String JDBC_POOLING_MAX_CONNECTIONS = "pooling.max-connections";
@@ -150,6 +187,17 @@ public final class APConfigurationProperties
    * @since 0.10.0
    */
   public static final String FORWARDING_SPI_ID_SUFFIX = "spi.id";
+  /**
+   * If <code>true</code>, a received MLS that could not be correlated with an outbound transaction
+   * - because the referenced outbound transaction is unknown, or because an MLS was already
+   * received for it - is not forwarded by the primary forwarder. The secondary forwarders still
+   * receive it.
+   *
+   * @since 0.14.0
+   */
+  public static final String FORWARDING_MLS_SKIP_UNCORRELATED = "forwarding.mls.skip-uncorrelated";
+  /** @since 0.14.0 */
+  public static final boolean FORWARDING_MLS_SKIP_UNCORRELATED_DEFAULT = false;
 
   // Forwarding - Secondary forwarders (since 0.9.0)
   /**
@@ -304,6 +352,7 @@ public final class APConfigurationProperties
   public static final long RETRY_FORWARDING_MAX_BACKOFF_MS_DEFAULT = 3_600_000L;
 
   // Retry scheduler
+  // Deliberately no "retry.scheduler.enabled" - the retry scheduler must run on every instance
   /** @since 0.9.0 */
   public static final String RETRY_SCHEDULER_INTERVAL = "retry.scheduler.interval";
   /** @since 0.9.0 */
@@ -548,7 +597,16 @@ public final class APConfigurationProperties
   @Deprecated (forRemoval = true, since = "0.9.0")
   public static final long SHUTDOWN_TIMEOUT_MS_DEFAULT = 30_000L;
   public static final String STARTUP_RECOVERY_ENABLED = "startup.recovery.enabled";
-  public static final boolean STARTUP_RECOVERY_ENABLED_DEFAULT = true;
+  /** Changed from <code>true</code> to <code>false</code> in 0.14.0 */
+  public static final boolean STARTUP_RECOVERY_ENABLED_DEFAULT = false;
+  /** @since 0.14.0 */
+  public static final String RECOVERY_GRACE_PERIOD_IN_FLIGHT = "recovery.grace-period.in-flight";
+  /** @since 0.14.0 */
+  public static final Duration RECOVERY_GRACE_PERIOD_IN_FLIGHT_DEFAULT = Duration.ofMinutes (30);
+  /** @since 0.14.0 */
+  public static final String RECOVERY_GRACE_PERIOD_RECEIVED = "recovery.grace-period.received";
+  /** @since 0.14.0 */
+  public static final Duration RECOVERY_GRACE_PERIOD_RECEIVED_DEFAULT = Duration.ofMinutes (10);
 
   private APConfigurationProperties ()
   {}

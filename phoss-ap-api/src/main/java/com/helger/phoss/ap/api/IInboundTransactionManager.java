@@ -188,6 +188,101 @@ public interface IInboundTransactionManager
   ESuccess updateStatus (@NonNull String sID, @NonNull EInboundStatus eStatus);
 
   /**
+   * Atomically claim a transaction returned by {@link #getAllForRetry(int)}: change its status from
+   * {@link EInboundStatus#FORWARD_FAILED} or {@link EInboundStatus#RECOVERING} to
+   * {@link EInboundStatus#FORWARDING}, if it is still in that status and due for a retry.
+   *
+   * @param sID
+   *        The transaction ID. Never <code>null</code>.
+   * @return {@link ESuccess#SUCCESS} if this call claimed the transaction.
+   * @since 0.14.0
+   */
+  @NonNull
+  ESuccess claimForRetry (@NonNull String sID);
+
+  /**
+   * Atomically claim a transaction for a manual replay: change its status from the status it was
+   * read with to {@link EInboundStatus#FORWARDING}, if it is still in that status. Unlike
+   * {@link #claimForRetry(String)} this ignores the next retry date time, but it fails if anybody
+   * else changed the status in the meantime - e.g. the retry scheduler that claimed it first. An
+   * archived transaction can never be claimed.
+   *
+   * @param sID
+   *        The transaction ID. Never <code>null</code>.
+   * @param eExpectedStatus
+   *        The status the transaction was read with. Never <code>null</code>.
+   * @return {@link ESuccess#SUCCESS} if this call claimed the transaction.
+   * @since 0.14.0
+   */
+  @NonNull
+  ESuccess claimForReplay (@NonNull String sID, @NonNull EInboundStatus eExpectedStatus);
+
+  /**
+   * Mark all transactions in {@link EInboundStatus#FORWARDING} as {@link EInboundStatus#RECOVERING},
+   * due for a retry at the provided date time. A transaction that is still being forwarded leaves
+   * that status again with its next regular status update; one that was left behind by an instance
+   * that stopped unexpectedly is forwarded again when it is due.
+   *
+   * @param aRecoveryDueDT
+   *        The date time at which the marked transactions become due for a retry. Never
+   *        <code>null</code>.
+   * @return The number of transactions marked. Always &ge; 0.
+   * @since 0.14.0
+   */
+  @Nonnegative
+  long markAllInFlightAsRecovering (@NonNull OffsetDateTime aRecoveryDueDT);
+
+  /**
+   * Mark all transactions in {@link EInboundStatus#RECEIVED} as
+   * {@link EInboundStatus#RECEIVE_RECOVERING}, due for resuming at the provided date time. A
+   * transaction that is still being processed leaves that status again with its next regular status
+   * update; one that was left behind by an instance that stopped unexpectedly is resumed when it is
+   * due.
+   *
+   * @param aRecoveryDueDT
+   *        The date time at which the marked transactions become due for resuming. Never
+   *        <code>null</code>.
+   * @return The number of transactions marked. Always &ge; 0.
+   * @since 0.14.0
+   */
+  @Nonnegative
+  long markAllReceivedAsRecovering (@NonNull OffsetDateTime aRecoveryDueDT);
+
+  /**
+   * Atomically claim a transaction returned by {@link #getAllForReceiveRecovery(int)}: change its
+   * status from {@link EInboundStatus#RECEIVE_RECOVERING} back to {@link EInboundStatus#RECEIVED},
+   * if it is still in that status and due. Back in {@link EInboundStatus#RECEIVED}, it is marked
+   * again, if the claiming instance stops as well.
+   *
+   * @param sID
+   *        The transaction ID. Never <code>null</code>.
+   * @return {@link ESuccess#SUCCESS} if this call claimed the transaction.
+   * @since 0.14.0
+   */
+  @NonNull
+  ESuccess claimForReceiveRecovery (@NonNull String sID);
+
+  /**
+   * Atomically claim a transaction returned by {@link #getAllForVerificationRetry(int)}: move its
+   * next retry to the lease end, if it is still deferred and due. The status stays unchanged.
+   * <p>
+   * The lease must be longer than the re-verification takes - until the status leaves
+   * {@link EInboundStatus#VERIFICATION_DEFERRED}, an expired lease lets another caller claim the
+   * transaction again. The lease end is compared with the database time, so a clock difference
+   * between application and database shortens or extends it.
+   * </p>
+   *
+   * @param sID
+   *        The transaction ID. Never <code>null</code>.
+   * @param aLeaseEndDT
+   *        Until when no other caller may claim the transaction. Never <code>null</code>.
+   * @return {@link ESuccess#SUCCESS} if this call claimed the transaction.
+   * @since 0.14.0
+   */
+  @NonNull
+  ESuccess claimForVerificationRetry (@NonNull String sID, @NonNull OffsetDateTime aLeaseEndDT);
+
+  /**
    * Update the status after a failed attempt with retry information.
    *
    * @param sID
@@ -282,8 +377,8 @@ public interface IInboundTransactionManager
    *        The transaction ID. Never <code>null</code>.
    * @param eMlsResponseCode
    *        The MLS response code to claim the slot with. Never <code>null</code>.
-   * @return {@link ESuccess#SUCCESS} if the slot was claimed by this call,
-   *         {@link ESuccess#FAILURE} if an MLS response code was already determined.
+   * @return {@link ESuccess#SUCCESS} if the slot was claimed by this call, {@link ESuccess#FAILURE}
+   *         if an MLS response code was already determined.
    * @since 0.13.0
    */
   @NonNull
@@ -325,6 +420,20 @@ public interface IInboundTransactionManager
                                      @Nullable String sVerificationDetails);
 
   /**
+   * Remember the outbound business document transaction that an inbound MLS was correlated with.
+   *
+   * @param sID
+   *        The ID of the inbound MLS transaction. Never <code>null</code>.
+   * @param sCorrelatedOutboundTransactionID
+   *        The ID of the correlated outbound transaction. Never <code>null</code>.
+   * @return {@link ESuccess}
+   * @since 0.14.0
+   */
+  @NonNull
+  ESuccess updateMlsCorrelatedOutboundTransactionID (@NonNull String sID,
+                                                     @NonNull String sCorrelatedOutboundTransactionID);
+
+  /**
    * Update the reporting status for a transaction.
    *
    * @param sID
@@ -343,7 +452,8 @@ public interface IInboundTransactionManager
   ICommonsList <IInboundTransaction> getAllInProcessing ();
 
   /**
-   * Get failed inbound transactions eligible for retry.
+   * Get failed and recovering inbound transactions eligible for retry. They are not locked - claim
+   * each one with {@link #claimForRetry(String)} before processing it.
    *
    * @param nBatchSize
    *        Maximum number of transactions to return. Must be &gt; 0.
@@ -353,7 +463,22 @@ public interface IInboundTransactionManager
   ICommonsList <IInboundTransaction> getAllForRetry (@Nonnegative int nBatchSize);
 
   /**
+   * Get inbound transactions in {@link EInboundStatus#RECEIVE_RECOVERING} whose processing is due for
+   * resuming. They are not locked - claim each one with {@link #claimForReceiveRecovery(String)}
+   * before processing it.
+   *
+   * @param nBatchSize
+   *        Maximum number of transactions to return. Must be &gt; 0.
+   * @return The list of transactions. Never <code>null</code>.
+   * @since 0.14.0
+   */
+  @NonNull
+  ICommonsList <IInboundTransaction> getAllForReceiveRecovery (@Nonnegative int nBatchSize);
+
+  /**
    * Get inbound transactions with a deferred verification that are eligible for re-verification.
+   * They are not locked - claim each one with
+   * {@link #claimForVerificationRetry(String, OffsetDateTime)} before processing it.
    *
    * @param nBatchSize
    *        Maximum number of transactions to return. Must be &gt; 0.
@@ -402,10 +527,14 @@ public interface IInboundTransactionManager
    *
    * @param nBatchSize
    *        Maximum number of transactions to return. Must be &gt; 0.
+   * @param bExcludeMlsPending
+   *        <code>true</code> to exclude forwarded business documents still waiting for their MLS
+   *        (see {@link #getAllForMlsApiTimeout(int, OffsetDateTime)}). Required while the MLS
+   *        watchdog is active, because it doesn't look into the archive.
    * @return The list of transactions. Never <code>null</code>.
    */
   @NonNull
-  ICommonsList <IInboundTransaction> getAllForArchival (@Nonnegative int nBatchSize);
+  ICommonsList <IInboundTransaction> getAllForArchival (@Nonnegative int nBatchSize, boolean bExcludeMlsPending);
 
   /**
    * Get all inbound business document transactions (excluding MLS messages) for which no MLS

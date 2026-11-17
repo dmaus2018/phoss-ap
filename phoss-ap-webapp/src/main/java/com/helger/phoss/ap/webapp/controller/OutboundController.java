@@ -1026,7 +1026,7 @@ public class OutboundController
   @GetMapping ("/in-transmission")
   @Operation (summary = "List outbound transactions in transmission",
               description = "Returns all outbound transactions that are not yet in a final state — includes status pending, " +
-                            "sending, failed (awaiting retry). Excludes rejected, sent, permanently_failed.")
+                            "sending, failed (awaiting retry) and recovering. Excludes rejected, sent, permanently_failed.")
   @ApiResponses ({ @ApiResponse (responseCode = "200", description = "List of outbound transactions"),
                    @ApiResponse (responseCode = "401",
                                  description = "Missing or invalid API token",

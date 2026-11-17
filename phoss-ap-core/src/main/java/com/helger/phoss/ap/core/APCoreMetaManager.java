@@ -16,6 +16,7 @@
  */
 package com.helger.phoss.ap.core;
 
+import java.util.Comparator;
 import java.util.ServiceLoader;
 
 import org.jspecify.annotations.NonNull;
@@ -26,10 +27,7 @@ import org.slf4j.LoggerFactory;
 import com.helger.annotation.style.ReturnsMutableCopy;
 import com.helger.annotation.style.VisibleForTesting;
 import com.helger.base.exception.InitializationException;
-import com.helger.base.string.StringHelper;
 import com.helger.collection.commons.CommonsArrayList;
-import com.helger.collection.commons.CommonsHashMap;
-import com.helger.collection.commons.ICommonsMap;
 import com.helger.collection.commons.ICommonsList;
 import com.helger.collection.commons.ICommonsOrderedSet;
 import com.helger.config.fallback.IConfigWithFallback;
@@ -39,7 +37,6 @@ import com.helger.peppolid.IParticipantIdentifier;
 import com.helger.phoss.ap.api.codelist.EC4CountryCodeMode;
 import com.helger.phoss.ap.api.codelist.EForwardingMode;
 import com.helger.phoss.ap.api.config.APConfigProvider;
-import com.helger.phoss.ap.api.config.APConfigurationProperties;
 import com.helger.phoss.ap.api.mgr.IDocumentForwarder;
 import com.helger.phoss.ap.api.spi.IAPLifecycleEventSPI;
 import com.helger.phoss.ap.api.spi.IAPNotificationHandlerSPI;
@@ -50,6 +47,7 @@ import com.helger.phoss.ap.api.spi.IOutboundDocumentVerifierSPI;
 import com.helger.phoss.ap.api.spi.IPeppolReceiverCheckSPI;
 import com.helger.phoss.ap.basic.APBasicConfig;
 import com.helger.phoss.ap.core.forwarding.DocumentForwarderFactory;
+import com.helger.phoss.ap.core.forwarding.ForwarderConfigSlot;
 import com.helger.phoss.ap.core.notification.LifecycleEventManager;
 import com.helger.phoss.ap.core.reporting.APPeppolReportingHelper;
 import com.helger.phoss.ap.core.notification.NotificationHandlerManager;
@@ -67,6 +65,14 @@ public final class APCoreMetaManager
   public static final int MAX_SECONDARY_FORWARDERS = 10;
   private static final Logger LOGGER = LoggerFactory.getLogger (APCoreMetaManager.class);
 
+  /**
+   * The order in which the document verifiers are invoked: ascending by priority, and by ID for
+   * the same priority. See issue #130.
+   */
+  @VisibleForTesting
+  static final Comparator <IDocumentVerifier> VERIFIER_ORDER = Comparator.comparingInt (IDocumentVerifier::getPriority)
+                                                                         .thenComparing (IDocumentVerifier::getID);
+
   private static EForwardingMode s_eForwardingMode;
   private static IDocumentForwarder s_aForwarder;
   private static final ICommonsList <IDocumentForwarder> s_aSecondaryForwarders = new CommonsArrayList <> ();
@@ -75,13 +81,54 @@ public final class APCoreMetaManager
   private static final ICommonsList <IInboundDocumentVerifierSPI> s_aInboundVerifiers = new CommonsArrayList <> ();
   private static final ICommonsList <IOutboundDocumentVerifierSPI> s_aOutboundVerifiers = new CommonsArrayList <> ();
   private static final ICommonsList <IPeppolReceiverCheckSPI> s_aReceiverChecks = new CommonsArrayList <> ();
+  private static boolean s_bVerifiersInitialized = false;
 
   private APCoreMetaManager ()
   {}
 
   /**
+   * Load all inbound and outbound document verifier SPIs. Called during startup before the
+   * {@link com.helger.phoss.ap.api.codelist.EAPStartupCheckPhase#POST_INIT} startup checks, so that
+   * {@link com.helger.phoss.ap.core.startup.StartupCheckDocumentVerifiers} can check them before
+   * anything else is initialized. The verifiers of each direction are sorted ascending by
+   * {@link IDocumentVerifier#getPriority()} and by ID for the same priority. May only be called
+   * once.
+   *
+   * @since 0.13.3
+   */
+  public static void initVerifierSPIs ()
+  {
+    if (s_bVerifiersInitialized)
+      throw new InitializationException ("The document verifiers were already initialized");
+    s_bVerifiersInitialized = true;
+
+    for (final IInboundDocumentVerifierSPI aVerifier : ServiceLoader.load (IInboundDocumentVerifierSPI.class))
+      s_aInboundVerifiers.add (aVerifier);
+    s_aInboundVerifiers.sort (VERIFIER_ORDER);
+    for (final IInboundDocumentVerifierSPI aVerifier : s_aInboundVerifiers)
+      LOGGER.info ("Loaded inbound document verifier '" +
+                   aVerifier.getID () +
+                   "' with priority " +
+                   aVerifier.getPriority () +
+                   ": " +
+                   aVerifier.getClass ().getName ());
+
+    for (final IOutboundDocumentVerifierSPI aVerifier : ServiceLoader.load (IOutboundDocumentVerifierSPI.class))
+      s_aOutboundVerifiers.add (aVerifier);
+    s_aOutboundVerifiers.sort (VERIFIER_ORDER);
+    for (final IOutboundDocumentVerifierSPI aVerifier : s_aOutboundVerifiers)
+      LOGGER.info ("Loaded outbound document verifier '" +
+                   aVerifier.getID () +
+                   "' with priority " +
+                   aVerifier.getPriority () +
+                   ": " +
+                   aVerifier.getClass ().getName ());
+  }
+
+  /**
    * Initialize the core meta manager by creating the document forwarder from configuration and
-   * loading all SPI-based verifiers, receiver checks, and notification handlers.
+   * loading the SPI-based receiver checks and notification handlers. The document verifiers must
+   * have been loaded via {@link #initVerifierSPIs()} before.
    */
   public static void init ()
   {
@@ -89,17 +136,17 @@ public final class APCoreMetaManager
 
     final IConfigWithFallback aConfig = APConfigProvider.getConfig ();
 
+    // The forwarding modes, the number of secondary forwarders and the SPI provider IDs were
+    // verified by StartupCheckForwarding
+
     // Create primary forwarder based on configuration
     {
-      final String sForwardingMode = aConfig.getAsString (APConfigurationProperties.FORWARDING_MODE);
-      final EForwardingMode eForwardingMode = EForwardingMode.getFromIDOrNull (sForwardingMode);
-      if (eForwardingMode == null)
-        throw new InitializationException ("The configured Forwarding Mode '" + sForwardingMode + "' is invalid");
-
+      final ForwarderConfigSlot aSlot = ForwarderConfigSlot.getPrimary (aConfig);
+      final EForwardingMode eForwardingMode = aSlot.mode ();
       final IDocumentForwarder aForwarder = DocumentForwarderFactory.create (eForwardingMode,
                                                                              aConfig,
-                                                                             IDocumentForwarder.DEFAULT_CONFIG_KEY_PREFIX);
-      if (aForwarder.initFromConfiguration (aConfig, IDocumentForwarder.DEFAULT_CONFIG_KEY_PREFIX).isFailure ())
+                                                                             aSlot.configPrefix ());
+      if (aForwarder.initFromConfiguration (aConfig, aSlot.configPrefix ()).isFailure ())
         throw new InitializationException ("Failed to init forwarder configuration - see logs for details");
 
       s_eForwardingMode = eForwardingMode;
@@ -109,37 +156,20 @@ public final class APCoreMetaManager
 
     // Create secondary forwarders (fire-and-forget, no retry, no SLA) based on configuration
     {
-      for (int nIndex = 1;; nIndex++)
+      int nIndex = 1;
+      for (final ForwarderConfigSlot aSlot : ForwarderConfigSlot.getAllSecondaries (aConfig))
       {
-        final String sSecondaryPrefix = APConfigurationProperties.FORWARDING_SECONDARY_PREFIX + nIndex + ".";
-        final String sSecondaryMode = aConfig.getAsString (sSecondaryPrefix +
-                                                           APConfigurationProperties.FORWARDING_SECONDARY_MODE_SUFFIX);
-        if (sSecondaryMode == null)
-          break;
-
-        final EForwardingMode eSecondaryMode = EForwardingMode.getFromIDOrNull (sSecondaryMode);
-        if (eSecondaryMode == null)
-          throw new InitializationException ("The configured Forwarding Mode for secondary forwarder at index " +
-                                             nIndex +
-                                             " ('" +
-                                             sSecondaryMode +
-                                             "') is invalid");
-
-        if (nIndex > MAX_SECONDARY_FORWARDERS)
-          throw new InitializationException ("No more than " +
-                                             MAX_SECONDARY_FORWARDERS +
-                                             " secondary Forwarders are allowed.");
-
-        final IDocumentForwarder aSecondary = DocumentForwarderFactory.create (eSecondaryMode,
+        final IDocumentForwarder aSecondary = DocumentForwarderFactory.create (aSlot.mode (),
                                                                                aConfig,
-                                                                               sSecondaryPrefix);
-        if (aSecondary.initFromConfiguration (aConfig, sSecondaryPrefix).isFailure ())
+                                                                               aSlot.configPrefix ());
+        if (aSecondary.initFromConfiguration (aConfig, aSlot.configPrefix ()).isFailure ())
           throw new InitializationException ("Failed to init secondary forwarder #" +
                                              nIndex +
                                              " configuration - see logs for details");
 
         s_aSecondaryForwarders.add (aSecondary);
         LOGGER.info ("Loaded secondary document forwarder #" + nIndex + ": " + aSecondary.toString ());
+        nIndex++;
       }
       if (s_aSecondaryForwarders.isEmpty ())
         LOGGER.info ("No secondary document forwarders configured");
@@ -149,28 +179,18 @@ public final class APCoreMetaManager
 
     // Create the sink for the copies of the self-generated MLS documents (fire-and-forget, no
     // retry, no SLA). Disabled by default - stay completely silent in that case.
-    if (aConfig.getAsBoolean (APConfigurationProperties.FORWARDING_MLS_COPY_ENABLED,
-                              APConfigurationProperties.FORWARDING_MLS_COPY_ENABLED_DEFAULT))
+    final ForwarderConfigSlot aMlsCopySlot = ForwarderConfigSlot.getMlsCopy (aConfig);
+    if (aMlsCopySlot != null)
     {
-      // Without an own mode the whole primary forwarder configuration is reused
-      final String sOwnMode = aConfig.getAsString (APConfigurationProperties.FORWARDING_MLS_COPY_MODE);
-      final boolean bOwnConfig = StringHelper.isNotEmpty (sOwnMode);
-      final String sMlsCopyPrefix = bOwnConfig ? APConfigurationProperties.FORWARDING_MLS_COPY_PREFIX
-                                               : IDocumentForwarder.DEFAULT_CONFIG_KEY_PREFIX;
-
-      final EForwardingMode eMlsCopyMode = bOwnConfig ? EForwardingMode.getFromIDOrNull (sOwnMode) : s_eForwardingMode;
-      if (eMlsCopyMode == null)
-        throw new InitializationException ("The configured Forwarding Mode for the MLS copy ('" +
-                                           sOwnMode +
-                                           "') is invalid");
-
-      final IDocumentForwarder aMlsCopy = DocumentForwarderFactory.create (eMlsCopyMode, aConfig, sMlsCopyPrefix);
-      if (aMlsCopy.initFromConfiguration (aConfig, sMlsCopyPrefix).isFailure ())
+      final IDocumentForwarder aMlsCopy = DocumentForwarderFactory.create (aMlsCopySlot.mode (),
+                                                                           aConfig,
+                                                                           aMlsCopySlot.configPrefix ());
+      if (aMlsCopy.initFromConfiguration (aConfig, aMlsCopySlot.configPrefix ()).isFailure ())
         throw new InitializationException ("Failed to init the MLS copy forwarder configuration - see logs for details");
 
       s_aMlsCopyForwarder = aMlsCopy;
       LOGGER.info ("Loaded MLS copy document forwarder" +
-                   (bOwnConfig ? "" : " (reusing the primary forwarder configuration)") +
+                   (aMlsCopySlot.isUsingPrimaryConfig () ? " (reusing the primary forwarder configuration)" : "") +
                    ": " +
                    aMlsCopy.toString ());
     }
@@ -204,42 +224,14 @@ public final class APCoreMetaManager
                      aExcludedPIDs.getAllMapped (IParticipantIdentifier::getURIEncoded));
     }
 
-    for (final IInboundDocumentVerifierSPI aVerifier : ServiceLoader.load (IInboundDocumentVerifierSPI.class))
-    {
-      s_aInboundVerifiers.add (aVerifier);
-      LOGGER.info ("Loaded inbound document verifier '" +
-                   aVerifier.getID () +
-                   "': " +
-                   aVerifier.getClass ().getName ());
-    }
-
-    for (final IOutboundDocumentVerifierSPI aVerifier : ServiceLoader.load (IOutboundDocumentVerifierSPI.class))
-    {
-      s_aOutboundVerifiers.add (aVerifier);
-      LOGGER.info ("Loaded outbound document verifier '" +
-                   aVerifier.getID () +
-                   "': " +
-                   aVerifier.getClass ().getName ());
-    }
-
-    // The IDs must be unique over all verifiers, so that a verifier can be identified by its ID
-    final ICommonsList <IDocumentVerifier> aAllVerifiers = new CommonsArrayList <> ();
-    aAllVerifiers.addAll (s_aInboundVerifiers);
-    aAllVerifiers.addAll (s_aOutboundVerifiers);
-    checkVerifierIDsAreUnique (aAllVerifiers);
-
-    // The IDs of the forwarder providers must be unique as well, because the configuration selects
-    // a provider by its ID
-    final ICommonsList <IDocumentForwarderProviderSPI> aAllProviders = new CommonsArrayList <> ();
+    // The document verifiers were loaded in initVerifierSPIs and their IDs were verified by
+    // StartupCheckDocumentVerifiers. The IDs of the forwarder providers were verified by
+    // StartupCheckForwarding
     for (final IDocumentForwarderProviderSPI aProvider : ServiceLoader.load (IDocumentForwarderProviderSPI.class))
-    {
-      aAllProviders.add (aProvider);
       LOGGER.info ("Loaded document forwarder provider '" +
                    aProvider.getID () +
                    "': " +
                    aProvider.getClass ().getName ());
-    }
-    checkForwarderProviderIDsAreUnique (aAllProviders);
 
     for (final IPeppolReceiverCheckSPI aCheck : ServiceLoader.load (IPeppolReceiverCheckSPI.class))
     {
@@ -251,81 +243,6 @@ public final class APCoreMetaManager
     LifecycleEventManager.initSPI ();
 
     LOGGER.info ("APMetaManager initialized successfully");
-  }
-
-  /**
-   * Ensure that the IDs of all inbound and outbound verifiers are unique. A verifier class that
-   * implements both SPIs is loaded twice - once per SPI - and therefore contributes the same ID
-   * twice, which is not a duplicate.
-   *
-   * @param aAllVerifiers
-   *        All loaded inbound and outbound verifiers. May not be <code>null</code>.
-   * @throws InitializationException
-   *         If two different verifier classes use the same ID.
-   */
-  @VisibleForTesting
-  static void checkVerifierIDsAreUnique (@NonNull final Iterable <? extends IDocumentVerifier> aAllVerifiers)
-  {
-    // Maps the verifier ID to the implementation class that uses it
-    final ICommonsMap <String, Class <?>> aIDToClass = new CommonsHashMap <> ();
-
-    for (final IDocumentVerifier aVerifier : aAllVerifiers)
-    {
-      final String sID = aVerifier.getID ();
-      if (StringHelper.isEmpty (sID))
-        throw new InitializationException ("The document verifier " +
-                                           aVerifier.getClass ().getName () +
-                                           " provides an empty ID");
-
-      final Class <?> aExistingClass = aIDToClass.get (sID);
-      if (aExistingClass == null)
-        aIDToClass.put (sID, aVerifier.getClass ());
-      else
-        if (!aExistingClass.equals (aVerifier.getClass ()))
-        {
-          // The same ID is used by two different implementations
-          throw new InitializationException ("The document verifier ID '" +
-                                             sID +
-                                             "' is used by " +
-                                             aExistingClass.getName () +
-                                             " and by " +
-                                             aVerifier.getClass ().getName () +
-                                             ". Verifier IDs must be unique over all inbound and outbound verifiers.");
-        }
-    }
-  }
-
-  /**
-   * Ensure that the IDs of all document forwarder provider SPIs are unique, because the
-   * configuration property selecting a forwarder refers to exactly one of them.
-   *
-   * @param aAllProviders
-   *        All loaded forwarder providers. May not be <code>null</code>.
-   * @throws InitializationException
-   *         If two providers use the same ID.
-   */
-  @VisibleForTesting
-  static void checkForwarderProviderIDsAreUnique (@NonNull final Iterable <? extends IDocumentForwarderProviderSPI> aAllProviders)
-  {
-    final ICommonsMap <String, Class <?>> aIDToClass = new CommonsHashMap <> ();
-    for (final IDocumentForwarderProviderSPI aProvider : aAllProviders)
-    {
-      final String sID = aProvider.getID ();
-      if (StringHelper.isEmpty (sID))
-        throw new InitializationException ("The document forwarder provider " +
-                                           aProvider.getClass ().getName () +
-                                           " provides an empty ID");
-
-      final Class <?> aExistingClass = aIDToClass.put (sID, aProvider.getClass ());
-      if (aExistingClass != null)
-        throw new InitializationException ("The document forwarder provider ID '" +
-                                           sID +
-                                           "' is used by " +
-                                           aExistingClass.getName () +
-                                           " and by " +
-                                           aProvider.getClass ().getName () +
-                                           ". Forwarder provider IDs must be unique over all providers.");
-    }
   }
 
   /**
@@ -419,7 +336,8 @@ public final class APCoreMetaManager
   }
 
   /**
-   * @return A mutable copy of all registered inbound document verifiers. Never <code>null</code>.
+   * @return A mutable copy of all registered inbound document verifiers, in the order in which they
+   *         are invoked. Never <code>null</code>.
    */
   @NonNull
   @ReturnsMutableCopy
@@ -429,7 +347,8 @@ public final class APCoreMetaManager
   }
 
   /**
-   * @return A mutable copy of all registered outbound document verifiers. Never <code>null</code>.
+   * @return A mutable copy of all registered outbound document verifiers, in the order in which they
+   *         are invoked. Never <code>null</code>.
    */
   @NonNull
   @ReturnsMutableCopy

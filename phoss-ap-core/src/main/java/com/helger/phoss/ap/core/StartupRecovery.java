@@ -41,9 +41,17 @@ public final class StartupRecovery
 
   /**
    * Run the startup recovery process. If startup recovery is disabled via configuration, this
-   * method returns immediately. Otherwise it resets all outbound transactions stuck in
-   * {@code SENDING} status and all inbound transactions stuck in {@code FORWARDING} status so they
-   * become eligible for retry.
+   * method returns immediately. Otherwise it resets all outbound transactions in {@code PENDING},
+   * {@code SENDING} or {@code RECOVERING} status and all inbound transactions in {@code FORWARDING}
+   * or {@code RECOVERING} status so they become eligible for an immediate retry. Inbound
+   * transactions in {@code RECEIVED} or {@code RECEIVE_RECOVERING} status are made due for an
+   * immediate receive recovery.
+   * <p>
+   * This is only safe in a single-instance deployment, because it cannot tell the transactions left
+   * behind by the previous run of this instance from those that another instance is processing right
+   * now. In a multi-instance deployment the retry scheduler marks in-flight transactions as
+   * {@code RECOVERING} instead, and retries them after the recovery grace period.
+   * </p>
    */
   public static void run ()
   {
@@ -59,12 +67,15 @@ public final class StartupRecovery
     final var aOutboundMgr = APJdbcMetaManager.getOutboundTransactionMgr ();
     final var aInboundMgr = APJdbcMetaManager.getInboundTransactionMgr ();
 
-    // Reset outbound 'sending' -> 'failed' with immediate retry
+    // Reset outbound 'pending', 'sending' and 'recovering' -> 'failed' with immediate retry
     final var aSendingTxs = aOutboundMgr.getAllInTransmission ();
     int nOutboundRecovered = 0;
     for (final var aTx : aSendingTxs)
     {
-      if (aTx.getStatus () == EOutboundStatus.SENDING)
+      final EOutboundStatus eStatus = aTx.getStatus ();
+      if (eStatus == EOutboundStatus.PENDING ||
+          eStatus == EOutboundStatus.SENDING ||
+          eStatus == EOutboundStatus.RECOVERING)
       {
         aOutboundMgr.updateStatusAndRetry (aTx.getID (),
                                            EOutboundStatus.FAILED,
@@ -75,12 +86,13 @@ public final class StartupRecovery
       }
     }
 
-    // Reset inbound 'forwarding' -> 'forward_failed' with immediate retry
+    // Reset inbound 'forwarding' and 'recovering' -> 'forward_failed' with immediate retry
     final var aForwardingTxs = aInboundMgr.getAllInProcessing ();
     int nInboundRecovered = 0;
     for (final var aTx : aForwardingTxs)
     {
-      if (aTx.getStatus () == EInboundStatus.FORWARDING)
+      final EInboundStatus eStatus = aTx.getStatus ();
+      if (eStatus == EInboundStatus.FORWARDING || eStatus == EInboundStatus.RECOVERING)
       {
         aInboundMgr.updateStatusAndRetry (aTx.getID (),
                                           EInboundStatus.FORWARD_FAILED,
@@ -89,6 +101,17 @@ public final class StartupRecovery
                                           "Recovered from unclean shutdown");
         nInboundRecovered++;
       }
+      else
+        if (eStatus == EInboundStatus.RECEIVED || eStatus == EInboundStatus.RECEIVE_RECOVERING)
+        {
+          // Not forwarded and maybe not verified - resumed immediately by the first retry
+          // scheduler cycle
+          aInboundMgr.updateStatusAndNextRetry (aTx.getID (),
+                                                EInboundStatus.RECEIVE_RECOVERING,
+                                                aTimestampMgr.getCurrentDateTimeUTC (),
+                                                "Recovered from unclean shutdown");
+          nInboundRecovered++;
+        }
     }
 
     LOGGER.info ("Startup recovery complete: " +

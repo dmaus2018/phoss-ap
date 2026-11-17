@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import com.helger.annotation.Nonempty;
 import com.helger.annotation.Nonnegative;
 import com.helger.base.enforce.ValueEnforcer;
+import com.helger.base.numeric.mutable.MutableBoolean;
 import com.helger.base.state.ESuccess;
 import com.helger.base.tostring.ToStringGenerator;
 import com.helger.collection.commons.ICommonsList;
@@ -61,14 +62,44 @@ public class ArchivalManagerJdbc extends AbstractAPJdbcManager implements IArchi
     m_sTableNamePrefix = sTableNamePrefix;
   }
 
+  // The candidate SELECT holds no lock, so the row is locked here - and only if it is still
+  // eligible for archival, because it may have changed since it was selected
+  private boolean _lockLiveRow (@NonNull final DBExecutor aExecutor,
+                                @NonNull final String sTable,
+                                @NonNull final String sArchivalCondition,
+                                @NonNull final ConstantPreparedStatementDataProvider aParams)
+  {
+    final ICommonsList <DBResultRow> aRows = aExecutor.queryAll ("SELECT id FROM " +
+                                                                 m_sTableNamePrefix +
+                                                                 sTable +
+                                                                 " WHERE id=? AND " +
+                                                                 sArchivalCondition +
+                                                                 " FOR UPDATE SKIP LOCKED",
+                                                                 aParams);
+    return aRows != null && aRows.isNotEmpty ();
+  }
+
   /** {@inheritDoc} */
   @NonNull
   public ESuccess archiveOutboundTransaction (@Nonempty final String sID)
   {
     ValueEnforcer.notEmpty (sID, "ID");
 
+    final ConstantPreparedStatementDataProvider aParams = new ConstantPreparedStatementDataProvider (sID);
+    final String sArchivalCondition = OutboundTransactionManagerJdbc.getArchivalCondition (aParams);
+
     final DBExecutor aExecutor = newExecutor ();
-    return aExecutor.performInTransaction (() -> {
+    final MutableBoolean aArchived = new MutableBoolean (false);
+    final ESuccess eSuccess = aExecutor.performInTransaction (() -> {
+      if (!_lockLiveRow (aExecutor, "outbound_transaction", sArchivalCondition, aParams))
+      {
+        if (LOGGER.isDebugEnabled ())
+          LOGGER.debug ("Outbound transaction '" +
+                        sID +
+                        "' is already archived, no longer eligible for archival or locked by a concurrent transaction - skipping");
+        return;
+      }
+
       // Copy sending attempts first
       aExecutor.insertOrUpdateOrDelete ("INSERT INTO " +
                                         m_sTableNamePrefix +
@@ -96,18 +127,33 @@ public class ArchivalManagerJdbc extends AbstractAPJdbcManager implements IArchi
       aExecutor.insertOrUpdateOrDelete ("DELETE FROM " + m_sTableNamePrefix + "outbound_transaction" + " WHERE id=?",
                                         new ConstantPreparedStatementDataProvider (sID));
 
+      aArchived.set (true);
       LOGGER.info ("Archived outbound transaction '" + sID + "'");
     });
+    return ESuccess.valueOf (eSuccess.isSuccess () && aArchived.booleanValue ());
   }
 
   /** {@inheritDoc} */
   @NonNull
-  public ESuccess archiveInboundTransaction (final String sID)
+  public ESuccess archiveInboundTransaction (final String sID, final boolean bExcludeMlsPending)
   {
     ValueEnforcer.notEmpty (sID, "ID");
 
+    final ConstantPreparedStatementDataProvider aParams = new ConstantPreparedStatementDataProvider (sID);
+    final String sArchivalCondition = InboundTransactionManagerJdbc.getArchivalCondition (bExcludeMlsPending, aParams);
+
     final DBExecutor aExecutor = newExecutor ();
-    return aExecutor.performInTransaction (() -> {
+    final MutableBoolean aArchived = new MutableBoolean (false);
+    final ESuccess eSuccess = aExecutor.performInTransaction (() -> {
+      if (!_lockLiveRow (aExecutor, "inbound_transaction", sArchivalCondition, aParams))
+      {
+        if (LOGGER.isDebugEnabled ())
+          LOGGER.debug ("Inbound transaction '" +
+                        sID +
+                        "' is already archived, no longer eligible for archival or locked by a concurrent transaction - skipping");
+        return;
+      }
+
       // Copy forwarding attempts first
       aExecutor.insertOrUpdateOrDelete ("INSERT INTO " +
                                         m_sTableNamePrefix +
@@ -135,8 +181,10 @@ public class ArchivalManagerJdbc extends AbstractAPJdbcManager implements IArchi
       aExecutor.insertOrUpdateOrDelete ("DELETE FROM " + m_sTableNamePrefix + "inbound_transaction" + " WHERE id=?",
                                         new ConstantPreparedStatementDataProvider (sID));
 
+      aArchived.set (true);
       LOGGER.info ("Archived inbound transaction '" + sID + "'");
     });
+    return ESuccess.valueOf (eSuccess.isSuccess () && aArchived.booleanValue ());
   }
 
   /** {@inheritDoc} */

@@ -29,6 +29,7 @@ import com.helger.annotation.concurrent.Immutable;
 import com.helger.json.IJsonObject;
 import com.helger.json.JsonObject;
 import com.helger.json.serialize.JsonWriterSettings;
+import com.helger.phoss.ap.api.model.IOutboundTransaction;
 
 /**
  * Helper class to construct single-line JSON records adhering strictly to the Elastic Common
@@ -96,6 +97,43 @@ public final class ObservabilityEcsJson
     public Builder peppol (@NonNull final String sKey, final int nValue)
     {
       m_aPeppol.add (sKey, nValue);
+      return this;
+    }
+
+    @NonNull
+    public Builder peppol (@NonNull final String sKey, final long nValue)
+    {
+      m_aPeppol.add (sKey, nValue);
+      return this;
+    }
+
+    @NonNull
+    public Builder outboundTransaction (@NonNull final IOutboundTransaction aTx)
+    {
+      peppol ("sender_id", aTx.getSenderID ());
+      peppol ("receiver_id", aTx.getReceiverID ());
+      peppol ("doc_type_id", aTx.getDocTypeID ());
+      peppol ("process_id", aTx.getProcessID ());
+      if (aTx.getTransactionType () != null)
+        peppol ("transaction_type", aTx.getTransactionType ().getID ());
+      if (aTx.getSourceType () != null)
+        peppol ("source_type", aTx.getSourceType ().getID ());
+      peppol ("document_path", aTx.getDocumentPath ());
+      peppol ("document_size", aTx.getDocumentSize ());
+      peppol ("document_hash", aTx.getDocumentHash ());
+      peppol ("c1_country_code", aTx.getC1CountryCode ());
+      if (aTx.getStatus () != null)
+        peppol ("status", aTx.getStatus ().getID ());
+      if (aTx.getReportingStatus () != null)
+        peppol ("reporting_status", aTx.getReportingStatus ().getID ());
+      peppol ("mls_to", aTx.getMlsTo ());
+      peppol ("sbdh_standard", aTx.getSbdhStandard ());
+      peppol ("sbdh_type_version", aTx.getSbdhTypeVersion ());
+      peppol ("sbdh_type", aTx.getSbdhType ());
+      peppol ("payload_mime_type", aTx.getPayloadMimeType ());
+      peppol ("custom1", aTx.getCustom1 ());
+      peppol ("custom2", aTx.getCustom2 ());
+      peppol ("custom3", aTx.getCustom3 ());
       return this;
     }
 
