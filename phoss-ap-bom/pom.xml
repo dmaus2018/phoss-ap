@@ -109,4 +109,21 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
+
+  <build>
+    <plugins>
+      <!-- Disable inherited cyclonedx-maven-plugin execution (its transitive dependency
+           org.cyclonedx:cyclonedx-core-java:9.0.5 is quarantined by Nexus Firewall) -->
+      <plugin>
+        <groupId>org.cyclonedx</groupId>
+        <artifactId>cyclonedx-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>embed-bom</id>
+            <phase>none</phase>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
