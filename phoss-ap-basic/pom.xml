@@ -39,6 +39,12 @@
     </license>
   </licenses>
 
+  <properties>
+    <!-- Skip Docker/LocalStack integration tests by default during normal builds
+         (can be enabled explicitly via -DskipITs=false) -->
+    <skipITs>true</skipITs>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.helger.commons</groupId>
